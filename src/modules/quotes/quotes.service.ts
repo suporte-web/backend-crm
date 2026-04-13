@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { QuoteStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
@@ -7,7 +7,15 @@ import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 
 @Injectable()
 export class QuotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
+
+  private ensureInternalUser(user: { sub: string; role: string }) {
+    const allowedRoles = ['ADMIN', 'AGENT', 'SALES'];
+
+    if (!allowedRoles.includes(user.role)) {
+      throw new ForbiddenException('You do not have permission to perform this action');
+    }
+  }
 
   async create(clientId: string, dto: CreateQuoteDto) {
     return this.prisma.quote.create({
@@ -48,7 +56,42 @@ export class QuotesService {
     });
   }
 
-  async findOne(id: string) {
+  async findAll(
+    user: { sub: string; role: string },
+    filters: { status?: string; clientId?: string },
+  ) {
+    this.ensureInternalUser(user);
+
+    const where: any = {};
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.clientId) {
+      where.clientId = filters.clientId;
+    }
+
+    return this.prisma.quote.findMany({
+      where,
+      include: {
+        client: {
+          include: {
+            user: true,
+          },
+        },
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+  async findOne(user: { sub: string; role: string }, id: string) {
     const quote = await this.prisma.quote.findUnique({
       where: { id },
       include: {
@@ -61,11 +104,20 @@ export class QuotesService {
       throw new NotFoundException('Quote not found');
     }
 
+    if (user.role === 'CLIENT' && quote.client.userId !== user.sub) {
+      throw new NotFoundException('Quote not found');
+    }
+
     return quote;
   }
 
-  async updateStatus(id: string, dto: UpdateQuoteStatusDto) {
-    await this.findOne(id);
+  async updateStatus(
+    user: { sub: string; role: string },
+    id: string,
+    dto: UpdateQuoteStatusDto,
+  ) {
+    this.ensureInternalUser(user);
+    await this.findOne(user, id);
 
     return this.prisma.quote.update({
       where: { id },
@@ -84,8 +136,13 @@ export class QuotesService {
     });
   }
 
-  async respond(id: string, dto: RespondQuoteDto) {
-    await this.findOne(id);
+  async respond(
+    user: { sub: string; role: string },
+    id: string,
+    dto: RespondQuoteDto,
+  ) {
+    this.ensureInternalUser(user);
+    await this.findOne(user, id);
 
     return this.prisma.quote.update({
       where: { id },

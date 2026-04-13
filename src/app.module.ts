@@ -11,6 +11,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { FaqModule } from './modules/faq/faq.module';
 import { AiModule } from './modules/ai/ai.module';
 
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
