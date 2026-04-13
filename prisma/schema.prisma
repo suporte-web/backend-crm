@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  AGENT
+  SALES
+  CLIENT
+}
+
+enum QuoteStatus {
+  RECEIVED
+  IN_ANALYSIS
+  ANSWERED
+  APPROVED
+  REJECTED
+}
+
+enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  CLOSED
+}
+
+enum ShipmentStatus {
+  RECEIVED
+  PREPARING
+  COLLECTED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  ISSUE
+}
+
+enum MessageSenderType {
+  CLIENT
+  AGENT
+  AI
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          UserRole
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  clientProfile Client?
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  document    String?
+  phone       String?
+  companyName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotes      Quote[]
+}
+
+model Quote {
+  id              String      @id @default(uuid())
+  clientId        String
+  origin          String
+  destination     String
+  serviceType     String
+  weight          Float?
+  volume          Float?
+  quantity        Int?
+  desiredDeadline DateTime?
+  notes           String?
+  price           Decimal?
+  commercialNotes String?
+  status          QuoteStatus @default(RECEIVED)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  history         QuoteHistory[]
+}
+
+model QuoteHistory {
+  id         String      @id @default(uuid())
+  quoteId    String
+  status     QuoteStatus
+  notes      String?
+  createdAt  DateTime    @default(now())
+
+  quote      Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
