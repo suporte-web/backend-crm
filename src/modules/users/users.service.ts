@@ -7,7 +7,7 @@ import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(dto: CreateUserDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -27,14 +27,14 @@ export class UsersService {
         passwordHash,
         role: dto.role,
         clientProfile:
-          dto.role === UserRole.CLIENT
+          dto.role === UserRole.CLIENTE
             ? {
-                create: {
-                  document: dto.document,
-                  phone: dto.phone,
-                  companyName: dto.companyName,
-                },
-              }
+              create: {
+                document: dto.document,
+                phone: dto.phone,
+                companyName: dto.companyName,
+              },
+            }
             : undefined,
       },
       include: {
@@ -62,6 +62,26 @@ export class UsersService {
 
     return user;
   }
+
+  async findInternalUsers() {
+    return this.prisma.user.findMany({
+      where: {
+        role: {
+          in: ['ADMIN', 'GESTAO', 'COMERCIAL'],
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
@@ -93,3 +113,4 @@ export class UsersService {
     return { message: 'User deleted successfully' };
   }
 }
+

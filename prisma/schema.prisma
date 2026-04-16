@@ -8,9 +8,10 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  AGENT
-  SALES
-  CLIENT
+  GESTAO
+  COMERCIAL
+  MARKETING
+  CLIENTE
 }
 
 enum QuoteStatus {
@@ -22,10 +23,10 @@ enum QuoteStatus {
 }
 
 enum TicketStatus {
-  NEW
-  IN_PROGRESS
-  WAITING_CUSTOMER
-  CLOSED
+  NOVO
+  EM_ANDAMENTO
+  AGUARDANDO_CLIENTE
+  FECHADO
 }
 
 enum ShipmentStatus {
@@ -39,8 +40,8 @@ enum ShipmentStatus {
 }
 
 enum MessageSenderType {
-  CLIENT
-  AGENT
+  CLIENTE
+  INTERNO 
   AI
 }
 
@@ -49,7 +50,7 @@ model User {
   name          String
   email         String    @unique
   passwordHash  String
-  role          UserRole
+  role          UserRole  @default(CLIENTE)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -57,16 +58,21 @@ model User {
 }
 
 model Client {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  document    String?
-  phone       String?
-  companyName String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  document        String?
+  phone           String?
+  companyName     String?
+  segment         String?
+  notes           String?
+  status          String? 
+  internalOwnerId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotes      Quote[]
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotes          Quote[]
+  tickets Ticket[]
 }
 
 model Quote {
@@ -91,11 +97,23 @@ model Quote {
 }
 
 model QuoteHistory {
-  id         String      @id @default(uuid())
-  quoteId    String
-  status     QuoteStatus
-  notes      String?
-  createdAt  DateTime    @default(now())
+  id        String      @id @default(uuid())
+  quoteId   String
+  status    QuoteStatus
+  notes     String?
+  createdAt DateTime    @default(now())
 
-  quote      Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  clientId    String
+  subject     String
+  description String
+  status      TicketStatus @default(NEW)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }

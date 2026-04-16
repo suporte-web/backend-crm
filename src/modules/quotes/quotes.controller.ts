@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,14 +19,13 @@ import { RespondQuoteDto } from './dto/respond-quote.dto';
 import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 import { QuotesService } from './quotes.service';
 
-
 @ApiTags('Cotações')
 @Controller('quotes')
 export class QuotesController {
   constructor(
     private readonly quotesService: QuotesService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -80,6 +80,10 @@ export class QuotesController {
     @CurrentUser() user: { sub: string; role: string },
     @Param('id') id: string,
   ) {
+    if (!id) {
+      throw new BadRequestException('Quote id is required');
+    }
+
     return this.quotesService.findOne(user, id);
   }
 
@@ -91,18 +95,25 @@ export class QuotesController {
     @Param('id') id: string,
     @Body() dto: UpdateQuoteStatusDto,
   ) {
+    if (!id) {
+      throw new BadRequestException('Quote id is required');
+    }
+
     return this.quotesService.updateStatus(user, id, dto);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Patch(':id/respond')
-respond(
-  @CurrentUser() user: { sub: string; role: string },
-  @Param('id') id: string,
-  @Body() dto: RespondQuoteDto,
-) {
-  return this.quotesService.respond(user, id, dto);
+  respond(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: RespondQuoteDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Quote id is required');
+    }
 
+    return this.quotesService.respond(user, id, dto);
   }
 }

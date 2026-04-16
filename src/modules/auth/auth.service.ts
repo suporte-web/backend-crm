@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
+import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -14,17 +15,29 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
 
+    console.log('USER:', user);
+    console.log('HASH:', user?.passwordHash);
+
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
+
+    console.log('PASSWORD OK?', isPasswordValid);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = {
+    const payload: {
+      sub: string;
+      email: string;
+      role: UserRole;
+    } = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -46,3 +59,4 @@ export class AuthService {
     return this.usersService.findOne(userId);
   }
 }
+

@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { QuoteStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
@@ -7,13 +12,15 @@ import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 
 @Injectable()
 export class QuotesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
-    const allowedRoles = ['ADMIN', 'AGENT', 'SALES'];
+    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
 
     if (!allowedRoles.includes(user.role)) {
-      throw new ForbiddenException('You do not have permission to perform this action');
+      throw new ForbiddenException(
+        'You do not have permission to perform this action',
+      );
     }
   }
 
@@ -39,7 +46,11 @@ export class QuotesService {
         },
       },
       include: {
-        history: true,
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
   }
@@ -48,7 +59,11 @@ export class QuotesService {
     return this.prisma.quote.findMany({
       where: { clientId },
       include: {
-        history: true,
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -62,10 +77,21 @@ export class QuotesService {
   ) {
     this.ensureInternalUser(user);
 
-    const where: any = {};
+    const where: {
+      status?: QuoteStatus;
+      clientId?: string;
+    } = {};
 
     if (filters.status) {
-      where.status = filters.status;
+      const isValidStatus = Object.values(QuoteStatus).includes(
+        filters.status as QuoteStatus,
+      );
+
+      if (!isValidStatus) {
+        throw new BadRequestException('Invalid quote status');
+      }
+
+      where.status = filters.status as QuoteStatus;
     }
 
     if (filters.clientId) {
@@ -91,11 +117,16 @@ export class QuotesService {
       },
     });
   }
+
   async findOne(user: { sub: string; role: string }, id: string) {
     const quote = await this.prisma.quote.findUnique({
       where: { id },
       include: {
-        history: true,
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
         client: true,
       },
     });
@@ -126,12 +157,16 @@ export class QuotesService {
         history: {
           create: {
             status: dto.status,
-            notes: dto.notes,
+            notes: dto.notes ?? `Status updated to ${dto.status}`,
           },
         },
       },
       include: {
-        history: true,
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
   }
@@ -153,12 +188,16 @@ export class QuotesService {
         history: {
           create: {
             status: QuoteStatus.ANSWERED,
-            notes: 'Commercial response sent',
+            notes: dto.commercialNotes ?? 'Commercial response sent',
           },
         },
       },
       include: {
-        history: true,
+        history: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
   }
