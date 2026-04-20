@@ -41,7 +41,7 @@ enum ShipmentStatus {
 
 enum MessageSenderType {
   CLIENTE
-  INTERNO 
+  INTERNO
   AI
 }
 
@@ -51,6 +51,7 @@ model User {
   email         String    @unique
   passwordHash  String
   role          UserRole  @default(CLIENTE)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -65,14 +66,15 @@ model Client {
   companyName     String?
   segment         String?
   notes           String?
-  status          String? 
+  status          String?
   internalOwnerId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotes          Quote[]
-  tickets Ticket[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotes    Quote[]
+  tickets   Ticket[]
+  trackings Tracking[]
 }
 
 model Quote {
@@ -92,8 +94,8 @@ model Quote {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  history         QuoteHistory[]
+  client  Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  history QuoteHistory[]
 }
 
 model QuoteHistory {
@@ -103,7 +105,7 @@ model QuoteHistory {
   notes     String?
   createdAt DateTime    @default(now())
 
-  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 }
 
 model Ticket {
@@ -111,9 +113,38 @@ model Ticket {
   clientId    String
   subject     String
   description String
-  status      TicketStatus @default(NEW)
+  status      TicketStatus @default(NOVO)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Tracking {
+  id            String         @id @default(uuid())
+  clientId      String
+  code          String         @unique
+  origin        String?
+  destination   String?
+  carrier       String?
+  status        ShipmentStatus @default(RECEIVED)
+  description   String?
+  estimatedDate DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  client  Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  history TrackingHistory[]
+}
+
+model TrackingHistory {
+  id          String         @id @default(uuid())
+  trackingId  String
+  status      ShipmentStatus
+  location    String?
+  description String?
+  createdAt   DateTime       @default(now())
+
+  tracking Tracking @relation(fields: [trackingId], references: [id], onDelete: Cascade)
 }

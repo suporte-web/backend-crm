@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -7,7 +11,7 @@ import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -29,23 +33,60 @@ export class UsersService {
         clientProfile:
           dto.role === UserRole.CLIENTE
             ? {
-              create: {
-                document: dto.document,
-                phone: dto.phone,
-                companyName: dto.companyName,
-              },
-            }
+                create: {
+                  document: dto.document,
+                  phone: dto.phone,
+                  companyName: dto.companyName,
+                },
+              }
             : undefined,
       },
-      include: {
-        clientProfile: true,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: {
+          select: {
+            id: true,
+            document: true,
+            phone: true,
+            companyName: true,
+            segment: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
   }
 
   async findAll() {
     return this.prisma.user.findMany({
-      include: { clientProfile: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: {
+          select: {
+            id: true,
+            document: true,
+            phone: true,
+            companyName: true,
+            segment: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -53,7 +94,27 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { clientProfile: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: {
+          select: {
+            id: true,
+            document: true,
+            phone: true,
+            companyName: true,
+            segment: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -67,7 +128,7 @@ export class UsersService {
     return this.prisma.user.findMany({
       where: {
         role: {
-          in: ['ADMIN', 'GESTAO', 'COMERCIAL'],
+          in: [UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL],
         },
       },
       select: {
@@ -75,13 +136,13 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        isActive: true,
       },
       orderBy: {
         name: 'asc',
       },
     });
   }
-
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
@@ -91,20 +152,86 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    await this.findOne(id);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id },
+      include: { clientProfile: true },
+    });
+
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (dto.email) {
+      const emailInUse = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (emailInUse && emailInUse.id !== id) {
+        throw new BadRequestException('Email already in use');
+      }
+    }
+
+    const shouldManageClientProfile =
+      dto.role === UserRole.CLIENTE ||
+      existingUser.role === UserRole.CLIENTE ||
+      !!existingUser.clientProfile;
 
     return this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name,
         email: dto.email,
+        role: dto.role,
+        isActive: dto.isActive,
+        clientProfile: shouldManageClientProfile
+          ? {
+              upsert: {
+                create: {
+                  document: dto.document,
+                  phone: dto.phone,
+                  companyName: dto.companyName,
+                },
+                update: {
+                  document: dto.document,
+                  phone: dto.phone,
+                  companyName: dto.companyName,
+                },
+              },
+            }
+          : undefined,
       },
-      include: { clientProfile: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: {
+          select: {
+            id: true,
+            document: true,
+            phone: true,
+            companyName: true,
+            segment: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
 
     await this.prisma.user.delete({
       where: { id },
@@ -113,4 +240,3 @@ export class UsersService {
     return { message: 'User deleted successfully' };
   }
 }
-
