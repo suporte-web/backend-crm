@@ -45,6 +45,50 @@ enum MessageSenderType {
   AI
 }
 
+enum ContentType {
+  NOTICIA
+  INFORMACAO
+  VLOG
+}
+
+enum AuditLogCategory {
+  ACCESS
+  AUTH
+  USER
+  CLIENT
+  QUOTE
+  TICKET
+  TRACKING
+  SYSTEM
+}
+
+enum AuditLogLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum AuditLogAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  SESSION_VALIDATED
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  USER_STATUS_CHANGED
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  QUOTE_CREATED
+  QUOTE_STATUS_CHANGED
+  QUOTE_RESPONDED
+  TICKET_CREATED
+  TICKET_STATUS_CHANGED
+  TRACKING_QUERIED
+  TRACKING_UPDATED
+  CUSTOM
+}
+
 model User {
   id            String    @id @default(uuid())
   name          String
@@ -56,6 +100,8 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   clientProfile Client?
+  auditLogs     AuditLog[]
+  authoredPosts PortalContent[]
 }
 
 model Client {
@@ -147,4 +193,49 @@ model TrackingHistory {
   createdAt   DateTime       @default(now())
 
   tracking Tracking @relation(fields: [trackingId], references: [id], onDelete: Cascade)
+}
+
+model PortalContent {
+  id            String      @id @default(uuid())
+  title         String
+  summary       String
+  body          String
+  type          ContentType
+  coverImageUrl String?
+  videoUrl      String?
+  isPublished   Boolean     @default(false)
+  publishedAt   DateTime?
+  authorId      String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([type, isPublished, publishedAt])
+  @@index([authorId, createdAt])
+}
+
+model AuditLog {
+  id         String           @id @default(uuid())
+  category   AuditLogCategory
+  action     AuditLogAction
+  level      AuditLogLevel    @default(INFO)
+  message    String
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  route      String?
+  method     String?
+  targetType String?
+  targetId   String?
+  success    Boolean          @default(true)
+  userId     String?
+  createdAt  DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+  @@index([action, createdAt])
+  @@index([success, createdAt])
 }

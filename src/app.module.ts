@@ -10,6 +10,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { FaqModule } from './modules/faq/faq.module';
 import { AiModule } from './modules/ai/ai.module';
+import { PortalContentModule } from './modules/portal-content/portal-content.module';
 
 
 @Module({
@@ -25,6 +26,7 @@ import { AiModule } from './modules/ai/ai.module';
     MessagesModule,
     FaqModule,
     AiModule,
+    PortalContentModule,
   ],
 })
 export class AppModule {}
