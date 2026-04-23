@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -11,7 +11,8 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { FaqModule } from './modules/faq/faq.module';
 import { AiModule } from './modules/ai/ai.module';
 import { PortalContentModule } from './modules/portal-content/portal-content.module';
-
+import { OpportunitiesModule } from './modules/opportunities/opportunities.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -27,6 +28,8 @@ import { PortalContentModule } from './modules/portal-content/portal-content.mod
     FaqModule,
     AiModule,
     PortalContentModule,
+    OpportunitiesModule,
+    LeadsModule,
   ],
 })
 export class AppModule {}

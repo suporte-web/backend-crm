@@ -7,19 +7,20 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UserRole } from '@prisma/client';
+import { TimelineEventType, UserRole } from '@prisma/client';
+import type { AuthUser } from '../auth/types/auth-user.type';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already in use');
+      throw new BadRequestException('E-mail ja esta em uso.');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -30,6 +31,7 @@ export class UsersService {
         email: dto.email,
         passwordHash,
         role: dto.role,
+        isActive: dto.isActive ?? true,
         clientProfile:
           dto.role === UserRole.CLIENTE
             ? {
@@ -37,6 +39,14 @@ export class UsersService {
                   document: dto.document,
                   phone: dto.phone,
                   companyName: dto.companyName,
+                  timelineEvents: {
+                    create: {
+                      type: TimelineEventType.LEAD_CREATED,
+                      title: 'Lead criado',
+                      description: `Lead inicial criado para ${dto.companyName ?? dto.name}.`,
+                      createdById: actor?.sub,
+                    },
+                  },
                 },
               }
             : undefined,
@@ -167,7 +177,7 @@ export class UsersService {
       });
 
       if (emailInUse && emailInUse.id !== id) {
-        throw new BadRequestException('Email already in use');
+        throw new BadRequestException('E-mail ja esta em uso.');
       }
     }
 

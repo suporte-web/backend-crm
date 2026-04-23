@@ -12,6 +12,30 @@ export class CreateQuoteDto {
   serviceType!: string;
 
   @IsOptional()
+  @IsString()
+  requestType?: string;
+
+  @IsOptional()
+  @IsString()
+  pickupAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  cargoDescription?: string;
+
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   weight?: number;
@@ -25,6 +49,11 @@ export class CreateQuoteDto {
   @Type(() => Number)
   @IsInt()
   quantity?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  merchandiseValue?: number;
 
   @IsOptional()
   @IsString()

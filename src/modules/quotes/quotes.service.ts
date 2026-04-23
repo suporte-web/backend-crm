@@ -31,9 +31,17 @@ export class QuotesService {
         origin: dto.origin,
         destination: dto.destination,
         serviceType: dto.serviceType,
+        requestType: dto.requestType,
+        pickupAddress: dto.pickupAddress,
+        deliveryAddress: dto.deliveryAddress,
+        cargoDescription: dto.cargoDescription,
+        contactName: dto.contactName,
+        contactPhone: dto.contactPhone,
         weight: dto.weight,
         volume: dto.volume,
         quantity: dto.quantity,
+        merchandiseValue:
+          dto.merchandiseValue !== undefined ? dto.merchandiseValue : undefined,
         desiredDeadline: dto.desiredDeadline
           ? new Date(dto.desiredDeadline)
           : null,
@@ -49,6 +57,11 @@ export class QuotesService {
         history: {
           orderBy: {
             createdAt: 'desc',
+          },
+        },
+        client: {
+          include: {
+            user: true,
           },
         },
       },
@@ -127,7 +140,11 @@ export class QuotesService {
             createdAt: 'desc',
           },
         },
-        client: true,
+        client: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
@@ -135,7 +152,7 @@ export class QuotesService {
       throw new NotFoundException('Quote not found');
     }
 
-    if (user.role === 'CLIENT' && quote.client.userId !== user.sub) {
+    if (user.role === 'CLIENTE' && quote.client.userId !== user.sub) {
       throw new NotFoundException('Quote not found');
     }
 

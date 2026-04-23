@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   UseGuards,
   Query,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { CreateTimelineNoteDto } from './dto/create-timeline-note.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 @ApiTags('Clients')
@@ -54,6 +56,13 @@ export class ClientsController {
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Get('dashboard/summary')
+  getDashboardSummary(@CurrentUser() user: AuthUser) {
+    return this.clientsService.getDashboardSummary(user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
   @Get(':id/summary')
   getSummary(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.getSummary(user, id);
@@ -61,9 +70,27 @@ export class ClientsController {
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Get(':id/detail')
+  getDetail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.clientsService.getDetail(user, id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
   @Get(':id/timeline')
   getTimeline(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.getTimeline(user, id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Post(':id/timeline')
+  createTimelineNote(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CreateTimelineNoteDto,
+  ) {
+    return this.clientsService.createTimelineNote(user, id, dto);
   }
 
   @UseGuards(RolesGuard)

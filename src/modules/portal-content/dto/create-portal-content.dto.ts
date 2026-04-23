@@ -15,11 +15,27 @@ export class CreatePortalContentDto {
   type!: ContentType;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
+  campaignName?: string;
+
+  @IsOptional()
+  @IsString()
+  ctaLabel?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  ctaUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  highlight?: boolean;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
   coverImageUrl?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   videoUrl?: string;
 
   @IsOptional()
