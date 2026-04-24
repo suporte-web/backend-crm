@@ -13,6 +13,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { PortalContentModule } from './modules/portal-content/portal-content.module';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     PortalContentModule,
     OpportunitiesModule,
     LeadsModule,
+    DeliveriesModule,
   ],
 })
 export class AppModule {}
