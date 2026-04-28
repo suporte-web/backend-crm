@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -12,6 +13,10 @@ import { OpportunityStage } from '@prisma/client';
 export class CreateOpportunityDto {
   @IsUUID()
   clientId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  quoteId?: string;
 
   @IsString()
   title!: string;
@@ -28,4 +33,12 @@ export class CreateOpportunityDto {
   @IsOptional()
   @IsDateString()
   expectedCloseDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  preContract?: boolean;
+
+  @IsOptional()
+  @IsString()
+  preContractNotes?: string;
 }

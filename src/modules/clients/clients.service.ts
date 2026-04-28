@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditLogAction,
+  AuditLogCategory,
   OpportunityStatus,
   Prisma,
   Quote,
@@ -12,13 +14,17 @@ import {
   TimelineEventType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateTimelineNoteDto } from './dto/create-timeline-note.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
@@ -448,10 +454,11 @@ export class ClientsService {
   async getDashboardSummary(user: AuthUser) {
     this.ensureInternalUser(user);
 
-    const [clients, opportunities] = await Promise.all([
+    const [clients, opportunities, quotes, tickets, users, leads] = await Promise.all([
       this.prisma.client.findMany({
         select: {
           id: true,
+          status: true,
         },
       }),
       this.prisma.opportunity.findMany({
@@ -459,6 +466,29 @@ export class ClientsService {
           stage: true,
           status: true,
           value: true,
+        },
+      }),
+      this.prisma.quote.findMany({
+        select: {
+          status: true,
+          price: true,
+        },
+      }),
+      this.prisma.ticket.findMany({
+        select: {
+          status: true,
+        },
+      }),
+      this.prisma.user.findMany({
+        select: {
+          id: true,
+          isActive: true,
+        },
+      }),
+      this.prisma.lead.findMany({
+        select: {
+          id: true,
+          status: true,
         },
       }),
     ]);
@@ -471,15 +501,35 @@ export class ClientsService {
     );
 
     return {
-      totalLeads: clients.length,
+      totalClients: clients.length,
+      activeClients: clients.filter((client) => client.status === 'ATIVO').length,
+      totalLeads: leads.length,
+      newLeads: leads.filter((lead) => lead.status === 'new').length,
       openOpportunities: openOpportunities.length,
       wonOpportunities: wonOpportunities.length,
+      totalQuotes: quotes.length,
+      openQuotes: quotes.filter((quote) =>
+        ['RECEIVED', 'IN_ANALYSIS'].includes(quote.status),
+      ).length,
+      answeredQuotes: quotes.filter((quote) => quote.status === 'ANSWERED').length,
+      totalTickets: tickets.length,
+      openTickets: tickets.filter(
+        (ticket) => !['FECHADO', 'CANCELADO', 'CLOSED'].includes(ticket.status),
+      ).length,
+      closedTickets: tickets.filter((ticket) =>
+        ['FECHADO', 'CANCELADO', 'CLOSED'].includes(ticket.status),
+      ).length,
+      usersWithAccess: users.filter((item) => item.isActive).length,
       conversionRate:
         opportunities.length === 0
           ? 0
           : Number(((wonOpportunities.length / opportunities.length) * 100).toFixed(1)),
       openValue: openOpportunities.reduce(
         (total, opportunity) => total + this.toNumber(opportunity.value),
+        0,
+      ),
+      answeredQuoteValue: quotes.reduce(
+        (total, quote) => total + this.toNumber(quote.price),
         0,
       ),
       opportunitiesByStage: [
@@ -525,7 +575,7 @@ export class ClientsService {
         : null,
     ].filter(Boolean);
 
-    return this.prisma.$transaction(async (tx) => {
+    const updatedClient = await this.prisma.$transaction(async (tx) => {
       const updatedClient = await tx.client.update({
         where: { id },
         data: {
@@ -561,5 +611,19 @@ export class ClientsService {
 
       return updatedClient;
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.CLIENT_UPDATED,
+      message: `Cliente atualizado: ${existingClient.companyName ?? existingClient.user.name}.`,
+      targetType: 'Client',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        changedFields,
+      },
+    });
+
+    return updatedClient;
   }
 }

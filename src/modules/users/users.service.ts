@@ -7,12 +7,21 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { TimelineEventType, UserRole } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogCategory,
+  TimelineEventType,
+  UserRole,
+} from '@prisma/client';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   async create(dto: CreateUserDto, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
@@ -25,7 +34,7 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         name: dto.name,
         email: dto.email,
@@ -39,6 +48,9 @@ export class UsersService {
                   document: dto.document,
                   phone: dto.phone,
                   companyName: dto.companyName,
+                  segment: dto.segment,
+                  status: dto.status ?? 'PENDENTE',
+                  internalOwnerId: dto.internalOwnerId ?? actor?.sub,
                   timelineEvents: {
                     create: {
                       type: TimelineEventType.LEAD_CREATED,
@@ -68,10 +80,26 @@ export class UsersService {
             status: true,
             createdAt: true,
             updatedAt: true,
+            internalOwnerId: true,
           },
         },
       },
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.USER_CREATED,
+      message: `Usuario criado: ${user.name}.`,
+      targetType: 'User',
+      targetId: user.id,
+      userId: actor?.sub,
+      details: {
+        role: user.role,
+        email: user.email,
+      },
+    });
+
+    return user;
   }
 
   async findAll() {
@@ -92,6 +120,7 @@ export class UsersService {
             companyName: true,
             segment: true,
             status: true,
+            internalOwnerId: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -120,6 +149,7 @@ export class UsersService {
             companyName: true,
             segment: true,
             status: true,
+            internalOwnerId: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -161,7 +191,7 @@ export class UsersService {
     });
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
       include: { clientProfile: true },
@@ -186,7 +216,7 @@ export class UsersService {
       existingUser.role === UserRole.CLIENTE ||
       !!existingUser.clientProfile;
 
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name,
@@ -200,11 +230,17 @@ export class UsersService {
                   document: dto.document,
                   phone: dto.phone,
                   companyName: dto.companyName,
+                  segment: dto.segment,
+                  status: dto.status,
+                  internalOwnerId: dto.internalOwnerId,
                 },
                 update: {
                   document: dto.document,
                   phone: dto.phone,
                   companyName: dto.companyName,
+                  segment: dto.segment,
+                  status: dto.status,
+                  internalOwnerId: dto.internalOwnerId,
                 },
               },
             }
@@ -226,15 +262,31 @@ export class UsersService {
             companyName: true,
             segment: true,
             status: true,
+            internalOwnerId: true,
             createdAt: true,
             updatedAt: true,
           },
         },
       },
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.USER_UPDATED,
+      message: `Usuario atualizado: ${updatedUser.name}.`,
+      targetType: 'User',
+      targetId: updatedUser.id,
+      userId: actor?.sub,
+      details: {
+        role: updatedUser.role,
+        email: updatedUser.email,
+      },
+    });
+
+    return updatedUser;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -245,6 +297,15 @@ export class UsersService {
 
     await this.prisma.user.delete({
       where: { id },
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.USER_DELETED,
+      message: `Usuario removido: ${existingUser.email}.`,
+      targetType: 'User',
+      targetId: id,
+      userId: actor?.sub,
     });
 
     return { message: 'User deleted successfully' };

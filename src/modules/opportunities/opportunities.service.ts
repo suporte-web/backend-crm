@@ -5,19 +5,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditLogAction,
+  AuditLogCategory,
   OpportunityStage,
   OpportunityStatus,
   Prisma,
   TimelineEventType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { UpdateOpportunityStageDto } from './dto/update-opportunity-stage.dto';
 
 @Injectable()
 export class OpportunitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   private ensureInternalUser(user: AuthUser) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
@@ -55,17 +61,34 @@ export class OpportunitiesService {
       throw new NotFoundException('Cliente nao encontrado.');
     }
 
+    if (dto.quoteId) {
+      const quote = await this.prisma.quote.findUnique({
+        where: { id: dto.quoteId },
+        select: {
+          id: true,
+          clientId: true,
+        },
+      });
+
+      if (!quote || quote.clientId !== dto.clientId) {
+        throw new BadRequestException('Cotacao invalida para este cliente.');
+      }
+    }
+
     const stage = dto.stage ?? OpportunityStage.NOVO;
 
-    return this.prisma.$transaction(async (tx) => {
+    const createdOpportunity = await this.prisma.$transaction(async (tx) => {
       const opportunity = await tx.opportunity.create({
         data: {
           clientId: dto.clientId,
+          quoteId: dto.quoteId,
           title: dto.title,
           value:
             dto.value !== undefined ? new Prisma.Decimal(dto.value) : undefined,
           stage,
           status: this.mapStageToStatus(stage),
+          preContract: dto.preContract ?? false,
+          preContractNotes: dto.preContractNotes,
           expectedCloseDate: dto.expectedCloseDate
             ? new Date(dto.expectedCloseDate)
             : null,
@@ -88,6 +111,22 @@ export class OpportunitiesService {
 
       return opportunity;
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.OPPORTUNITY_CREATED,
+      message: `Oportunidade criada: ${dto.title}.`,
+      targetType: 'Opportunity',
+      targetId: createdOpportunity.id,
+      userId: user.sub,
+      details: {
+        clientId: dto.clientId,
+        quoteId: dto.quoteId ?? null,
+        preContract: dto.preContract ?? false,
+      },
+    });
+
+    return createdOpportunity;
   }
 
   async findAll(
@@ -143,6 +182,7 @@ export class OpportunitiesService {
             user: true,
           },
         },
+        quote: true,
       },
       orderBy: {
         updatedAt: 'desc',
@@ -194,7 +234,7 @@ export class OpportunitiesService {
           ? `A oportunidade "${opportunity.title}" foi marcada como perdida.`
           : `A oportunidade "${opportunity.title}" avancou para ${dto.stage}.`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const updatedOpportunity = await this.prisma.$transaction(async (tx) => {
       const updatedOpportunity = await tx.opportunity.update({
         where: { id },
         data: {
@@ -228,5 +268,24 @@ export class OpportunitiesService {
 
       return updatedOpportunity;
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.OPPORTUNITY_STAGE_CHANGED,
+      message: `Etapa da oportunidade alterada para ${dto.stage}.`,
+      targetType: 'Opportunity',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        from: opportunity.stage,
+        to: dto.stage,
+        lostReason:
+          dto.stage === OpportunityStage.PERDIDO
+            ? dto.lostReason?.trim() ?? null
+            : null,
+      },
+    });
+
+    return updatedOpportunity;
   }
 }

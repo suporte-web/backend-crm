@@ -14,6 +14,9 @@ import { PortalContentModule } from './modules/portal-content/portal-content.mod
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { DeliveriesModule } from './modules/deliveries/deliveries.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { DeliveriesModule } from './modules/deliveries/deliveries.module';
     OpportunitiesModule,
     LeadsModule,
     DeliveriesModule,
+    AuditLogsModule,
+    NotificationsModule,
+    SuppliersModule,
   ],
 })
 export class AppModule {}

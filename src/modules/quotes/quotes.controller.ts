@@ -42,7 +42,7 @@ export class QuotesController {
       throw new NotFoundException('Perfil do cliente não encontrado');
     }
 
-    return this.quotesService.create(client.id, dto);
+    return this.quotesService.create(client.id, dto, user);
   }
 
   @ApiBearerAuth()

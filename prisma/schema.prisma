@@ -23,10 +23,50 @@ enum QuoteStatus {
 }
 
 enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  CLOSED
   NOVO
+  ABERTO
   EM_ANDAMENTO
   AGUARDANDO_CLIENTE
+  AGUARDANDO_COMERCIAL
+  AGUARDANDO_GESTAO
+  RESPONDIDO
+  APROVADO_CLIENTE
+  APROVADO_GESTAO
+  AJUSTE_SOLICITADO
+  REPROVADO
   FECHADO
+  CANCELADO
+}
+
+enum TicketType {
+  COTACAO
+  LEAD
+  PRE_NEGOCIACAO
+  APROVACAO_GESTAO
+  AJUSTE_CLIENTE
+  AJUSTE_GESTAO
+  SUPORTE
+  DOCUMENTACAO
+  OPERACIONAL
+}
+
+enum TicketHistoryEventType {
+  CREATED
+  STATUS_CHANGED
+  MESSAGE_SENT
+  INTERNAL_NOTE
+  NOTIFICATION_SENT
+  EMAIL_SENT
+  PRE_PROPOSAL_SENT
+  APPROVAL_SENT
+  APPROVED
+  REJECTED
+  ADJUSTMENT_REQUESTED
+  CLOSED
 }
 
 enum ShipmentStatus {
@@ -87,6 +127,8 @@ enum LeadImportRowStatus {
 }
 
 enum MessageSenderType {
+  CLIENT
+  AGENT
   CLIENTE
   INTERNO
   AI
@@ -131,9 +173,20 @@ enum AuditLogAction {
   QUOTE_RESPONDED
   TICKET_CREATED
   TICKET_STATUS_CHANGED
+  TICKET_RESPONDED
   TRACKING_QUERIED
   TRACKING_UPDATED
+  OPPORTUNITY_CREATED
+  OPPORTUNITY_STAGE_CHANGED
+  SUPPLIER_INVITED
   CUSTOM
+}
+
+enum SupplierInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
 }
 
 model User {
@@ -149,11 +202,17 @@ model User {
   clientProfile             Client?
   auditLogs                 AuditLog[]
   authoredPosts             PortalContent[]
+  supplierInvites           SupplierInvite[]   @relation("SupplierInviteAuthor")
   createdTimelineEvents     TimelineEvent[]     @relation("TimelineEventAuthor")
   createdLeads              Lead[]              @relation("LeadCreatedBy")
   updatedLeads              Lead[]              @relation("LeadUpdatedBy")
   createdLeadTimelineEvents LeadTimelineEvent[] @relation("LeadTimelineEventAuthor")
   leadImportJobs            LeadImportJob[]
+  ticketMessages            TicketMessage[]    @relation("TicketMessageAuthor")
+  assignedTickets           Ticket[]           @relation("TicketAssignedTo")
+  requestedTickets          Ticket[]           @relation("TicketRequester")
+  ticketHistoryEvents       TicketHistory[]    @relation("TicketHistoryActor")
+  notifications             Notification[]
 }
 
 model Client {
@@ -204,6 +263,7 @@ model Lead {
   updatedBy   User?               @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   timeline    LeadTimelineEvent[]
   importRows  LeadImportRowResult[]
+  tickets     Ticket[]
 
   @@index([normalizedEmail])
   @@index([normalizedPhone])
@@ -271,18 +331,24 @@ model LeadImportRowResult {
 model Opportunity {
   id                String            @id @default(uuid())
   clientId          String
+  quoteId           String?
   title             String
   value             Decimal?
   stage             OpportunityStage  @default(NOVO)
   status            OpportunityStatus @default(OPEN)
+  preContract       Boolean           @default(false)
+  preContractNotes  String?
   expectedCloseDate DateTime?
   lostReason        String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quote  Quote?  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  tickets Ticket[]
 
   @@index([clientId, stage])
+  @@index([quoteId])
   @@index([status, createdAt])
 }
 
@@ -316,6 +382,7 @@ model Quote {
   cargoDescription String?
   contactName      String?
   contactPhone     String?
+  contactEmail     String?
   weight           Float?
   volume           Float?
   quantity         Int?
@@ -330,6 +397,8 @@ model Quote {
 
   client  Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   history QuoteHistory[]
+  tickets Ticket[]
+  opportunities Opportunity[]
 }
 
 model QuoteHistory {
@@ -343,15 +412,96 @@ model QuoteHistory {
 }
 
 model Ticket {
-  id          String       @id @default(uuid())
-  clientId    String
-  subject     String
-  description String
-  status      TicketStatus @default(NOVO)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                 String       @id @default(uuid())
+  clientId           String?
+  quoteId            String?
+  leadId             String?
+  opportunityId      String?
+  assignedToId       String?
+  requesterId        String?
+  type               TicketType   @default(SUPORTE)
+  subject            String
+  description        String
+  status             TicketStatus @default(ABERTO)
+  requiresActionRole UserRole?
+  lastInteractionAt  DateTime     @default(now())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client        Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quote         Quote?          @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  lead          Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  opportunity   Opportunity?    @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  assignedTo    User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  requester     User?           @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: SetNull)
+  messages      TicketMessage[]
+  history       TicketHistory[]
+  notifications Notification[]
+
+  @@index([clientId])
+  @@index([quoteId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([assignedToId, status])
+  @@index([type, status])
+  @@index([requiresActionRole, status])
+  @@index([status, createdAt])
+  @@index([lastInteractionAt])
+}
+
+model TicketMessage {
+  id          String            @id @default(uuid())
+  ticketId    String
+  senderType  MessageSenderType @default(INTERNO)
+  message     String
+  isInternal  Boolean           @default(false)
+  attachments Json?
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("TicketMessageAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model TicketHistory {
+  id           String                 @id @default(uuid())
+  ticketId     String
+  eventType    TicketHistoryEventType
+  title        String
+  description  String
+  metadata     Json?
+  internalOnly Boolean                @default(false)
+  createdById  String?
+  createdAt    DateTime               @default(now())
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("TicketHistoryActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  ticketId  String?
+  title     String
+  message   String
+  link      String?
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([ticketId, createdAt])
 }
 
 model Tracking {
@@ -430,4 +580,24 @@ model AuditLog {
   @@index([category, createdAt])
   @@index([action, createdAt])
   @@index([success, createdAt])
+}
+
+model SupplierInvite {
+  id          String               @id @default(uuid())
+  companyName String
+  contactName String?
+  email       String
+  phone       String?
+  token       String               @unique
+  status      SupplierInviteStatus @default(PENDING)
+  notes       String?
+  invitedById String?
+  acceptedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  invitedBy User? @relation("SupplierInviteAuthor", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([email, createdAt])
+  @@index([status, createdAt])
 }

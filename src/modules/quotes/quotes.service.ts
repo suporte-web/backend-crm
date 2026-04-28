@@ -4,15 +4,32 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { QuoteStatus } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogCategory,
+  MessageSenderType,
+  OpportunityStage,
+  QuoteStatus,
+  TicketHistoryEventType,
+  TicketStatus,
+  TicketType,
+  UserRole,
+  TimelineEventType,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { RespondQuoteDto } from './dto/respond-quote.dto';
 import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 
 @Injectable()
 export class QuotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
@@ -24,48 +41,177 @@ export class QuotesService {
     }
   }
 
-  async create(clientId: string, dto: CreateQuoteDto) {
-    return this.prisma.quote.create({
-      data: {
-        clientId,
-        origin: dto.origin,
-        destination: dto.destination,
-        serviceType: dto.serviceType,
-        requestType: dto.requestType,
-        pickupAddress: dto.pickupAddress,
-        deliveryAddress: dto.deliveryAddress,
-        cargoDescription: dto.cargoDescription,
-        contactName: dto.contactName,
-        contactPhone: dto.contactPhone,
-        weight: dto.weight,
-        volume: dto.volume,
-        quantity: dto.quantity,
-        merchandiseValue:
-          dto.merchandiseValue !== undefined ? dto.merchandiseValue : undefined,
-        desiredDeadline: dto.desiredDeadline
-          ? new Date(dto.desiredDeadline)
-          : null,
-        notes: dto.notes,
-        history: {
-          create: {
-            status: QuoteStatus.RECEIVED,
-            notes: 'Quote created by client',
-          },
-        },
-      },
+  async create(clientId: string, dto: CreateQuoteDto, user?: { sub: string }) {
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
       include: {
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        client: {
-          include: {
-            user: true,
-          },
-        },
+        user: true,
       },
     });
+
+    if (!client) {
+      throw new NotFoundException('Cliente nao encontrado.');
+    }
+
+    const shouldCreatePreContract =
+      dto.requestType?.toLowerCase().includes('contrato') ?? false;
+
+    const quote = await this.prisma.$transaction(async (tx) => {
+      const createdQuote = await tx.quote.create({
+        data: {
+          clientId,
+          origin: dto.origin,
+          destination: dto.destination,
+          serviceType: dto.serviceType,
+          requestType: dto.requestType,
+          pickupAddress: dto.pickupAddress,
+          deliveryAddress: dto.deliveryAddress,
+          cargoDescription: dto.cargoDescription,
+          contactName: dto.contactName,
+          contactPhone: dto.contactPhone,
+          contactEmail: dto.contactEmail,
+          weight: dto.weight,
+          volume: dto.volume,
+          quantity: dto.quantity,
+          merchandiseValue:
+            dto.merchandiseValue !== undefined ? dto.merchandiseValue : undefined,
+          desiredDeadline: dto.desiredDeadline
+            ? new Date(dto.desiredDeadline)
+            : null,
+          notes: dto.notes,
+          history: {
+            create: {
+              status: QuoteStatus.RECEIVED,
+              notes: 'Cotacao criada pelo cliente',
+            },
+          },
+        },
+        include: {
+          history: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+          client: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      });
+
+      const opportunity = await tx.opportunity.create({
+        data: {
+          clientId,
+          quoteId: createdQuote.id,
+          title: shouldCreatePreContract
+            ? `Pre-contrato - ${dto.serviceType}`
+            : `Cotacao - ${dto.serviceType}`,
+          value:
+            dto.merchandiseValue !== undefined
+              ? dto.merchandiseValue
+              : undefined,
+          stage: OpportunityStage.NOVO,
+          preContract: shouldCreatePreContract,
+          preContractNotes: shouldCreatePreContract
+            ? 'Pre-contrato criado automaticamente a partir da cotacao do cliente.'
+            : undefined,
+        },
+      });
+
+      await tx.timelineEvent.create({
+        data: {
+          clientId,
+          type: TimelineEventType.OPPORTUNITY_CREATED,
+          title: 'Oportunidade criada pela cotacao',
+          description: `Cotacao ${createdQuote.serviceType} entrou no pipeline comercial.`,
+          createdById: user?.sub,
+          metadata: {
+            quoteId: createdQuote.id,
+            opportunityId: opportunity.id,
+            preContract: shouldCreatePreContract,
+          },
+        },
+      });
+
+      const ticket = await tx.ticket.create({
+        data: {
+          clientId,
+          quoteId: createdQuote.id,
+          opportunityId: opportunity.id,
+          requesterId: user?.sub ?? client.userId,
+          type: TicketType.COTACAO,
+          status: TicketStatus.AGUARDANDO_COMERCIAL,
+          requiresActionRole: UserRole.COMERCIAL,
+          lastInteractionAt: new Date(),
+          subject: `Nova cotacao: ${dto.serviceType}`,
+          description: `Cliente ${client.companyName ?? client.user.name} enviou cotacao de ${dto.origin} para ${dto.destination}.`,
+          messages: {
+            create: {
+              senderType: MessageSenderType.CLIENTE,
+              message:
+                dto.notes?.trim() ||
+                `Cotacao criada para ${dto.serviceType}: ${dto.origin} -> ${dto.destination}.`,
+              createdById: user?.sub,
+            },
+          },
+          history: {
+            create: {
+              eventType: TicketHistoryEventType.CREATED,
+              title: 'Cotacao recebida',
+              description:
+                'Ticket criado automaticamente a partir da cotacao do cliente.',
+              createdById: user?.sub ?? client.userId,
+            },
+          },
+        },
+      });
+
+      await this.notificationsService.notifyUsers(
+        [client.userId],
+        {
+          ticketId: ticket.id,
+          title: 'Sua cotacao foi recebida',
+          message:
+            'Sua cotacao foi enviada com sucesso. Nossa equipe comercial ira analisar e retornara em breve.',
+          actorId: user?.sub ?? client.userId,
+          emailSubject: 'Sua cotacao foi recebida',
+        },
+        tx,
+      );
+
+      await this.notificationsService.notifyRoles(
+        [UserRole.COMERCIAL, UserRole.ADMIN],
+        {
+          ticketId: ticket.id,
+          title: 'Nova cotacao recebida no CRM',
+          message:
+            'Nova cotacao recebida. Acesse o ticket para iniciar o atendimento.',
+          actorId: user?.sub ?? client.userId,
+          emailSubject: 'Nova cotacao recebida no CRM',
+          emailSummary: `${client.companyName ?? client.user.name} - ${dto.serviceType}`,
+        },
+        tx,
+      );
+
+      return createdQuote;
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.QUOTE_CREATED,
+      message: `Cotacao criada para ${client.companyName ?? client.user.name}.`,
+      targetType: 'Quote',
+      targetId: quote.id,
+      userId: user?.sub ?? client.userId,
+      details: {
+        clientId,
+        serviceType: dto.serviceType,
+        requestType: dto.requestType ?? null,
+      },
+    });
+
+    return quote;
   }
 
   async findMine(clientId: string) {
@@ -167,7 +313,7 @@ export class QuotesService {
     this.ensureInternalUser(user);
     await this.findOne(user, id);
 
-    return this.prisma.quote.update({
+    const updatedQuote = await this.prisma.quote.update({
       where: { id },
       data: {
         status: dto.status,
@@ -186,6 +332,21 @@ export class QuotesService {
         },
       },
     });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.QUOTE_STATUS_CHANGED,
+      message: `Status da cotacao alterado para ${dto.status}.`,
+      targetType: 'Quote',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        status: dto.status,
+        notes: dto.notes ?? null,
+      },
+    });
+
+    return updatedQuote;
   }
 
   async respond(
@@ -196,7 +357,7 @@ export class QuotesService {
     this.ensureInternalUser(user);
     await this.findOne(user, id);
 
-    return this.prisma.quote.update({
+    const updatedQuote = await this.prisma.quote.update({
       where: { id },
       data: {
         price: dto.price,
@@ -215,7 +376,85 @@ export class QuotesService {
             createdAt: 'desc',
           },
         },
+        tickets: {
+          include: {
+            client: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    if (updatedQuote.tickets.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const ticket of updatedQuote.tickets) {
+          const updatedTicket = await tx.ticket.update({
+            where: { id: ticket.id },
+            data: {
+              status: TicketStatus.AGUARDANDO_CLIENTE,
+              requiresActionRole: UserRole.CLIENTE,
+              lastInteractionAt: new Date(),
+              messages: {
+                create: {
+                  senderType: MessageSenderType.INTERNO,
+                  message:
+                    dto.commercialNotes ??
+                    `Proposta registrada no valor ${dto.price}.`,
+                  createdById: user.sub,
+                },
+              },
+              history: {
+                create: {
+                  eventType: TicketHistoryEventType.MESSAGE_SENT,
+                  title: 'Proposta enviada ao cliente',
+                  description: 'Resposta comercial registrada na cotacao.',
+                  createdById: user.sub,
+                },
+              },
+            },
+            include: {
+              client: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          });
+
+          await this.notificationsService.notifyUsers(
+            [updatedTicket.client?.userId],
+            {
+              ticketId: updatedTicket.id,
+              title: 'Sua solicitacao foi respondida',
+              message:
+                'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
+              actorId: user.sub,
+              emailSubject: 'Sua solicitacao foi respondida',
+              emailSummary:
+                dto.commercialNotes ??
+                `Proposta registrada no valor ${dto.price}.`,
+            },
+            tx,
+          );
+        }
+      });
+    }
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.QUOTE_RESPONDED,
+      message: 'Proposta comercial enviada para cotacao.',
+      targetType: 'Quote',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        price: dto.price,
+      },
+    });
+
+    return updatedQuote;
   }
 }

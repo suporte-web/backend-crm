@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateQuoteDto {
   @IsString()
@@ -34,6 +34,10 @@ export class CreateQuoteDto {
   @IsOptional()
   @IsString()
   contactPhone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
 
   @IsOptional()
   @Type(() => Number)

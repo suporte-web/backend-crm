@@ -11,10 +11,16 @@ import {
   LeadImportRowStatus,
   LeadTimelineEventType,
   Prisma,
+  MessageSenderType,
+  TicketHistoryEventType,
+  TicketStatus,
+  TicketType,
+  UserRole,
 } from '@prisma/client';
 import { readFile, unlink } from 'fs/promises';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
@@ -60,7 +66,10 @@ type ParsedCsvRow = Record<string, string>;
 
 @Injectable()
 export class LeadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private ensureInternalUser(user: AuthUser) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
@@ -337,8 +346,12 @@ export class LeadsService {
       metadata?: Prisma.InputJsonValue;
       createdById?: string | null;
     },
+    options?: {
+      createTicket?: boolean;
+      ticketActorId?: string | null;
+    },
   ) {
-    return tx.lead.create({
+    const lead = await tx.lead.create({
       data: {
         name: payload.name,
         email: payload.email,
@@ -392,6 +405,60 @@ export class LeadsService {
         },
       },
     });
+
+    if (options?.createTicket) {
+      const ticketDescription = [
+        payload.company ? `Empresa: ${payload.company}.` : null,
+        payload.email ? `E-mail: ${payload.email}.` : null,
+        payload.phone ? `Telefone: ${payload.phone}.` : null,
+        payload.notes ? `Observacoes: ${payload.notes}` : null,
+      ].filter(Boolean).join(' ');
+
+      const ticket = await tx.ticket.create({
+        data: {
+          leadId: lead.id,
+          requesterId: options.ticketActorId ?? payload.createdById ?? null,
+          type: TicketType.LEAD,
+          status: TicketStatus.AGUARDANDO_COMERCIAL,
+          requiresActionRole: UserRole.COMERCIAL,
+          subject: `Novo lead: ${lead.name}`,
+          description:
+            ticketDescription || 'Novo lead recebido e aguardando atendimento comercial.',
+          messages: {
+            create: {
+              senderType: MessageSenderType.INTERNO,
+              message:
+                ticketDescription ||
+                'Novo lead recebido e aguardando atendimento comercial.',
+              createdById: options.ticketActorId ?? payload.createdById ?? null,
+            },
+          },
+          history: {
+            create: {
+              eventType: TicketHistoryEventType.CREATED,
+              title: 'Lead recebido',
+              description: 'Ticket criado automaticamente a partir de um novo lead.',
+              createdById: options.ticketActorId ?? payload.createdById ?? null,
+            },
+          },
+        },
+      });
+
+      await this.notificationsService.notifyRoles(
+        [UserRole.COMERCIAL, UserRole.ADMIN],
+        {
+          ticketId: ticket.id,
+          title: 'Novo lead recebido',
+          message: 'Novo lead recebido. Acesse o ticket para iniciar o atendimento.',
+          actorId: options.ticketActorId ?? payload.createdById ?? null,
+          emailSubject: 'Novo lead recebido no CRM',
+          emailSummary: `${lead.name}${lead.company ? ` - ${lead.company}` : ''}`,
+        },
+        tx,
+      );
+    }
+
+    return lead;
   }
 
   private parseCsv(content: string) {
@@ -634,6 +701,10 @@ export class LeadsService {
           description: 'Lead cadastrado manualmente no CRM.',
           createdById: user.sub,
         },
+        {
+          createTicket: true,
+          ticketActorId: user.sub,
+        },
       ),
     );
   }
@@ -716,6 +787,10 @@ export class LeadsService {
                   fileName: file.originalname,
                   rowNumber: mapped.rowNumber,
                 },
+              },
+              {
+                createTicket: false,
+                ticketActorId: user.sub,
               },
             ),
           );
@@ -1055,6 +1130,10 @@ export class LeadsService {
             sourcePhone: dto.sourcePhone ?? null,
             messageText: dto.notes ?? null,
           },
+        },
+        {
+          createTicket: true,
+          ticketActorId: null,
         },
       ),
     );
