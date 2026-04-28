@@ -17,6 +17,7 @@ import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PropostasModule } from './modules/propostas/propostas.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     AuditLogsModule,
     NotificationsModule,
     SuppliersModule,
+    PropostasModule,
   ],
 })
 export class AppModule {}
