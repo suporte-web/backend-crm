@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { join } from 'path';
+import { extname, join } from 'path';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
@@ -24,6 +25,9 @@ import { ManagementPropostaDecisionDto } from './dto/management-proposta-decisio
 import { UpdatePropostaDto } from './dto/update-proposta.dto';
 import { PropostasService } from './propostas.service';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { diskStorage } = require('multer');
+
 type UploadedPropostaFile = {
   filename: string;
   originalname: string;
@@ -31,8 +35,87 @@ type UploadedPropostaFile = {
   size: number;
 };
 
+function resolvePropostaFileExtension(file: {
+  originalname: string;
+  mimetype: string;
+}) {
+  const extension = extname(file.originalname).toLowerCase();
+
+  if (extension) {
+    return extension;
+  }
+
+  const extensionByMimeType: Record<string, string> = {
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      '.xlsx',
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+  };
+
+  return extensionByMimeType[file.mimetype] ?? '';
+}
+
 const propostaFileInterceptor = FileInterceptor('arquivo', {
-  dest: join(process.cwd(), 'uploads', 'propostas'),
+  storage: diskStorage({
+    destination: join(process.cwd(), 'uploads', 'propostas'),
+    filename: (
+      _req: unknown,
+      file: { fieldname: string; originalname: string; mimetype: string },
+      callback: (error: Error | null, fileName: string) => void,
+    ) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      callback(
+        null,
+        `${file.fieldname}-${uniqueSuffix}${resolvePropostaFileExtension(file)}`,
+      );
+    },
+  }),
+  fileFilter: (
+    _req: unknown,
+    file: { mimetype: string; originalname: string },
+    callback: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
+    const extension = extname(file.originalname).toLowerCase();
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+    ];
+    const allowedExtensions = [
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.jpg',
+      '.jpeg',
+      '.png',
+    ];
+
+    if (
+      !allowedMimeTypes.includes(file.mimetype) &&
+      !allowedExtensions.includes(extension)
+    ) {
+      callback(
+        new BadRequestException(
+          'Envie um arquivo de proposta em PDF, documento, planilha ou imagem.',
+        ),
+        false,
+      );
+      return;
+    }
+
+    callback(null, true);
+  },
   limits: {
     fileSize: 10 * 1024 * 1024,
   },

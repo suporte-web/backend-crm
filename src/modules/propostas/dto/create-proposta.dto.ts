@@ -1,6 +1,6 @@
 import {
   IsDateString,
-  IsInt,
+  IsDefined,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -28,10 +28,11 @@ export class CreatePropostaDto {
   @IsString()
   destino?: string;
 
-  @IsOptional()
+  @IsDefined()
   @Type(() => Number)
   @IsNumber()
-  valor?: number;
+  @IsPositive()
+  valor!: number;
 
   @IsOptional()
   @IsString()
@@ -46,10 +47,8 @@ export class CreatePropostaDto {
   observacoes?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @IsPositive()
-  validadeDias?: number;
+  @IsString()
+  validadeDias?: string;
 
   @IsOptional()
   @IsDateString()

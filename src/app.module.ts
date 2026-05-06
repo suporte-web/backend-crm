@@ -19,6 +19,7 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PropostasModule } from './modules/propostas/propostas.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { EntradasModule } from './modules/entradas/entradas.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ChatsModule } from './modules/chats/chats.module';
     SuppliersModule,
     PropostasModule,
     ChatsModule,
+    EntradasModule,
   ],
 })
 export class AppModule {}

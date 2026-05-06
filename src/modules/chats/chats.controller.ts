@@ -40,6 +40,11 @@ export class ChatsController {
     return this.chatsService.findMessages(user, chatId);
   }
 
+  @Patch(':chatId/read')
+  markRead(@CurrentUser() user: AuthUser, @Param('chatId') chatId: string) {
+    return this.chatsService.markRead(user, chatId);
+  }
+
   @Post(':chatId/messages')
   sendMessage(
     @CurrentUser() user: AuthUser,

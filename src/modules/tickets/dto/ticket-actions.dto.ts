@@ -3,7 +3,6 @@ import {
   IsBoolean,
   IsDateString,
   IsIn,
-  IsInt,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -49,10 +48,8 @@ export class SendPreProposalDto {
   observacoes?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @IsPositive()
-  validadeDias?: number;
+  @IsString()
+  validadeDias?: string;
 
   @IsOptional()
   @IsDateString()

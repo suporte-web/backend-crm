@@ -35,7 +35,7 @@ export class ClientsService {
   ) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
-    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
+    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
@@ -298,7 +298,7 @@ export class ClientsService {
     const internalUsers = await this.prisma.user.findMany({
       where: {
         role: {
-          in: ['ADMIN', 'GESTAO', 'COMERCIAL'],
+          in: ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'],
         },
       },
       select: {
@@ -884,7 +884,7 @@ export class ClientsService {
     requestId: string,
     dto: DecideClientDeletionDto,
   ) {
-    this.ensureManagementUser(user);
+    this.ensureManagementUser(user); 
 
     const request = await this.prisma.clientDeletionRequest.findUnique({
       where: { id: requestId },

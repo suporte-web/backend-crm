@@ -101,6 +101,32 @@ model Lead {
   @@index([status, createdAt])
 }
 
+model Prospect {
+  id                 String                     @id @default(uuid())
+  nomeRazaoSocial    String
+  nomeContato        String?
+  email              String?
+  telefone           String?
+  document           String?
+  cidade             String?
+  estado             String?
+  origem             EntradaOrigem             @default(SITE)
+  statusCadastral    ProspectStatusCadastral   @default(PROSPECT)
+  portalAccessStatus ProspectPortalAccessStatus @default(SEM_ACESSO)
+  createdFromTicketId String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  createdFromTicket  Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
+  tickets            Ticket[]                   @relation("TicketProspect")
+  quotes             Quote[]
+
+  @@index([email])
+  @@index([telefone])
+  @@index([document])
+  @@index([statusCadastral, createdAt])
+  @@index([origem, createdAt])
+}
+
 model LeadTimelineEvent {
   id          String                @id @default(uuid())
   leadId      String
@@ -199,14 +225,15 @@ model TimelineEvent {
 model Quote {
   id               String         @id @default(uuid())
   code             String         @unique
-  clientId         String
+  clientId         String?
+  prospectId       String?
   origin           String
   destination      String
   serviceType      String
   weight           Float?
   volume           Float?
   quantity         Int?
-  desiredDeadline  DateTime?
+  desiredDeadline  String?
   notes            String?
   price            Decimal?
   commercialNotes  String?
@@ -223,10 +250,13 @@ model Quote {
   contactEmail     String?
   opportunities    Opportunity[]
   propostas        Proposta[]
-  client           Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect         Prospect?      @relation(fields: [prospectId], references: [id])
   history          QuoteHistory[]
   tickets          Ticket[]
   chats            Chat[]
+
+  @@index([prospectId])
 }
 
 model QuoteHistory {
@@ -240,10 +270,20 @@ model QuoteHistory {
 
 model Ticket {
   id                 String          @id @default(uuid())
+  protocolo          String?         @unique
   clientId           String?
+  prospectId         String?
   subject            String
   description        String
   status             TicketStatus    @default(ABERTO)
+  origem             EntradaOrigem?
+  prioridade         TicketPriority   @default(NORMAL)
+  nomeSolicitante    String?
+  emailSolicitante   String?
+  telefoneSolicitante String?
+  mensagem           String?
+  formPayload        Json?
+  closedAt           DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   quoteId            String?
@@ -260,15 +300,18 @@ model Ticket {
   propostas          Proposta[]
   assignedTo         User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
   client             Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect           Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
   lead               Lead?           @relation(fields: [leadId], references: [id])
   opportunity        Opportunity?    @relation(fields: [opportunityId], references: [id])
   quote              Quote?          @relation(fields: [quoteId], references: [id])
   requester          User?           @relation("TicketRequester", fields: [requesterId], references: [id])
+  createdProspects   Prospect[]      @relation("ProspectCreatedFromTicket")
   history            TicketHistory[]
   messages           TicketMessage[]
   chats              Chat[]
 
   @@index([clientId])
+  @@index([prospectId])
   @@index([quoteId])
   @@index([leadId])
   @@index([opportunityId])
@@ -278,6 +321,8 @@ model Ticket {
   @@index([internalOnly, status])
   @@index([status, createdAt])
   @@index([lastInteractionAt])
+  @@index([origem, createdAt])
+  @@index([protocolo])
 }
 
 model TicketMessage {
@@ -356,7 +401,7 @@ model Proposta {
   arquivoUrl                    String?
   arquivoMimeType               String?
   arquivoTamanho                Int?
-  validadeDias                  Int?
+  validadeDias                  String?
   validaAte                     DateTime?
   versao                        Int            @default(1)
   enviadaEm                     DateTime?
@@ -453,6 +498,7 @@ model ChatParticipant {
   userId    String
   canRead   Boolean  @default(true)
   canWrite  Boolean  @default(true)
+  lastReadAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
@@ -644,6 +690,11 @@ enum TicketStatus {
   AJUSTE_SOLICITADO
   REPROVADO
   CANCELADO
+  CONVERTIDO_EM_PROSPECT
+  COTACAO_CRIADA
+  FINALIZADO
+  PERDIDO
+  TRANSFERIDO
 }
 
 enum TicketType {
@@ -656,6 +707,42 @@ enum TicketType {
   SUPORTE
   DOCUMENTACAO
   OPERACIONAL
+  FORNECEDOR
+  AGREGADO
+  FINANCEIRO
+  FISCAL
+  JURIDICO
+  MARKETING
+  FROTA
+}
+
+enum EntradaOrigem {
+  SITE
+  PORTAL
+  MANUAL
+}
+
+enum TicketPriority {
+  BAIXA
+  NORMAL
+  ALTA
+  URGENTE
+}
+
+enum ProspectStatusCadastral {
+  PROSPECT
+  AGUARDANDO_CADASTRO
+  EM_VALIDACAO
+  ATIVO
+  REPROVADO
+  INATIVO
+}
+
+enum ProspectPortalAccessStatus {
+  SEM_ACESSO
+  CONVITE_ENVIADO
+  ATIVO
+  BLOQUEADO
 }
 
 enum TicketHistoryEventType {

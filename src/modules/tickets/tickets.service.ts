@@ -83,6 +83,32 @@ export class TicketsService {
     return trimmed || null;
   }
 
+  private toPositiveDecimal(
+    value: number | Prisma.Decimal | null | undefined,
+  ) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const decimal = new Prisma.Decimal(value);
+
+    return decimal.gt(0) ? decimal : null;
+  }
+
+  private assertPositiveProposalValue(
+    value: number | Prisma.Decimal | null | undefined,
+  ) {
+    const decimal = this.toPositiveDecimal(value);
+
+    if (!decimal) {
+      throw new BadRequestException(
+        'Informe um valor maior que zero para a proposta.',
+      );
+    }
+
+    return decimal;
+  }
+
   private generateDisplayCode(prefix: 'PROP', source: string) {
     let hash = 0;
 
@@ -123,6 +149,9 @@ export class TicketsService {
       TicketStatus.AJUSTE_SOLICITADO,
       TicketStatus.EM_ANDAMENTO,
       TicketStatus.IN_PROGRESS,
+      TicketStatus.CONVERTIDO_EM_PROSPECT,
+      TicketStatus.COTACAO_CRIADA,
+      TicketStatus.TRANSFERIDO,
     ];
 
     if (newStatuses.includes(status)) {
@@ -156,6 +185,7 @@ export class TicketsService {
         },
       },
       quote: true,
+      prospect: true,
       lead: true,
       opportunity: true,
       assignedTo: {
@@ -271,6 +301,18 @@ export class TicketsService {
             is: { user: { email: { contains: query, mode: 'insensitive' } } },
           },
         },
+        {
+          prospect: {
+            is: {
+              nomeRazaoSocial: { contains: query, mode: 'insensitive' },
+            },
+          },
+        },
+        {
+          prospect: {
+            is: { email: { contains: query, mode: 'insensitive' } },
+          },
+        },
         { quote: { is: { code: { contains: query, mode: 'insensitive' } } } },
         {
           quote: {
@@ -345,6 +387,9 @@ export class TicketsService {
                 TicketStatus.RESPONDIDO,
                 TicketStatus.APROVADO_CLIENTE,
                 TicketStatus.AJUSTE_SOLICITADO,
+                TicketStatus.CONVERTIDO_EM_PROSPECT,
+                TicketStatus.COTACAO_CRIADA,
+                TicketStatus.TRANSFERIDO,
               ],
             },
           },
@@ -1033,6 +1078,12 @@ export class TicketsService {
       throw new BadRequestException('Informe a pre-proposta ou pre-contrato.');
     }
 
+    if (ticket.prospectId && !ticket.clientId) {
+      throw new BadRequestException(
+        'Prospect precisa virar cliente ativo antes de contrato ou pre-contrato.',
+      );
+    }
+
     const opportunityId = dto.opportunityId ?? ticket.opportunityId;
     const now = new Date();
     const preContractNotes = this.sanitize(dto.preContractNotes) ?? message;
@@ -1040,27 +1091,38 @@ export class TicketsService {
       dto.valor !== undefined ? new Prisma.Decimal(dto.valor) : undefined;
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
+      const latestProposta = await tx.proposta.findFirst({
+        where: { ticketId: id },
+        orderBy: [
+          {
+            versao: 'desc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+      });
+      const finalNegotiatedValue = this.assertPositiveProposalValue(
+        negotiatedValue ?? latestProposta?.valor ?? ticket.quote?.price,
+      );
+
       if (opportunityId) {
         await tx.opportunity.update({
           where: { id: opportunityId },
           data: {
             preContract: true,
             preContractNotes,
-            ...(negotiatedValue !== undefined
-              ? {
-                  value: negotiatedValue,
-                  stage: OpportunityStage.PROPOSTA,
-                }
-              : {}),
+            value: finalNegotiatedValue,
+            stage: OpportunityStage.PROPOSTA,
           },
         });
       }
 
-      if (ticket.quoteId && negotiatedValue !== undefined) {
+      if (ticket.quoteId) {
         await tx.quote.update({
           where: { id: ticket.quoteId },
           data: {
-            price: negotiatedValue,
+            price: finalNegotiatedValue,
             commercialNotes: preContractNotes,
             status: QuoteStatus.ANSWERED,
             history: {
@@ -1073,17 +1135,6 @@ export class TicketsService {
         });
       }
 
-      const latestProposta = await tx.proposta.findFirst({
-        where: { ticketId: id },
-        orderBy: [
-          {
-            versao: 'desc',
-          },
-          {
-            createdAt: 'desc',
-          },
-        ],
-      });
       const reusableStatuses: StatusProposta[] = [
         StatusProposta.RASCUNHO,
         StatusProposta.ENVIADA_AO_CLIENTE,
@@ -1128,9 +1179,7 @@ export class TicketsService {
         propostaBaseData.destino = ticket.quote.destination;
       }
 
-      if (dto.valor !== undefined) {
-        propostaBaseData.valor = dto.valor;
-      }
+      propostaBaseData.valor = finalNegotiatedValue;
       if (dto.condicoesPagamento !== undefined) {
         propostaBaseData.condicoesPagamento = this.sanitize(
           dto.condicoesPagamento,
@@ -1145,7 +1194,7 @@ export class TicketsService {
         propostaBaseData.observacoes = this.sanitize(dto.observacoes);
       }
       if (dto.validadeDias !== undefined) {
-        propostaBaseData.validadeDias = dto.validadeDias;
+        propostaBaseData.validadeDias = this.sanitize(dto.validadeDias);
       }
       if (dto.validaAte !== undefined) {
         propostaBaseData.validaAte = dto.validaAte
@@ -1222,10 +1271,7 @@ export class TicketsService {
                 propostaCode,
                 opportunityId: opportunityId ?? null,
                 quoteId: ticket.quoteId ?? null,
-                valorNegociado:
-                  negotiatedValue !== undefined
-                    ? negotiatedValue.toString()
-                    : null,
+                valorNegociado: finalNegotiatedValue.toString(),
               },
             },
           },

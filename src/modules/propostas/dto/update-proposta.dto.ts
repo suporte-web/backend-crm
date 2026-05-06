@@ -1,6 +1,5 @@
 import {
   IsDateString,
-  IsInt,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -32,6 +31,7 @@ export class UpdatePropostaDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @IsPositive()
   valor?: number;
 
   @IsOptional()
@@ -47,10 +47,8 @@ export class UpdatePropostaDto {
   observacoes?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @IsPositive()
-  validadeDias?: number;
+  @IsString()
+  validadeDias?: string;
 
   @IsOptional()
   @IsDateString()

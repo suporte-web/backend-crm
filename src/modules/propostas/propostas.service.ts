@@ -121,6 +121,36 @@ export class PropostasService {
     return trimmed || null;
   }
 
+  private toPositiveDecimal(
+    value: number | Prisma.Decimal | null | undefined,
+  ) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const decimal = new Prisma.Decimal(value);
+
+    if (decimal.lte(0)) {
+      return null;
+    }
+
+    return decimal;
+  }
+
+  private assertPositiveProposalValue(
+    value: number | Prisma.Decimal | null | undefined,
+  ) {
+    const decimal = this.toPositiveDecimal(value);
+
+    if (!decimal) {
+      throw new BadRequestException(
+        'Informe um valor maior que zero para a proposta.',
+      );
+    }
+
+    return decimal;
+  }
+
   private async syncNegotiatedValue(
     tx: Prisma.TransactionClient,
     input: {
@@ -357,7 +387,7 @@ export class PropostasService {
       data.destino = this.sanitize(dto.destino);
     }
     if (dto.valor !== undefined) {
-      data.valor = dto.valor;
+      data.valor = this.assertPositiveProposalValue(dto.valor);
     }
     if (dto.condicoesPagamento !== undefined) {
       data.condicoesPagamento = this.sanitize(dto.condicoesPagamento);
@@ -369,7 +399,7 @@ export class PropostasService {
       data.observacoes = this.sanitize(dto.observacoes);
     }
     if (dto.validadeDias !== undefined) {
-      data.validadeDias = dto.validadeDias;
+      data.validadeDias = this.sanitize(dto.validadeDias);
     }
     if (dto.validaAte !== undefined) {
       data.validaAte = dto.validaAte ? new Date(dto.validaAte) : null;
@@ -408,6 +438,14 @@ export class PropostasService {
   ) {
     this.ensureInternalUser(user);
     const ticket = await this.getTicketOrThrow(ticketId, user);
+
+    if (ticket.prospectId && !ticket.clientId) {
+      throw new BadRequestException(
+        'Prospect precisa virar cliente ativo antes de criar proposta ou contrato.',
+      );
+    }
+
+    this.assertPositiveProposalValue(dto.valor);
     const data: Prisma.PropostaUncheckedUpdateInput = {
       ...this.buildPropostaData(dto),
       ...this.buildArquivoData(arquivo),
@@ -515,6 +553,10 @@ export class PropostasService {
       );
     }
 
+    this.assertPositiveProposalValue(
+      dto.valor !== undefined ? dto.valor : proposta.valor,
+    );
+
     const data: Prisma.PropostaUncheckedUpdateInput = {
       ...this.buildPropostaData(dto),
       ...this.buildArquivoData(arquivo),
@@ -588,6 +630,10 @@ export class PropostasService {
         'Esta proposta nao pode ser enviada ao cliente no status atual.',
       );
     }
+
+    this.assertPositiveProposalValue(
+      dto.valor !== undefined ? dto.valor : proposta.valor,
+    );
 
     const now = new Date();
     const link = `/tickets?ticket=${ticketId}`;
@@ -795,6 +841,8 @@ export class PropostasService {
         'A proposta precisa estar aprovada pelo cliente para seguir para a Gestao.',
       );
     }
+
+    this.assertPositiveProposalValue(proposta.valor);
 
     const managementRecipients = await this.getManagementRecipients();
     const now = new Date();

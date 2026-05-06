@@ -62,6 +62,7 @@ export class ChatsService {
     UserRole.ADMIN,
     UserRole.GESTAO,
     UserRole.COMERCIAL,
+    UserRole.MARKETING,
   ]);
 
   constructor(
@@ -181,6 +182,45 @@ export class ChatsService {
           userId: participant.userId,
           canRead: participant.canRead ?? true,
           canWrite: participant.canWrite ?? true,
+        },
+      });
+    }
+  }
+
+  private async touchChatAfterMessage(
+    tx: PrismaClientLike,
+    chatId: string,
+    authorId: string,
+    messageCreatedAt: Date,
+  ) {
+    const client = tx as PrismaClientLike & {
+      chat?: {
+        update?: (args: Prisma.ChatUpdateArgs) => Promise<unknown>;
+      };
+      chatParticipant?: {
+        updateMany?: (
+          args: Prisma.ChatParticipantUpdateManyArgs,
+        ) => Promise<unknown>;
+      };
+    };
+
+    if (client.chat?.update) {
+      await client.chat.update({
+        where: { id: chatId },
+        data: {
+          updatedAt: messageCreatedAt,
+        },
+      });
+    }
+
+    if (client.chatParticipant?.updateMany) {
+      await client.chatParticipant.updateMany({
+        where: {
+          chatId,
+          userId: authorId,
+        },
+        data: {
+          lastReadAt: messageCreatedAt,
         },
       });
     }
@@ -399,14 +439,17 @@ export class ChatsService {
     if (entityType === ChatEntityType.COTACAO) {
       const quote = await tx.quote.findUnique({
         where: { id: entityId },
-        include: { client: { include: { user: true } } },
+        include: { client: { include: { user: true } }, prospect: true },
       });
 
       if (!quote) {
         throw new NotFoundException('Cotacao nao encontrada.');
       }
 
-      if (user.role === UserRole.CLIENTE && quote.client.userId !== user.sub) {
+      if (
+        user.role === UserRole.CLIENTE &&
+        (!quote.client?.userId || quote.client.userId !== user.sub)
+      ) {
         throw new NotFoundException('Cotacao nao encontrada.');
       }
 
@@ -422,10 +465,12 @@ export class ChatsService {
         quoteId: quote.id,
         clientId: quote.clientId,
         title: title ?? quote.code,
-        defaultParticipants: this.uniqueParticipants([
-          { userId: user.sub },
-          { userId: quote.client.userId },
-        ]),
+        defaultParticipants: this.uniqueParticipants(
+          [
+            { userId: user.sub },
+            quote.client?.userId ? { userId: quote.client.userId } : null,
+          ].filter(Boolean) as ParticipantInput[],
+        ),
       };
     }
 
@@ -595,8 +640,36 @@ export class ChatsService {
     return result.chat;
   }
 
+  private async countUnreadMessagesForUser(
+    user: AuthUser,
+    chatId: string,
+    lastReadAt?: Date | null,
+  ) {
+    return this.prisma.chatMessage.count({
+      where: {
+        AND: [
+          this.buildMessageWhereForUser(user, chatId),
+          {
+            authorId: {
+              not: user.sub,
+            },
+          },
+          ...(lastReadAt
+            ? [
+                {
+                  createdAt: {
+                    gt: lastReadAt,
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
+    });
+  }
+
   async findAll(user: AuthUser) {
-    return this.prisma.chat.findMany({
+    const chats = await this.prisma.chat.findMany({
       where:
         user.role === UserRole.ADMIN
           ? {}
@@ -688,6 +761,27 @@ export class ChatsService {
         updatedAt: 'desc',
       },
     });
+
+    return Promise.all(
+      chats.map(async (chat) => {
+        const participant = chat.participants.find(
+          (item) => item.userId === user.sub && item.canRead,
+        );
+        const unreadCount = participant
+          ? await this.countUnreadMessagesForUser(
+              user,
+              chat.id,
+              participant.lastReadAt,
+            )
+          : 0;
+
+        return {
+          ...chat,
+          lastReadAt: participant?.lastReadAt ?? null,
+          unreadCount,
+        };
+      }),
+    );
   }
 
   async ensureTicketChat(
@@ -883,7 +977,7 @@ export class ChatsService {
     const chat = await this.getChatOrThrow(this.prisma, chatId);
     this.assertParticipant(user, chat);
 
-    return this.prisma.chatMessage.findMany({
+    const messages = await this.prisma.chatMessage.findMany({
       where: this.buildMessageWhereForUser(user, chatId),
       include: {
         author: {
@@ -913,6 +1007,42 @@ export class ChatsService {
         createdAt: 'asc',
       },
     });
+
+    await this.markRead(user, chatId);
+
+    return messages;
+  }
+
+  async markRead(user: AuthUser, chatId: string) {
+    const chat = await this.getChatOrThrow(this.prisma, chatId);
+    this.assertParticipant(user, chat);
+    const lastReadAt = new Date();
+
+    const client = this.prisma as PrismaService & {
+      chatParticipant?: {
+        updateMany?: (
+          args: Prisma.ChatParticipantUpdateManyArgs,
+        ) => Promise<unknown>;
+      };
+    };
+
+    if (client.chatParticipant?.updateMany) {
+      await client.chatParticipant.updateMany({
+        where: {
+          chatId,
+          userId: user.sub,
+          canRead: true,
+        },
+        data: {
+          lastReadAt,
+        },
+      });
+    }
+
+    return {
+      chatId,
+      lastReadAt,
+    };
   }
 
   async createMessageInTransaction(
@@ -929,7 +1059,7 @@ export class ChatsService {
       new Set([input.authorId, ...(input.authorizedUserIds ?? [])]),
     );
 
-    return tx.chatMessage.create({
+    const message = await tx.chatMessage.create({
       data: {
         chatId: input.chatId,
         authorId: input.authorId,
@@ -945,6 +1075,15 @@ export class ChatsService {
             : undefined,
       },
     });
+
+    await this.touchChatAfterMessage(
+      tx,
+      input.chatId,
+      input.authorId,
+      message.createdAt,
+    );
+
+    return message;
   }
 
   async sendMessage(user: AuthUser, chatId: string, dto: SendChatMessageDto) {
@@ -978,7 +1117,7 @@ export class ChatsService {
         }
       }
 
-      return tx.chatMessage.create({
+      const createdMessage = await tx.chatMessage.create({
         data: {
           chatId,
           authorId: user.sub,
@@ -1005,6 +1144,15 @@ export class ChatsService {
           recipients: true,
         },
       });
+
+      await this.touchChatAfterMessage(
+        tx,
+        chatId,
+        user.sub,
+        createdMessage.createdAt,
+      );
+
+      return createdMessage;
     });
 
     await this.auditLogsService.create({

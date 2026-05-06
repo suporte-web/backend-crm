@@ -9,6 +9,7 @@ import {
   AuditLogCategory,
   MessageSenderType,
   OpportunityStage,
+  ProspectStatusCadastral,
   QuoteStatus,
   TicketHistoryEventType,
   TicketStatus,
@@ -39,6 +40,7 @@ export class QuotesService {
           user: true,
         },
       },
+      prospect: true,
       history: {
         orderBy: {
           createdAt: 'desc' as const,
@@ -51,6 +53,7 @@ export class QuotesService {
               user: true,
             },
           },
+          prospect: true,
         },
       },
       propostas: {
@@ -75,6 +78,18 @@ export class QuotesService {
     return trimmed || null;
   }
 
+  private parseOptionalDate(value?: string | null) {
+    const sanitized = this.sanitize(value);
+
+    if (!sanitized) {
+      return null;
+    }
+
+    const date = new Date(sanitized);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
   private formatQuoteStatus(status: QuoteStatus) {
     const labels: Record<QuoteStatus, string> = {
       RECEIVED: 'Recebida',
@@ -85,6 +100,21 @@ export class QuotesService {
     };
 
     return labels[status];
+  }
+
+  private getQuoteRequesterName(quote: {
+    client?: {
+      companyName?: string | null;
+      user?: { name: string } | null;
+    } | null;
+    prospect?: { nomeRazaoSocial: string } | null;
+  }) {
+    return (
+      quote.client?.companyName ??
+      quote.client?.user?.name ??
+      quote.prospect?.nomeRazaoSocial ??
+      'Prospect'
+    );
   }
 
   private generateDisplayCode(prefix: 'COT' | 'PROP', source: string) {
@@ -144,9 +174,7 @@ export class QuotesService {
             dto.merchandiseValue !== undefined
               ? dto.merchandiseValue
               : undefined,
-          desiredDeadline: dto.desiredDeadline
-            ? new Date(dto.desiredDeadline)
-            : null,
+          desiredDeadline: this.sanitize(dto.desiredDeadline),
           notes: this.sanitize(dto.notes),
           history: {
             create: {
@@ -358,7 +386,7 @@ export class QuotesService {
   ) {
     const quote = await this.findOne(user, id);
     const isClientOwner =
-      user.role === 'CLIENTE' && quote.client.userId === user.sub;
+      user.role === 'CLIENTE' && quote.client?.userId === user.sub;
     const editableStatuses: QuoteStatus[] = [
       QuoteStatus.RECEIVED,
       QuoteStatus.IN_ANALYSIS,
@@ -468,9 +496,7 @@ export class QuotesService {
           merchandiseValue: dto.merchandiseValue,
           desiredDeadline:
             dto.desiredDeadline !== undefined
-              ? dto.desiredDeadline
-                ? new Date(dto.desiredDeadline)
-                : null
+              ? this.sanitize(dto.desiredDeadline)
               : undefined,
           notes: dto.notes !== undefined ? this.sanitize(dto.notes) : undefined,
           history: {
@@ -490,9 +516,11 @@ export class QuotesService {
           where: { quoteId: id },
           data: {
             subject: `Nova cotacao: ${updated.serviceType}`,
-            description: `Cliente ${
-              updated.client.companyName ?? updated.client.user.name
-            } enviou cotacao de ${updated.origin} para ${updated.destination}.`,
+            description: `${this.getQuoteRequesterName(
+              updated,
+            )} enviou cotacao de ${updated.origin} para ${
+              updated.destination
+            }.`,
             lastInteractionAt: new Date(),
           },
         });
@@ -526,9 +554,9 @@ export class QuotesService {
                 : {}),
               ...(dto.desiredDeadline !== undefined
                 ? {
-                    expectedCloseDate: dto.desiredDeadline
-                      ? new Date(dto.desiredDeadline)
-                      : null,
+                    expectedCloseDate: this.parseOptionalDate(
+                      dto.desiredDeadline,
+                    ),
                   }
                 : {}),
             },
@@ -560,24 +588,57 @@ export class QuotesService {
     dto: UpdateQuoteStatusDto,
   ) {
     this.ensureInternalUser(user);
-    await this.findOne(user, id);
+    const quote = await this.findOne(user, id);
 
-    const updatedQuote = await this.prisma.quote.update({
-      where: { id },
-      data: {
-        status: dto.status,
-        history: {
-          create: {
-            status: dto.status,
-            notes:
-              dto.notes ??
-              `Status atualizado para ${this.formatQuoteStatus(dto.status)}.`,
+    const updatedQuote = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.quote.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          history: {
+            create: {
+              status: dto.status,
+              notes:
+                dto.notes ??
+                `Status atualizado para ${this.formatQuoteStatus(dto.status)}.`,
+            },
           },
         },
-      },
-      include: {
-        ...this.buildQuoteInclude(),
-      },
+        include: {
+          ...this.buildQuoteInclude(),
+        },
+      });
+
+      if (dto.status === QuoteStatus.APPROVED && quote.prospectId) {
+        await tx.prospect.update({
+          where: { id: quote.prospectId },
+          data: {
+            statusCadastral: ProspectStatusCadastral.AGUARDANDO_CADASTRO,
+          },
+        });
+
+        if (updated.tickets.length > 0) {
+          await tx.ticketHistory.createMany({
+            data: updated.tickets.map((ticket) => ({
+              ticketId: ticket.id,
+              eventType: TicketHistoryEventType.STATUS_CHANGED,
+              title: 'Prospect aguardando cadastro',
+              description:
+                'Cotacao aprovada. O prospect precisa completar cadastro antes de contrato, operacao, entrega ou rastreamento.',
+              createdById: user.sub,
+              internalOnly: true,
+              metadata: {
+                quoteId: id,
+                prospectId: quote.prospectId,
+                statusCadastral:
+                  ProspectStatusCadastral.AGUARDANDO_CADASTRO,
+              },
+            })),
+          });
+        }
+      }
+
+      return updated;
     });
 
     await this.auditLogsService.create({
@@ -633,11 +694,17 @@ export class QuotesService {
     if (updatedQuote.tickets.length > 0) {
       await this.prisma.$transaction(async (tx) => {
         for (const ticket of updatedQuote.tickets) {
+          const hasClientUser = Boolean(ticket.client?.userId);
+          const prospectFlow = Boolean(updatedQuote.prospectId && !hasClientUser);
           const updatedTicket = await tx.ticket.update({
             where: { id: ticket.id },
             data: {
-              status: TicketStatus.AGUARDANDO_CLIENTE,
-              requiresActionRole: UserRole.CLIENTE,
+              status: prospectFlow
+                ? TicketStatus.COTACAO_CRIADA
+                : TicketStatus.AGUARDANDO_CLIENTE,
+              requiresActionRole: prospectFlow
+                ? UserRole.COMERCIAL
+                : UserRole.CLIENTE,
               lastInteractionAt: new Date(),
               messages: {
                 create: {
@@ -651,9 +718,14 @@ export class QuotesService {
               history: {
                 create: {
                   eventType: TicketHistoryEventType.MESSAGE_SENT,
-                  title: 'Proposta enviada ao cliente',
-                  description: 'Resposta comercial registrada na cotacao.',
+                  title: prospectFlow
+                    ? 'Resposta comercial registrada'
+                    : 'Proposta enviada ao cliente',
+                  description: prospectFlow
+                    ? 'Resposta comercial registrada para cotacao de prospect. O cadastro precisa ser concluido antes de contrato.'
+                    : 'Resposta comercial registrada na cotacao.',
                   createdById: user.sub,
+                  internalOnly: prospectFlow,
                 },
               },
             },
@@ -705,7 +777,7 @@ export class QuotesService {
   async remove(user: { sub: string; role: string }, id: string) {
     const quote = await this.findOne(user, id);
     const isClientOwner =
-      user.role === 'CLIENTE' && quote.client.userId === user.sub;
+      user.role === 'CLIENTE' && quote.client?.userId === user.sub;
     const deletableStatuses: QuoteStatus[] = [
       QuoteStatus.RECEIVED,
       QuoteStatus.IN_ANALYSIS,
