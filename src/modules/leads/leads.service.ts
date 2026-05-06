@@ -75,7 +75,9 @@ export class LeadsService {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
 
     if (!allowedRoles.includes(user.role)) {
-      throw new ForbiddenException('Voce nao tem permissao para acessar este recurso.');
+      throw new ForbiddenException(
+        'Voce nao tem permissao para acessar este recurso.',
+      );
     }
   }
 
@@ -106,7 +108,9 @@ export class LeadsService {
     );
   }
 
-  private toJsonValue(value: Prisma.JsonValue | Record<string, unknown> | undefined | null) {
+  private toJsonValue(
+    value: Prisma.JsonValue | Record<string, unknown> | undefined | null,
+  ) {
     if (value === undefined || value === null) {
       return undefined;
     }
@@ -114,7 +118,10 @@ export class LeadsService {
     return value as Prisma.InputJsonValue;
   }
 
-  private async findDuplicateLead(email?: string | null, phone?: string | null) {
+  private async findDuplicateLead(
+    email?: string | null,
+    phone?: string | null,
+  ) {
     const normalizedEmail = this.normalizeEmail(email);
     const normalizedPhone = this.normalizePhone(phone);
 
@@ -185,7 +192,9 @@ export class LeadsService {
     if (directPhone) {
       return {
         phone: directPhone,
-        name: this.sanitizeText(typeof payload.name === 'string' ? payload.name : null),
+        name: this.sanitizeText(
+          typeof payload.name === 'string' ? payload.name : null,
+        ),
         externalMessageId: this.sanitizeText(
           typeof payload.externalMessageId === 'string'
             ? payload.externalMessageId
@@ -274,9 +283,13 @@ export class LeadsService {
         return {
           phone,
           name: this.sanitizeText(
-            contactRecord && typeof contactRecord.profile === 'object' && contactRecord.profile
-              ? typeof (contactRecord.profile as Record<string, unknown>).name === 'string'
-                ? ((contactRecord.profile as Record<string, unknown>).name as string)
+            contactRecord &&
+              typeof contactRecord.profile === 'object' &&
+              contactRecord.profile
+              ? typeof (contactRecord.profile as Record<string, unknown>)
+                  .name === 'string'
+                ? ((contactRecord.profile as Record<string, unknown>)
+                    .name as string)
                 : null
               : null,
           ),
@@ -284,7 +297,9 @@ export class LeadsService {
             typeof messageRecord.id === 'string' ? messageRecord.id : null,
           ),
           externalContactId: this.sanitizeText(
-            typeof contactRecord?.wa_id === 'string' ? contactRecord.wa_id : null,
+            typeof contactRecord?.wa_id === 'string'
+              ? contactRecord.wa_id
+              : null,
           ),
           channel: 'whatsapp' as const,
           sourcePhone: this.sanitizeText(
@@ -303,7 +318,9 @@ export class LeadsService {
           metadata: {
             provider: 'meta-cloud-api',
             messageType:
-              typeof messageRecord.type === 'string' ? messageRecord.type : null,
+              typeof messageRecord.type === 'string'
+                ? messageRecord.type
+                : null,
             businessPhoneNumberId:
               typeof metadata?.phone_number_id === 'string'
                 ? metadata.phone_number_id
@@ -412,7 +429,9 @@ export class LeadsService {
         payload.email ? `E-mail: ${payload.email}.` : null,
         payload.phone ? `Telefone: ${payload.phone}.` : null,
         payload.notes ? `Observacoes: ${payload.notes}` : null,
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
 
       const ticket = await tx.ticket.create({
         data: {
@@ -421,15 +440,18 @@ export class LeadsService {
           type: TicketType.LEAD,
           status: TicketStatus.AGUARDANDO_COMERCIAL,
           requiresActionRole: UserRole.COMERCIAL,
+          internalOnly: true,
           subject: `Novo lead: ${lead.name}`,
           description:
-            ticketDescription || 'Novo lead recebido e aguardando atendimento comercial.',
+            ticketDescription ||
+            'Novo lead recebido e aguardando atendimento comercial.',
           messages: {
             create: {
               senderType: MessageSenderType.INTERNO,
               message:
                 ticketDescription ||
                 'Novo lead recebido e aguardando atendimento comercial.',
+              isInternal: true,
               createdById: options.ticketActorId ?? payload.createdById ?? null,
             },
           },
@@ -437,7 +459,9 @@ export class LeadsService {
             create: {
               eventType: TicketHistoryEventType.CREATED,
               title: 'Lead recebido',
-              description: 'Ticket criado automaticamente a partir de um novo lead.',
+              description:
+                'Ticket criado automaticamente a partir de um novo lead.',
+              internalOnly: true,
               createdById: options.ticketActorId ?? payload.createdById ?? null,
             },
           },
@@ -449,7 +473,8 @@ export class LeadsService {
         {
           ticketId: ticket.id,
           title: 'Novo lead recebido',
-          message: 'Novo lead recebido. Acesse o ticket para iniciar o atendimento.',
+          message:
+            'Novo lead recebido. Acesse o ticket para iniciar o atendimento.',
           actorId: options.ticketActorId ?? payload.createdById ?? null,
           emailSubject: 'Novo lead recebido no CRM',
           emailSummary: `${lead.name}${lead.company ? ` - ${lead.company}` : ''}`,
@@ -537,9 +562,14 @@ export class LeadsService {
     });
   }
 
-  private mapCsvRow(row: ParsedCsvRow, defaults: { source: string; status: string }) {
+  private mapCsvRow(
+    row: ParsedCsvRow,
+    defaults: { source: string; status: string },
+  ) {
     const get = (...keys: string[]) => {
-      const found = keys.find((key) => row[key] !== undefined && row[key] !== '');
+      const found = keys.find(
+        (key) => row[key] !== undefined && row[key] !== '',
+      );
       return found ? row[found] : '';
     };
 
@@ -678,7 +708,9 @@ export class LeadsService {
 
     const duplicate = await this.findDuplicateLead(dto.email, dto.phone);
     if (duplicate) {
-      throw new ConflictException(`Ja existe um lead com este contato: ${duplicate.name}.`);
+      throw new ConflictException(
+        `Ja existe um lead com este contato: ${duplicate.name}.`,
+      );
     }
 
     return this.prisma.$transaction((tx) =>
@@ -724,7 +756,8 @@ export class LeadsService {
     try {
       const fileContent = await readFile(file.path, 'utf-8');
       const parsedRows = this.parseCsv(fileContent);
-      const defaultSource = this.sanitizeText(dto.defaultSource) ?? 'import_csv';
+      const defaultSource =
+        this.sanitizeText(dto.defaultSource) ?? 'import_csv';
       const defaultStatus = this.sanitizeText(dto.defaultStatus) ?? 'new';
       const rowResults: Array<Prisma.LeadImportRowResultCreateManyInput> = [];
       let successCount = 0;
@@ -749,7 +782,10 @@ export class LeadsService {
           continue;
         }
 
-        const duplicate = await this.findDuplicateLead(mapped.email, mapped.phone);
+        const duplicate = await this.findDuplicateLead(
+          mapped.email,
+          mapped.phone,
+        );
         if (duplicate) {
           ignoredCount += 1;
           rowResults.push({
@@ -810,7 +846,10 @@ export class LeadsService {
             jobId: job.id,
             rowNumber: mapped.rowNumber,
             status: LeadImportRowStatus.FAILED,
-            reason: error instanceof Error ? error.message : 'Falha ao importar linha.',
+            reason:
+              error instanceof Error
+                ? error.message
+                : 'Falha ao importar linha.',
             rawData: rawRow,
           });
         }
@@ -872,7 +911,10 @@ export class LeadsService {
           status: LeadImportJobStatus.FAILED,
           completedAt: new Date(),
           summary: {
-            message: error instanceof Error ? error.message : 'Falha ao processar CSV.',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Falha ao processar CSV.',
           },
         },
       });
@@ -961,7 +1003,9 @@ export class LeadsService {
     const expectedToken = this.getWebhookToken();
 
     if (!expectedToken) {
-      throw new ForbiddenException('Token de verificacao do WhatsApp nao configurado.');
+      throw new ForbiddenException(
+        'Token de verificacao do WhatsApp nao configurado.',
+      );
     }
 
     if (
@@ -969,7 +1013,9 @@ export class LeadsService {
       !input.verifyToken ||
       input.verifyToken !== expectedToken
     ) {
-      throw new ForbiddenException('Verificacao do webhook do WhatsApp recusada.');
+      throw new ForbiddenException(
+        'Verificacao do webhook do WhatsApp recusada.',
+      );
     }
 
     return input.challenge ?? 'ok';
@@ -1001,16 +1047,24 @@ export class LeadsService {
     );
   }
 
-  async receiveFromWhatsApp(dto: ReceiveWhatsAppLeadDto, context: IntegrationContext) {
+  async receiveFromWhatsApp(
+    dto: ReceiveWhatsAppLeadDto,
+    context: IntegrationContext,
+  ) {
     const configuredToken =
       process.env.WHATSAPP_INTEGRATION_TOKEN ||
       process.env.WHATSAPP_VERIFY_TOKEN;
 
     if (!configuredToken) {
-      throw new ForbiddenException('Token de integracao do WhatsApp nao configurado.');
+      throw new ForbiddenException(
+        'Token de integracao do WhatsApp nao configurado.',
+      );
     }
 
-    if (!context.integrationToken || context.integrationToken !== configuredToken) {
+    if (
+      !context.integrationToken ||
+      context.integrationToken !== configuredToken
+    ) {
       throw new ForbiddenException('Token de integracao invalido.');
     }
 
@@ -1021,7 +1075,9 @@ export class LeadsService {
 
     const normalizedPhone = this.normalizePhone(phone);
     if (!normalizedPhone) {
-      throw new BadRequestException('Telefone invalido para integracao de WhatsApp.');
+      throw new BadRequestException(
+        'Telefone invalido para integracao de WhatsApp.',
+      );
     }
 
     const existingLead = await this.prisma.lead.findFirst({
@@ -1045,17 +1101,29 @@ export class LeadsService {
           where: { id: existingLead.id },
           data: {
             name: existingLead.name || this.sanitizeText(dto.name) || undefined,
-            company: existingLead.company || this.sanitizeText(dto.company) || undefined,
-            notes: existingLead.notes || this.sanitizeText(dto.notes) || undefined,
+            company:
+              existingLead.company ||
+              this.sanitizeText(dto.company) ||
+              undefined,
+            notes:
+              existingLead.notes || this.sanitizeText(dto.notes) || undefined,
             externalMessageId:
-              this.sanitizeText(dto.externalMessageId) ?? existingLead.externalMessageId,
+              this.sanitizeText(dto.externalMessageId) ??
+              existingLead.externalMessageId,
             externalContactId:
-              this.sanitizeText(dto.externalContactId) ?? existingLead.externalContactId,
-            channel: this.sanitizeText(dto.channel) ?? existingLead.channel ?? 'whatsapp',
-            sourcePhone: this.sanitizeText(dto.sourcePhone) ?? existingLead.sourcePhone,
+              this.sanitizeText(dto.externalContactId) ??
+              existingLead.externalContactId,
+            channel:
+              this.sanitizeText(dto.channel) ??
+              existingLead.channel ??
+              'whatsapp',
+            sourcePhone:
+              this.sanitizeText(dto.sourcePhone) ?? existingLead.sourcePhone,
             lastInteractionAt: interactionDate,
             metadata: this.toJsonValue(dto.metadata ?? existingLead.metadata),
-            rawPayload: this.toJsonValue(dto.rawPayload ?? existingLead.rawPayload),
+            rawPayload: this.toJsonValue(
+              dto.rawPayload ?? existingLead.rawPayload,
+            ),
           },
         });
 

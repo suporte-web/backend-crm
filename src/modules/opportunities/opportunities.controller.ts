@@ -17,10 +17,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
+import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { UpdateOpportunityStageDto } from './dto/update-opportunity-stage.dto';
 import { OpportunitiesService } from './opportunities.service';
 
-@ApiTags('Opportunities')
+@ApiTags('Oportunidades')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
@@ -61,5 +62,18 @@ export class OpportunitiesController {
     }
 
     return this.opportunitiesService.updateStage(user, id, dto);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateOpportunityDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Id da oportunidade e obrigatorio.');
+    }
+
+    return this.opportunitiesService.update(user, id, dto);
   }
 }

@@ -7,8 +7,13 @@ import {
 import {
   AuditLogAction,
   AuditLogCategory,
+  ChatMessageVisibility,
   MessageSenderType,
+  OpportunityStage,
+  OpportunityStatus,
   Prisma,
+  QuoteStatus,
+  StatusProposta,
   TicketHistoryEventType,
   TicketStatus,
   TicketType,
@@ -17,6 +22,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { ChatsService } from '../chats/chats.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
@@ -38,6 +44,7 @@ type TicketNotificationTarget = {
   id: string;
   subject: string;
   assignedToId?: string | null;
+  internalOnly?: boolean | null;
   client?: {
     userId: string;
     companyName?: string | null;
@@ -54,6 +61,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly chatsService: ChatsService,
   ) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
@@ -73,6 +81,30 @@ export class TicketsService {
   private sanitize(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private generateDisplayCode(prefix: 'PROP', source: string) {
+    let hash = 0;
+
+    for (const char of source) {
+      hash = (hash * 31 + char.charCodeAt(0)) % 1000000;
+    }
+
+    return `${prefix}-${String(hash).padStart(6, '0')}`;
+  }
+
+  private isInternalDirectedTicket(user: AuthUser, dto: CreateTicketDto) {
+    if (!this.isInternalUser(user)) {
+      return false;
+    }
+
+    if (dto.isInternal !== undefined) {
+      return dto.isInternal;
+    }
+
+    return Boolean(
+      dto.leadId || dto.assignedToId || dto.type === TicketType.LEAD,
+    );
   }
 
   private getActionRole(status: TicketStatus): UserRole | null {
@@ -112,7 +144,9 @@ export class TicketsService {
     return null;
   }
 
-  private includeTicketRelations(user?: { role: string }): Prisma.TicketInclude {
+  private includeTicketRelations(user?: {
+    role: string;
+  }): Prisma.TicketInclude {
     const hideInternal = user?.role === 'CLIENTE';
 
     return {
@@ -139,6 +173,23 @@ export class TicketsService {
           email: true,
           role: true,
         },
+      },
+      propostas: {
+        where: hideInternal
+          ? {
+              status: {
+                not: StatusProposta.RASCUNHO,
+              },
+            }
+          : undefined,
+        orderBy: [
+          {
+            versao: 'desc',
+          },
+          {
+            updatedAt: 'desc',
+          },
+        ],
       },
       messages: {
         where: hideInternal ? { isInternal: false } : undefined,
@@ -202,16 +253,48 @@ export class TicketsService {
   private buildTextSearchWhere(query: string): Prisma.TicketWhereInput {
     return {
       OR: [
+        { id: { contains: query, mode: 'insensitive' } },
         { subject: { contains: query, mode: 'insensitive' } },
         { description: { contains: query, mode: 'insensitive' } },
-        { client: { is: { companyName: { contains: query, mode: 'insensitive' } } } },
-        { client: { is: { user: { name: { contains: query, mode: 'insensitive' } } } } },
-        { client: { is: { user: { email: { contains: query, mode: 'insensitive' } } } } },
-        { quote: { is: { serviceType: { contains: query, mode: 'insensitive' } } } },
+        {
+          client: {
+            is: { companyName: { contains: query, mode: 'insensitive' } },
+          },
+        },
+        {
+          client: {
+            is: { user: { name: { contains: query, mode: 'insensitive' } } },
+          },
+        },
+        {
+          client: {
+            is: { user: { email: { contains: query, mode: 'insensitive' } } },
+          },
+        },
+        { quote: { is: { code: { contains: query, mode: 'insensitive' } } } },
+        {
+          quote: {
+            is: { serviceType: { contains: query, mode: 'insensitive' } },
+          },
+        },
+        {
+          propostas: {
+            some: { code: { contains: query, mode: 'insensitive' } },
+          },
+        },
+        {
+          propostas: {
+            some: { titulo: { contains: query, mode: 'insensitive' } },
+          },
+        },
         { lead: { is: { name: { contains: query, mode: 'insensitive' } } } },
         { lead: { is: { email: { contains: query, mode: 'insensitive' } } } },
         { lead: { is: { company: { contains: query, mode: 'insensitive' } } } },
-        { opportunity: { is: { title: { contains: query, mode: 'insensitive' } } } },
+        {
+          opportunity: {
+            is: { title: { contains: query, mode: 'insensitive' } },
+          },
+        },
       ],
     };
   }
@@ -238,6 +321,7 @@ export class TicketsService {
 
     if (user.role === 'CLIENTE') {
       and.push({
+        internalOnly: false,
         client: {
           is: {
             userId: user.sub,
@@ -277,13 +361,16 @@ export class TicketsService {
       and.push({
         OR: [
           { assignedToId: user.sub },
+          { requesterId: user.sub },
           { requiresActionRole: UserRole.GESTAO },
           { status: TicketStatus.AGUARDANDO_GESTAO },
           { type: TicketType.APROVACAO_GESTAO },
         ],
       });
     } else if (user.role !== 'ADMIN') {
-      throw new ForbiddenException('Voce nao tem permissao para acessar tickets.');
+      throw new ForbiddenException(
+        'Voce nao tem permissao para acessar tickets.',
+      );
     }
 
     return and.length > 0 ? { AND: and } : {};
@@ -291,14 +378,22 @@ export class TicketsService {
 
   private assertTicketAccess(
     user: { sub: string; role: string },
-    ticket: { client?: { userId: string } | null },
+    ticket: {
+      client?: { userId: string } | null;
+      internalOnly?: boolean | null;
+    },
   ) {
-    if (user.role === 'CLIENTE' && ticket.client?.userId !== user.sub) {
+    if (
+      user.role === 'CLIENTE' &&
+      (ticket.internalOnly || ticket.client?.userId !== user.sub)
+    ) {
       throw new NotFoundException('Ticket nao encontrado.');
     }
 
     if (!this.isInternalUser(user) && user.role !== 'CLIENTE') {
-      throw new ForbiddenException('Voce nao tem permissao para acessar tickets.');
+      throw new ForbiddenException(
+        'Voce nao tem permissao para acessar tickets.',
+      );
     }
   }
 
@@ -403,7 +498,7 @@ export class TicketsService {
       TicketStatus.AJUSTE_SOLICITADO,
     ];
 
-    if (clientStatuses.includes(status)) {
+    if (!ticket.internalOnly && clientStatuses.includes(status)) {
       await this.notifyClient(
         tx,
         ticket,
@@ -468,7 +563,9 @@ export class TicketsService {
 
     if (quote) {
       if (client && quote.clientId !== client.id) {
-        throw new BadRequestException('Cotacao nao pertence ao cliente informado.');
+        throw new BadRequestException(
+          'Cotacao nao pertence ao cliente informado.',
+        );
       }
       client = quote.client;
     }
@@ -510,7 +607,9 @@ export class TicketsService {
     }
 
     if (!client && !lead) {
-      throw new BadRequestException('Informe um cliente, cotacao, oportunidade ou lead.');
+      throw new BadRequestException(
+        'Informe um cliente, cotacao, oportunidade ou lead.',
+      );
     }
 
     return {
@@ -529,15 +628,29 @@ export class TicketsService {
       throw new BadRequestException('Informe assunto e descricao do ticket.');
     }
 
-    if (this.isInternalUser(user) && !dto.clientId && !dto.leadId && !dto.quoteId && !dto.opportunityId) {
-      throw new BadRequestException('Informe um cliente, cotacao, oportunidade ou lead.');
+    if (
+      this.isInternalUser(user) &&
+      !dto.clientId &&
+      !dto.leadId &&
+      !dto.quoteId &&
+      !dto.opportunityId
+    ) {
+      throw new BadRequestException(
+        'Informe um cliente, cotacao, oportunidade ou lead.',
+      );
     }
 
-    const { client, quote, opportunity, lead } = await this.loadLinkedData(user, dto);
+    const { client, quote, opportunity, lead } = await this.loadLinkedData(
+      user,
+      dto,
+    );
     const createdByClient = user.role === 'CLIENTE';
+    const internalOnly = this.isInternalDirectedTicket(user, dto);
     const initialStatus = createdByClient
       ? TicketStatus.AGUARDANDO_COMERCIAL
-      : TicketStatus.ABERTO;
+      : internalOnly
+        ? TicketStatus.AGUARDANDO_COMERCIAL
+        : TicketStatus.ABERTO;
 
     const ticket = await this.prisma.$transaction(async (tx) => {
       const createdTicket = await tx.ticket.create({
@@ -548,16 +661,26 @@ export class TicketsService {
           opportunityId: opportunity?.id ?? dto.opportunityId ?? null,
           assignedToId: dto.assignedToId ?? null,
           requesterId: user.sub,
-          type: dto.type ?? (quote ? TicketType.COTACAO : lead ? TicketType.LEAD : TicketType.SUPORTE),
+          type:
+            dto.type ??
+            (quote
+              ? TicketType.COTACAO
+              : lead
+                ? TicketType.LEAD
+                : TicketType.SUPORTE),
           subject,
           description,
           status: initialStatus,
           requiresActionRole: this.getActionRole(initialStatus),
+          internalOnly,
           lastInteractionAt: new Date(),
           messages: {
             create: {
-              senderType: createdByClient ? MessageSenderType.CLIENTE : MessageSenderType.INTERNO,
+              senderType: createdByClient
+                ? MessageSenderType.CLIENTE
+                : MessageSenderType.INTERNO,
               message: description,
+              isInternal: internalOnly,
               createdById: user.sub,
             },
           },
@@ -567,12 +690,41 @@ export class TicketsService {
               title: 'Ticket criado',
               description: createdByClient
                 ? 'Demanda criada pelo cliente.'
-                : 'Demanda registrada pela equipe interna.',
+                : internalOnly
+                  ? 'Demanda interna registrada pela equipe interna.'
+                  : 'Demanda registrada pela equipe interna.',
+              internalOnly,
               createdById: user.sub,
             },
           },
         },
         include: this.includeTicketRelations(user),
+      });
+
+      const chatParticipantIds = internalOnly
+        ? await this.getCommercialRecipientIds(createdTicket, tx)
+        : [];
+      const chat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId: createdTicket.id,
+        subject: createdTicket.subject,
+        actorId: user.sub,
+        requesterId: createdTicket.requesterId,
+        assignedToId: createdTicket.assignedToId,
+        clientId: createdTicket.clientId,
+        clientUserId: createdTicket.client?.userId,
+        leadId: createdTicket.leadId,
+        quoteId: createdTicket.quoteId,
+        internalOnly: createdTicket.internalOnly,
+        participantUserIds: chatParticipantIds,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: chat.id,
+        authorId: user.sub,
+        content: description,
+        visibility: internalOnly
+          ? ChatMessageVisibility.GESTAO_COMERCIAL
+          : ChatMessageVisibility.PUBLICA_CLIENTE,
       });
 
       if (createdByClient) {
@@ -582,6 +734,18 @@ export class TicketsService {
           user.sub,
           'Nova demanda recebida',
           'Nova demanda de cliente recebida. Acesse o ticket para iniciar o atendimento.',
+        );
+      } else if (internalOnly) {
+        await this.notifyCommercial(
+          tx,
+          createdTicket,
+          user.sub,
+          lead
+            ? 'Novo lead direcionado ao Comercial'
+            : 'Ticket interno direcionado ao Comercial',
+          lead
+            ? 'A Gestao direcionou um lead para atendimento comercial.'
+            : 'A Gestao abriu um ticket interno para acompanhamento comercial.',
         );
       } else if (createdTicket.client?.userId) {
         await this.notifyClient(
@@ -610,6 +774,7 @@ export class TicketsService {
         opportunityId: ticket.opportunityId ?? null,
         type: ticket.type,
         status: ticket.status,
+        internalOnly: ticket.internalOnly,
       },
     });
 
@@ -620,10 +785,7 @@ export class TicketsService {
     return this.findAll({ sub: userId, role: 'CLIENTE' }, filters);
   }
 
-  async findAll(
-    user: { sub: string; role: string },
-    filters: TicketFilters,
-  ) {
+  async findAll(user: { sub: string; role: string }, filters: TicketFilters) {
     const where = this.buildWhereForUser(user, filters);
 
     return this.prisma.ticket.findMany({
@@ -704,11 +866,7 @@ export class TicketsService {
     return updatedTicket;
   }
 
-  async updateStatus(
-    user: AuthUser,
-    id: string,
-    dto: UpdateTicketStatusDto,
-  ) {
+  async updateStatus(user: AuthUser, id: string, dto: UpdateTicketStatusDto) {
     this.ensureInternalUser(user);
     await this.findOne(user, id);
 
@@ -753,11 +911,7 @@ export class TicketsService {
     return updatedTicket;
   }
 
-  async reply(
-    user: AuthUser,
-    id: string,
-    dto: CreateTicketMessageDto,
-  ) {
+  async reply(user: AuthUser, id: string, dto: CreateTicketMessageDto) {
     const ticket = await this.findOne(user, id);
     const message = this.sanitize(dto.message);
 
@@ -766,7 +920,8 @@ export class TicketsService {
     }
 
     const internalAuthor = this.isInternalUser(user);
-    const isInternalNote = internalAuthor && dto.isInternal === true;
+    const isInternalNote =
+      internalAuthor && (dto.isInternal === true || ticket.internalOnly);
     const senderType = internalAuthor
       ? MessageSenderType.INTERNO
       : MessageSenderType.CLIENTE;
@@ -774,8 +929,8 @@ export class TicketsService {
       user.role === 'CLIENTE'
         ? TicketStatus.AGUARDANDO_COMERCIAL
         : isInternalNote
-          ? dto.nextStatus ?? ticket.status
-          : dto.nextStatus ?? TicketStatus.AGUARDANDO_CLIENTE;
+          ? (dto.nextStatus ?? ticket.status)
+          : (dto.nextStatus ?? TicketStatus.AGUARDANDO_CLIENTE);
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.ticket.update({
@@ -807,6 +962,28 @@ export class TicketsService {
           },
         },
         include: this.includeTicketRelations(user),
+      });
+
+      const chat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId: updated.id,
+        subject: updated.subject,
+        actorId: user.sub,
+        requesterId: updated.requesterId,
+        assignedToId: updated.assignedToId,
+        clientId: updated.clientId,
+        clientUserId: updated.client?.userId,
+        leadId: updated.leadId,
+        quoteId: updated.quoteId,
+        internalOnly: updated.internalOnly,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: chat.id,
+        authorId: user.sub,
+        content: message,
+        visibility: isInternalNote
+          ? ChatMessageVisibility.GESTAO_COMERCIAL
+          : ChatMessageVisibility.PUBLICA_CLIENTE,
       });
 
       if (user.role === 'CLIENTE') {
@@ -847,11 +1024,7 @@ export class TicketsService {
     return updatedTicket;
   }
 
-  async sendPreProposal(
-    user: AuthUser,
-    id: string,
-    dto: SendPreProposalDto,
-  ) {
+  async sendPreProposal(user: AuthUser, id: string, dto: SendPreProposalDto) {
     this.ensureInternalUser(user);
     const ticket = await this.findOne(user, id);
     const message = this.sanitize(dto.message);
@@ -861,6 +1034,10 @@ export class TicketsService {
     }
 
     const opportunityId = dto.opportunityId ?? ticket.opportunityId;
+    const now = new Date();
+    const preContractNotes = this.sanitize(dto.preContractNotes) ?? message;
+    const negotiatedValue =
+      dto.valor !== undefined ? new Prisma.Decimal(dto.valor) : undefined;
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
       if (opportunityId) {
@@ -868,9 +1045,154 @@ export class TicketsService {
           where: { id: opportunityId },
           data: {
             preContract: true,
-            preContractNotes: dto.preContractNotes ?? message,
+            preContractNotes,
+            ...(negotiatedValue !== undefined
+              ? {
+                  value: negotiatedValue,
+                  stage: OpportunityStage.PROPOSTA,
+                }
+              : {}),
           },
         });
+      }
+
+      if (ticket.quoteId && negotiatedValue !== undefined) {
+        await tx.quote.update({
+          where: { id: ticket.quoteId },
+          data: {
+            price: negotiatedValue,
+            commercialNotes: preContractNotes,
+            status: QuoteStatus.ANSWERED,
+            history: {
+              create: {
+                status: QuoteStatus.ANSWERED,
+                notes: preContractNotes,
+              },
+            },
+          },
+        });
+      }
+
+      const latestProposta = await tx.proposta.findFirst({
+        where: { ticketId: id },
+        orderBy: [
+          {
+            versao: 'desc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+      });
+      const reusableStatuses: StatusProposta[] = [
+        StatusProposta.RASCUNHO,
+        StatusProposta.ENVIADA_AO_CLIENTE,
+        StatusProposta.AJUSTE_SOLICITADO_PELO_CLIENTE,
+        StatusProposta.AJUSTE_SOLICITADO_PELA_GESTAO,
+      ];
+      const propostaBaseData: Prisma.PropostaUncheckedUpdateInput = {
+        status: StatusProposta.ENVIADA_AO_CLIENTE,
+        enviadaEm: now,
+        enviadaPorId: user.sub,
+        quoteId: ticket.quoteId ?? null,
+        opportunityId: opportunityId ?? null,
+        clientId: ticket.clientId ?? null,
+        motivoRecusaCliente: null,
+      };
+      const titulo =
+        this.sanitize(dto.titulo) ??
+        latestProposta?.titulo ??
+        `Pre-proposta - ${ticket.subject}`;
+
+      propostaBaseData.titulo = titulo;
+      propostaBaseData.descricao = message;
+
+      if (dto.descricaoServico !== undefined) {
+        propostaBaseData.descricaoServico = this.sanitize(dto.descricaoServico);
+      } else if (
+        !latestProposta?.descricaoServico &&
+        ticket.quote?.serviceType
+      ) {
+        propostaBaseData.descricaoServico = ticket.quote.serviceType;
+      }
+
+      if (dto.origem !== undefined) {
+        propostaBaseData.origem = this.sanitize(dto.origem);
+      } else if (!latestProposta?.origem && ticket.quote?.origin) {
+        propostaBaseData.origem = ticket.quote.origin;
+      }
+
+      if (dto.destino !== undefined) {
+        propostaBaseData.destino = this.sanitize(dto.destino);
+      } else if (!latestProposta?.destino && ticket.quote?.destination) {
+        propostaBaseData.destino = ticket.quote.destination;
+      }
+
+      if (dto.valor !== undefined) {
+        propostaBaseData.valor = dto.valor;
+      }
+      if (dto.condicoesPagamento !== undefined) {
+        propostaBaseData.condicoesPagamento = this.sanitize(
+          dto.condicoesPagamento,
+        );
+      }
+      if (dto.condicoesComerciais !== undefined) {
+        propostaBaseData.condicoesComerciais = this.sanitize(
+          dto.condicoesComerciais,
+        );
+      }
+      if (dto.observacoes !== undefined) {
+        propostaBaseData.observacoes = this.sanitize(dto.observacoes);
+      }
+      if (dto.validadeDias !== undefined) {
+        propostaBaseData.validadeDias = dto.validadeDias;
+      }
+      if (dto.validaAte !== undefined) {
+        propostaBaseData.validaAte = dto.validaAte
+          ? new Date(dto.validaAte)
+          : null;
+      }
+
+      let propostaId: string | null = null;
+      let propostaCode: string | null = null;
+
+      if (latestProposta && reusableStatuses.includes(latestProposta.status)) {
+        const updatedProposta = await tx.proposta.update({
+          where: { id: latestProposta.id },
+          data: propostaBaseData,
+          select: {
+            id: true,
+            code: true,
+          },
+        });
+
+        propostaId = updatedProposta.id;
+        propostaCode = updatedProposta.code;
+      } else {
+        const versao = (latestProposta?.versao ?? 0) + 1;
+        const createdProposta = await tx.proposta.create({
+          data: {
+            ...propostaBaseData,
+            code: `TMP-${Date.now()}`,
+            ticketId: id,
+            criadaPorId: user.sub,
+            versao,
+          } as Prisma.PropostaUncheckedCreateInput,
+          select: {
+            id: true,
+          },
+        });
+
+        propostaCode = this.generateDisplayCode('PROP', createdProposta.id);
+
+        await tx.proposta.update({
+          where: { id: createdProposta.id },
+          data: {
+            code: propostaCode,
+          },
+        });
+
+        propostaId = createdProposta.id;
       }
 
       const updated = await tx.ticket.update({
@@ -880,7 +1202,7 @@ export class TicketsService {
           opportunityId: opportunityId ?? null,
           status: TicketStatus.AGUARDANDO_CLIENTE,
           requiresActionRole: UserRole.CLIENTE,
-          lastInteractionAt: new Date(),
+          lastInteractionAt: now,
           messages: {
             create: {
               senderType: MessageSenderType.INTERNO,
@@ -892,8 +1214,19 @@ export class TicketsService {
             create: {
               eventType: TicketHistoryEventType.PRE_PROPOSAL_SENT,
               title: 'Pre-proposta enviada',
-              description: 'Pre-proposta/pre-contrato enviado para analise do cliente.',
+              description:
+                'Pre-proposta/pre-contrato enviado para analise do cliente.',
               createdById: user.sub,
+              metadata: {
+                propostaId,
+                propostaCode,
+                opportunityId: opportunityId ?? null,
+                quoteId: ticket.quoteId ?? null,
+                valorNegociado:
+                  negotiatedValue !== undefined
+                    ? negotiatedValue.toString()
+                    : null,
+              },
             },
           },
         },
@@ -931,24 +1264,32 @@ export class TicketsService {
     ];
 
     if (!allowedClientDecisionStatuses.includes(ticket.status)) {
-      throw new BadRequestException('Este ticket nao esta aguardando acao do cliente.');
+      throw new BadRequestException(
+        'Este ticket nao esta aguardando acao do cliente.',
+      );
     }
 
     const decisionMap = {
       APPROVE: {
         status: TicketStatus.APROVADO_CLIENTE,
+        propostaStatus: StatusProposta.APROVADA_PELO_CLIENTE,
+        propostaDateField: 'aprovadaPeloClienteEm',
         eventType: TicketHistoryEventType.APPROVED,
         title: 'Cliente aprovou a pre-negociacao',
         message: 'Cliente aprovou a proposta/pre-negociacao.',
       },
       REQUEST_ADJUSTMENT: {
         status: TicketStatus.AJUSTE_SOLICITADO,
+        propostaStatus: StatusProposta.AJUSTE_SOLICITADO_PELO_CLIENTE,
+        propostaDateField: 'ajusteSolicitadoPeloClienteEm',
         eventType: TicketHistoryEventType.ADJUSTMENT_REQUESTED,
         title: 'Cliente solicitou ajuste',
         message: 'Cliente solicitou ajuste na proposta/pre-negociacao.',
       },
       REJECT: {
         status: TicketStatus.REPROVADO,
+        propostaStatus: StatusProposta.RECUSADA_PELO_CLIENTE,
+        propostaDateField: 'recusadaPeloClienteEm',
         eventType: TicketHistoryEventType.REJECTED,
         title: 'Cliente recusou a pre-negociacao',
         message: 'Cliente recusou a proposta/pre-negociacao.',
@@ -956,8 +1297,35 @@ export class TicketsService {
     }[dto.action];
 
     const message = this.sanitize(dto.message) ?? decisionMap.message;
+    const now = new Date();
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
+      const latestProposta = await tx.proposta.findFirst({
+        where: { ticketId: id },
+        orderBy: [
+          {
+            versao: 'desc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+      });
+
+      if (latestProposta) {
+        await tx.proposta.update({
+          where: { id: latestProposta.id },
+          data: {
+            status: decisionMap.propostaStatus,
+            [decisionMap.propostaDateField]: now,
+            motivoRecusaCliente:
+              dto.action === 'REJECT'
+                ? message
+                : latestProposta.motivoRecusaCliente,
+          } as Prisma.PropostaUncheckedUpdateInput,
+        });
+      }
+
       const updated = await tx.ticket.update({
         where: { id },
         data: {
@@ -967,7 +1335,7 @@ export class TicketsService {
               : ticket.type,
           status: decisionMap.status,
           requiresActionRole: this.getActionRole(decisionMap.status),
-          lastInteractionAt: new Date(),
+          lastInteractionAt: now,
           messages: {
             create: {
               senderType: MessageSenderType.CLIENTE,
@@ -987,6 +1355,26 @@ export class TicketsService {
         include: this.includeTicketRelations(user),
       });
 
+      const chat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId: updated.id,
+        subject: updated.subject,
+        actorId: user.sub,
+        requesterId: updated.requesterId,
+        assignedToId: updated.assignedToId,
+        clientId: updated.clientId,
+        clientUserId: updated.client?.userId,
+        leadId: updated.leadId,
+        quoteId: updated.quoteId,
+        internalOnly: updated.internalOnly,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: chat.id,
+        authorId: user.sub,
+        content: message,
+        visibility: ChatMessageVisibility.PUBLICA_CLIENTE,
+      });
+
       await this.notifyCommercial(
         tx,
         updated,
@@ -995,17 +1383,38 @@ export class TicketsService {
         decisionMap.message,
       );
 
+      if (dto.action === 'REJECT') {
+        await this.notifyManagement(
+          tx,
+          updated,
+          user.sub,
+          decisionMap.title,
+          message,
+        );
+      }
+
       return updated;
     });
+
+    if (dto.action === 'REJECT') {
+      await this.auditLogsService.create({
+        category: AuditLogCategory.TICKET,
+        action: AuditLogAction.PROPOSAL_REJECTED,
+        message: `Cliente recusou a proposta/pre-negociacao do ticket ${ticket.subject}.`,
+        targetType: 'Ticket',
+        targetId: id,
+        userId: user.sub,
+        details: {
+          ticketId: id,
+          motivo: message,
+        },
+      });
+    }
 
     return updatedTicket;
   }
 
-  async sendToManagement(
-    user: AuthUser,
-    id: string,
-    dto: SendToManagementDto,
-  ) {
+  async sendToManagement(user: AuthUser, id: string, dto: SendToManagementDto) {
     this.ensureInternalUser(user);
     const ticket = await this.findOne(user, id);
 
@@ -1030,6 +1439,7 @@ export class TicketsService {
             create: {
               senderType: MessageSenderType.INTERNO,
               message: publicMessage,
+              isInternal: ticket.internalOnly,
               createdById: user.sub,
             },
           },
@@ -1038,11 +1448,38 @@ export class TicketsService {
               eventType: TicketHistoryEventType.APPROVAL_SENT,
               title: 'Enviado para aprovacao da Gestao',
               description: 'Negociacao enviada para aprovacao da Gestao.',
+              internalOnly: ticket.internalOnly,
               createdById: user.sub,
             },
           },
         },
         include: this.includeTicketRelations(user),
+      });
+
+      const managementParticipantIds =
+        await this.notificationsService.getUserIdsByRoles(
+          [UserRole.GESTAO, UserRole.ADMIN],
+          tx,
+        );
+      const chat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId: updated.id,
+        subject: updated.subject,
+        actorId: user.sub,
+        requesterId: updated.requesterId,
+        assignedToId: updated.assignedToId,
+        clientId: updated.clientId,
+        clientUserId: updated.client?.userId,
+        leadId: updated.leadId,
+        quoteId: updated.quoteId,
+        internalOnly: updated.internalOnly,
+        participantUserIds: managementParticipantIds,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: chat.id,
+        authorId: user.sub,
+        content: publicMessage,
+        visibility: ChatMessageVisibility.GESTAO_COMERCIAL,
       });
 
       await this.notifyManagement(
@@ -1052,13 +1489,15 @@ export class TicketsService {
         'Negociacao aguardando aprovacao da Gestao',
         'Uma negociacao foi enviada para aprovacao da Gestao.',
       );
-      await this.notifyClient(
-        tx,
-        updated,
-        user.sub,
-        'Sua negociacao esta em validacao interna',
-        'Sua negociacao esta em validacao interna.',
-      );
+      if (!ticket.internalOnly) {
+        await this.notifyClient(
+          tx,
+          updated,
+          user.sub,
+          'Sua negociacao esta em validacao interna',
+          'Sua negociacao esta em validacao interna.',
+        );
+      }
 
       return updated;
     });
@@ -1078,7 +1517,9 @@ export class TicketsService {
     const ticket = await this.findOne(user, id);
 
     if (ticket.status !== TicketStatus.AGUARDANDO_GESTAO) {
-      throw new BadRequestException('Ticket nao esta aguardando aprovacao da Gestao.');
+      throw new BadRequestException(
+        'Ticket nao esta aguardando aprovacao da Gestao.',
+      );
     }
 
     const decisionMap = {
@@ -1087,7 +1528,8 @@ export class TicketsService {
         eventType: TicketHistoryEventType.APPROVED,
         title: 'Gestao aprovou a negociacao',
         commercialMessage: 'Gestao aprovou a negociacao.',
-        clientMessage: 'Sua negociacao foi aprovada. O servico seguira para execucao.',
+        clientMessage:
+          'Sua negociacao foi aprovada. O servico seguira para execucao.',
       },
       REQUEST_ADJUSTMENT: {
         status: TicketStatus.AJUSTE_SOLICITADO,
@@ -1138,10 +1580,72 @@ export class TicketsService {
         };
       }
 
+      if (dto.action === 'APPROVE' && ticket.opportunityId) {
+        const latestProposta = await tx.proposta.findFirst({
+          where: {
+            ticketId: id,
+            valor: {
+              not: null,
+            },
+          },
+          orderBy: [
+            {
+              versao: 'desc',
+            },
+            {
+              updatedAt: 'desc',
+            },
+          ],
+          select: {
+            valor: true,
+          },
+        });
+        const negotiatedValue =
+          latestProposta?.valor ?? ticket.quote?.price ?? null;
+
+        if (!negotiatedValue || negotiatedValue.lte(0)) {
+          throw new BadRequestException(
+            'Informe o valor do servico negociado antes de aprovar a negociacao.',
+          );
+        }
+
+        await tx.opportunity.update({
+          where: { id: ticket.opportunityId },
+          data: {
+            value: negotiatedValue,
+            stage: OpportunityStage.GANHO,
+            status: OpportunityStatus.WON,
+          },
+        });
+      }
+
       const updated = await tx.ticket.update({
         where: { id },
         data: updateData,
         include: this.includeTicketRelations(user),
+      });
+
+      const chat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId: updated.id,
+        subject: updated.subject,
+        actorId: user.sub,
+        requesterId: updated.requesterId,
+        assignedToId: updated.assignedToId,
+        clientId: updated.clientId,
+        clientUserId: updated.client?.userId,
+        leadId: updated.leadId,
+        quoteId: updated.quoteId,
+        internalOnly: updated.internalOnly,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: chat.id,
+        authorId: user.sub,
+        content: note ?? decisionMap.commercialMessage,
+        visibility:
+          dto.action === 'APPROVE' && !ticket.internalOnly
+            ? ChatMessageVisibility.PUBLICA_CLIENTE
+            : ChatMessageVisibility.GESTAO_COMERCIAL,
       });
 
       await this.notifyCommercial(
@@ -1152,7 +1656,10 @@ export class TicketsService {
         decisionMap.commercialMessage,
       );
 
-      if (dto.action === 'APPROVE' || dto.notifyClient) {
+      if (
+        !ticket.internalOnly &&
+        (dto.action === 'APPROVE' || dto.notifyClient)
+      ) {
         await this.notifyClient(
           tx,
           updated,

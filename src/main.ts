@@ -11,6 +11,7 @@ async function bootstrap() {
   const uploadsDir = join(process.cwd(), 'uploads');
   const portalContentUploadsDir = join(uploadsDir, 'portal-content');
   const leadImportsDir = join(uploadsDir, 'lead-imports');
+  const propostasUploadsDir = join(uploadsDir, 'propostas');
 
   if (!existsSync(portalContentUploadsDir)) {
     mkdirSync(portalContentUploadsDir, { recursive: true });
@@ -18,6 +19,10 @@ async function bootstrap() {
 
   if (!existsSync(leadImportsDir)) {
     mkdirSync(leadImportsDir, { recursive: true });
+  }
+
+  if (!existsSync(propostasUploadsDir)) {
+    mkdirSync(propostasUploadsDir, { recursive: true });
   }
 
   app.enableCors({

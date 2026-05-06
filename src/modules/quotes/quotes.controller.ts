@@ -16,10 +16,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { RespondQuoteDto } from './dto/respond-quote.dto';
+import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 import { QuotesService } from './quotes.service';
 
-@ApiTags('Cotações')
+@ApiTags('Cotacoes')
 @Controller('quotes')
 export class QuotesController {
   constructor(
@@ -39,7 +40,7 @@ export class QuotesController {
     });
 
     if (!client) {
-      throw new NotFoundException('Perfil do cliente não encontrado');
+      throw new NotFoundException('Perfil do cliente nao encontrado.');
     }
 
     return this.quotesService.create(client.id, dto, user);
@@ -67,7 +68,7 @@ export class QuotesController {
     });
 
     if (!client) {
-      throw new NotFoundException('Perfil do cliente não encontrado');
+      throw new NotFoundException('Perfil do cliente nao encontrado.');
     }
 
     return this.quotesService.findMine(client.id);
@@ -81,10 +82,25 @@ export class QuotesController {
     @Param('id') id: string,
   ) {
     if (!id) {
-      throw new BadRequestException('Quote id is required');
+      throw new BadRequestException('Informe o identificador da cotacao.');
     }
 
     return this.quotesService.findOne(user, id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateQuoteDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotacao.');
+    }
+
+    return this.quotesService.update(user, id, dto);
   }
 
   @ApiBearerAuth()
@@ -96,7 +112,7 @@ export class QuotesController {
     @Body() dto: UpdateQuoteStatusDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Quote id is required');
+      throw new BadRequestException('Informe o identificador da cotacao.');
     }
 
     return this.quotesService.updateStatus(user, id, dto);
@@ -111,9 +127,23 @@ export class QuotesController {
     @Body() dto: RespondQuoteDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Quote id is required');
+      throw new BadRequestException('Informe o identificador da cotacao.');
     }
 
     return this.quotesService.respond(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/delete')
+  remove(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotacao.');
+    }
+
+    return this.quotesService.remove(user, id);
   }
 }

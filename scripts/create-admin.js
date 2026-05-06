@@ -30,6 +30,7 @@ async function main() {
       data: {
         name: 'Admin',
         passwordHash,
+        mustChangePassword: true,
         role: 'ADMIN',
       },
     });
@@ -43,6 +44,7 @@ async function main() {
       name: 'Admin',
       email,
       passwordHash,
+      mustChangePassword: true,
       role: 'ADMIN',
     },
   });

@@ -5,18 +5,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditLogAction,
+  AuditLogCategory,
+  ChatMessageVisibility,
   MessageSenderType,
+  OpportunityStage,
+  OpportunityStatus,
   Prisma,
+  QuoteStatus,
   StatusLogEmail,
   StatusProposta,
   TicketHistoryEventType,
   TicketStatus,
+  TicketType,
   UserRole as PrismaUserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { ChatsService } from '../chats/chats.service';
 import { ClientPropostaDecisionDto } from './dto/client-proposta-decision.dto';
 import { CreatePropostaDto } from './dto/create-proposta.dto';
+import { ManagementPropostaDecisionDto } from './dto/management-proposta-decision.dto';
 import { UpdatePropostaDto } from './dto/update-proposta.dto';
 
 const PROPOSTA_EDITAVEL: StatusProposta[] = [
@@ -32,6 +42,13 @@ type EmailRecipient = {
   userId: string;
   name: string;
   email: string;
+};
+
+type UploadedPropostaFile = {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
 };
 
 type TicketWithAccessData = Prisma.TicketGetPayload<{
@@ -59,7 +76,21 @@ type TicketWithAccessData = Prisma.TicketGetPayload<{
 
 @Injectable()
 export class PropostasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chatsService: ChatsService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
+
+  private generateDisplayCode(prefix: 'PROP', source: string) {
+    let hash = 0;
+
+    for (const char of source) {
+      hash = (hash * 31 + char.charCodeAt(0)) % 1000000;
+    }
+
+    return `${prefix}-${String(hash).padStart(6, '0')}`;
+  }
 
   private isInternalUser(user: AuthUser) {
     return ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role);
@@ -79,9 +110,100 @@ export class PropostasService {
     }
   }
 
+  private ensureManagementUser(user: AuthUser) {
+    if (!['ADMIN', 'GESTAO'].includes(user.role)) {
+      throw new ForbiddenException('Apenas a Gestao pode executar esta acao.');
+    }
+  }
+
   private sanitize(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private async syncNegotiatedValue(
+    tx: Prisma.TransactionClient,
+    input: {
+      quoteId?: string | null;
+      opportunityId?: string | null;
+      valor?: number | Prisma.Decimal | null;
+      commercialNotes?: string | null;
+      markQuoteAnswered?: boolean;
+    },
+  ) {
+    if (input.valor === undefined || input.valor === null) {
+      return;
+    }
+
+    const value = new Prisma.Decimal(input.valor);
+
+    if (input.quoteId) {
+      await tx.quote.update({
+        where: { id: input.quoteId },
+        data: {
+          price: value,
+          ...(input.commercialNotes !== undefined
+            ? { commercialNotes: this.sanitize(input.commercialNotes) }
+            : {}),
+          ...(input.markQuoteAnswered
+            ? {
+                status: QuoteStatus.ANSWERED,
+                history: {
+                  create: {
+                    status: QuoteStatus.ANSWERED,
+                    notes:
+                      this.sanitize(input.commercialNotes) ??
+                      'Valor negociado registrado na proposta.',
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+    }
+
+    if (input.opportunityId) {
+      await tx.opportunity.update({
+        where: { id: input.opportunityId },
+        data: {
+          value,
+          stage: OpportunityStage.PROPOSTA,
+        },
+      });
+    }
+  }
+
+  private buildArquivoData(file?: UploadedPropostaFile) {
+    if (!file) {
+      return {};
+    }
+
+    return {
+      arquivoNome: file.originalname,
+      arquivoUrl: `/uploads/propostas/${file.filename}`,
+      arquivoMimeType: file.mimetype,
+      arquivoTamanho: file.size,
+    };
+  }
+
+  private buildMessageAttachments(proposta: {
+    arquivoNome?: string | null;
+    arquivoUrl?: string | null;
+    arquivoMimeType?: string | null;
+    arquivoTamanho?: number | null;
+  }): Prisma.InputJsonValue | undefined {
+    if (!proposta.arquivoUrl) {
+      return undefined;
+    }
+
+    return [
+      {
+        name: proposta.arquivoNome ?? 'Proposta',
+        url: proposta.arquivoUrl,
+        mimeType: proposta.arquivoMimeType ?? null,
+        size: proposta.arquivoTamanho ?? null,
+      },
+    ];
   }
 
   private getActionRole(status: TicketStatus): PrismaUserRole | null {
@@ -117,7 +239,7 @@ export class PropostasService {
 
   private assertTicketAccess(user: AuthUser, ticket: TicketWithAccessData) {
     if (user.role === 'CLIENTE') {
-      if (ticket.client?.userId !== user.sub) {
+      if (ticket.internalOnly || ticket.client?.userId !== user.sub) {
         throw new NotFoundException('Ticket nao encontrado.');
       }
       return;
@@ -212,7 +334,7 @@ export class PropostasService {
   }
 
   private buildPropostaData(dto: CreatePropostaDto | UpdatePropostaDto) {
-    const data: Prisma.PropostaUpdateInput = {};
+    const data: Prisma.PropostaUncheckedUpdateInput = {};
 
     if (dto.titulo !== undefined) {
       const titulo = this.sanitize(dto.titulo);
@@ -278,10 +400,18 @@ export class PropostasService {
     return proposta;
   }
 
-  async create(user: AuthUser, ticketId: string, dto: CreatePropostaDto) {
+  async create(
+    user: AuthUser,
+    ticketId: string,
+    dto: CreatePropostaDto,
+    arquivo?: UploadedPropostaFile,
+  ) {
     this.ensureInternalUser(user);
     const ticket = await this.getTicketOrThrow(ticketId, user);
-    const data = this.buildPropostaData(dto);
+    const data: Prisma.PropostaUncheckedUpdateInput = {
+      ...this.buildPropostaData(dto),
+      ...this.buildArquivoData(arquivo),
+    };
 
     if (!data.titulo) {
       throw new BadRequestException('Informe o titulo da proposta.');
@@ -298,6 +428,7 @@ export class PropostasService {
       const created = await tx.proposta.create({
         data: {
           ...data,
+          code: `TMP-${Date.now()}`,
           ticketId,
           quoteId: ticket.quoteId,
           opportunityId: ticket.opportunityId,
@@ -309,6 +440,22 @@ export class PropostasService {
         include: this.includePropostaRelations(user),
       });
 
+      const propostaCode = this.generateDisplayCode('PROP', created.id);
+      const propostaWithCode = await tx.proposta.update({
+        where: { id: created.id },
+        data: {
+          code: propostaCode,
+        },
+        include: this.includePropostaRelations(user),
+      });
+
+      await this.syncNegotiatedValue(tx, {
+        quoteId: ticket.quoteId,
+        opportunityId: ticket.opportunityId,
+        valor: dto.valor,
+        commercialNotes: dto.observacoes ?? dto.condicoesComerciais,
+      });
+
       await tx.ticketHistory.create({
         data: {
           ticketId,
@@ -318,13 +465,14 @@ export class PropostasService {
           createdById: user.sub,
           metadata: {
             propostaId: created.id,
+            propostaCode,
             versao,
             status: created.status,
           },
         },
       });
 
-      return created;
+      return propostaWithCode;
     });
 
     return proposta;
@@ -356,6 +504,7 @@ export class PropostasService {
     ticketId: string,
     propostaId: string,
     dto: UpdatePropostaDto,
+    arquivo?: UploadedPropostaFile,
   ) {
     this.ensureInternalUser(user);
     const proposta = await this.getPropostaOrThrow(user, ticketId, propostaId);
@@ -366,13 +515,23 @@ export class PropostasService {
       );
     }
 
-    const data = this.buildPropostaData(dto);
+    const data: Prisma.PropostaUncheckedUpdateInput = {
+      ...this.buildPropostaData(dto),
+      ...this.buildArquivoData(arquivo),
+    };
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.proposta.update({
         where: { id: propostaId },
         data,
         include: this.includePropostaRelations(user),
+      });
+
+      await this.syncNegotiatedValue(tx, {
+        quoteId: proposta.quoteId,
+        opportunityId: proposta.opportunityId,
+        valor: dto.valor,
+        commercialNotes: dto.observacoes ?? dto.condicoesComerciais,
       });
 
       await tx.ticketHistory.create({
@@ -396,7 +555,12 @@ export class PropostasService {
     return updated;
   }
 
-  async sendToClient(user: AuthUser, ticketId: string, propostaId: string) {
+  async sendToClient(
+    user: AuthUser,
+    ticketId: string,
+    propostaId: string,
+    dto: UpdatePropostaDto = {},
+  ) {
     this.ensureInternalUser(user);
     const ticket = await this.getTicketOrThrow(ticketId, user);
 
@@ -428,16 +592,31 @@ export class PropostasService {
     const now = new Date();
     const link = `/tickets?ticket=${ticketId}`;
     const emailSubject = 'Proposta disponivel para analise';
+    const pendingData = this.buildPropostaData(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedProposta = await tx.proposta.update({
         where: { id: propostaId },
         data: {
+          ...pendingData,
           status: StatusProposta.ENVIADA_AO_CLIENTE,
           enviadaEm: now,
           enviadaPorId: user.sub,
+          motivoRecusaCliente: null,
         },
         include: this.includePropostaRelations(user),
+      });
+
+      await this.syncNegotiatedValue(tx, {
+        quoteId: proposta.quoteId,
+        opportunityId: proposta.opportunityId,
+        valor: dto.valor !== undefined ? dto.valor : proposta.valor,
+        commercialNotes:
+          dto.observacoes ??
+          dto.condicoesComerciais ??
+          proposta.observacoes ??
+          proposta.condicoesComerciais,
+        markQuoteAnswered: true,
       });
 
       await tx.ticket.update({
@@ -456,8 +635,50 @@ export class PropostasService {
           ticketId,
           senderType: MessageSenderType.INTERNO,
           message: 'O Comercial enviou uma proposta para analise do cliente.',
+          attachments: this.buildMessageAttachments(proposta),
           createdById: user.sub,
         },
+      });
+
+      const propostaChat = await this.chatsService.ensurePropostaChat(tx, {
+        propostaId,
+        code: proposta.code,
+        ticketId,
+        actorId: user.sub,
+        clientId: proposta.clientId,
+        clientUserId,
+        quoteId: proposta.quoteId,
+        criadaPorId: proposta.criadaPorId,
+        enviadaPorId: user.sub,
+        assignedToId: ticket.assignedToId,
+        requesterId: ticket.requesterId,
+      });
+      const ticketChat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId,
+        subject: ticket.subject,
+        actorId: user.sub,
+        requesterId: ticket.requesterId,
+        assignedToId: ticket.assignedToId,
+        clientId: ticket.clientId,
+        clientUserId,
+        leadId: ticket.leadId,
+        quoteId: ticket.quoteId,
+        internalOnly: ticket.internalOnly,
+      });
+      const publicProposalMessage =
+        'O Comercial enviou uma proposta para analise do cliente.';
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: propostaChat.id,
+        authorId: user.sub,
+        content: publicProposalMessage,
+        visibility: ChatMessageVisibility.PUBLICA_CLIENTE,
+      });
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: ticketChat.id,
+        authorId: user.sub,
+        content: publicProposalMessage,
+        visibility: ChatMessageVisibility.PUBLICA_CLIENTE,
       });
 
       await tx.ticketHistory.create({
@@ -511,6 +732,21 @@ export class PropostasService {
       };
     });
 
+    await this.auditLogsService.create({
+      category: AuditLogCategory.TICKET,
+      action: AuditLogAction.PROPOSAL_SENT,
+      message: `Proposta enviada ao cliente: ${proposta.code}.`,
+      targetType: 'Proposta',
+      targetId: propostaId,
+      userId: user.sub,
+      details: {
+        ticketId,
+        propostaId,
+        clientUserId,
+        status: StatusProposta.ENVIADA_AO_CLIENTE,
+      },
+    });
+
     await this.deliverProposalEmail({
       ticketId,
       propostaId,
@@ -525,7 +761,152 @@ export class PropostasService {
       message: MENSAGEM_PROPOSTA_CLIENTE,
     });
 
-    return this.findOne(user, ticketId, propostaId);
+    const propostaAtualizada = await this.findOne(user, ticketId, propostaId);
+
+    return {
+      ...propostaAtualizada,
+      proposta: propostaAtualizada,
+      ticketStatus: TicketStatus.AGUARDANDO_CLIENTE,
+      mensagem: 'Proposta enviada ao cliente com sucesso.',
+    };
+  }
+
+  async sendToManagement(user: AuthUser, ticketId: string, propostaId: string) {
+    this.ensureInternalUser(user);
+    const ticket = await this.getTicketOrThrow(ticketId, user);
+
+    const proposta = await this.prisma.proposta.findFirst({
+      where: {
+        id: propostaId,
+        ticketId,
+      },
+    });
+
+    if (!proposta) {
+      throw new NotFoundException('Proposta nao encontrada.');
+    }
+
+    const allowedStatusesForManagementSend: StatusProposta[] = [
+      StatusProposta.APROVADA_PELO_CLIENTE,
+    ];
+
+    if (!allowedStatusesForManagementSend.includes(proposta.status)) {
+      throw new BadRequestException(
+        'A proposta precisa estar aprovada pelo cliente para seguir para a Gestao.',
+      );
+    }
+
+    const managementRecipients = await this.getManagementRecipients();
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.proposta.update({
+        where: { id: propostaId },
+        data: {
+          status: StatusProposta.ENVIADA_PARA_GESTAO,
+          enviadaParaGestaoEm: now,
+        },
+      });
+
+      await tx.ticket.update({
+        where: { id: ticketId },
+        data: {
+          type: TicketType.APROVACAO_GESTAO,
+          status: TicketStatus.AGUARDANDO_GESTAO,
+          requiresActionRole: this.getActionRole(
+            TicketStatus.AGUARDANDO_GESTAO,
+          ),
+          lastInteractionAt: now,
+        },
+      });
+
+      await tx.ticketHistory.create({
+        data: {
+          ticketId,
+          eventType: TicketHistoryEventType.APPROVAL_SENT,
+          title: 'Proposta enviada para aprovacao da Gestao',
+          description: `A proposta ${proposta.code} foi enviada para aprovacao da Gestao.`,
+          createdById: user.sub,
+          metadata: {
+            propostaId,
+            propostaCode: proposta.code,
+            versao: proposta.versao,
+            status: StatusProposta.ENVIADA_PARA_GESTAO,
+          },
+        },
+      });
+
+      const managementParticipantIds = managementRecipients.map(
+        (recipient) => recipient.userId,
+      );
+      const propostaChat = await this.chatsService.ensurePropostaChat(tx, {
+        propostaId,
+        code: proposta.code,
+        ticketId,
+        actorId: user.sub,
+        clientId: proposta.clientId,
+        clientUserId: ticket.client?.userId,
+        quoteId: proposta.quoteId,
+        criadaPorId: proposta.criadaPorId,
+        enviadaPorId: proposta.enviadaPorId,
+        assignedToId: ticket.assignedToId,
+        requesterId: ticket.requesterId,
+      });
+      const ticketChat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId,
+        subject: ticket.subject,
+        actorId: user.sub,
+        requesterId: ticket.requesterId,
+        assignedToId: ticket.assignedToId,
+        clientId: ticket.clientId,
+        clientUserId: ticket.client?.userId,
+        leadId: ticket.leadId,
+        quoteId: ticket.quoteId,
+        internalOnly: true,
+        participantUserIds: managementParticipantIds,
+      });
+      const managementMessage = `A proposta ${proposta.code} foi enviada para aprovacao da Gestao.`;
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: propostaChat.id,
+        authorId: user.sub,
+        content: managementMessage,
+        visibility: ChatMessageVisibility.GESTAO_COMERCIAL,
+      });
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: ticketChat.id,
+        authorId: user.sub,
+        content: managementMessage,
+        visibility: ChatMessageVisibility.GESTAO_COMERCIAL,
+      });
+
+      await Promise.all(
+        managementRecipients.map((recipient) =>
+          tx.notification.create({
+            data: {
+              userId: recipient.userId,
+              ticketId,
+              title: 'Proposta aguardando aprovacao da Gestao',
+              message:
+                'Uma proposta formal foi enviada para analise e aprovacao da Gestao.',
+              link: `/tickets?ticket=${ticketId}`,
+              metadata: {
+                propostaId,
+                propostaCode: proposta.code,
+                versao: proposta.versao,
+                status: StatusProposta.ENVIADA_PARA_GESTAO,
+              },
+            },
+          }),
+        ),
+      );
+    });
+
+    return {
+      proposta: await this.findOne(user, ticketId, propostaId),
+      ticketStatus: TicketStatus.AGUARDANDO_GESTAO,
+      mensagem: 'Proposta enviada para aprovacao da Gestao.',
+    };
   }
 
   async approveByClient(user: AuthUser, ticketId: string, propostaId: string) {
@@ -597,6 +978,7 @@ export class PropostasService {
       successMessage: 'Proposta recusada com sucesso.',
       eventType: TicketHistoryEventType.REJECTED,
       motivo,
+      notifyManagement: true,
     });
   }
 
@@ -619,6 +1001,7 @@ export class PropostasService {
       successMessage: string;
       eventType: TicketHistoryEventType;
       motivo?: string;
+      notifyManagement?: boolean;
     },
   ) {
     this.ensureClientUser(user);
@@ -650,7 +1033,17 @@ export class PropostasService {
       );
     }
 
-    const recipients = await this.getCommercialRecipients(ticket);
+    const commercialRecipients = await this.getCommercialRecipients(ticket);
+    const recipients = options.notifyManagement
+      ? Array.from(
+          new Map(
+            [
+              ...commercialRecipients,
+              ...(await this.getManagementRecipients()),
+            ].map((recipient) => [recipient.userId, recipient]),
+          ).values(),
+        )
+      : commercialRecipients;
     const now = new Date();
     const previousTicketStatus = ticket.status;
 
@@ -660,6 +1053,10 @@ export class PropostasService {
         data: {
           status: options.propostaStatus,
           [options.propostaDateField]: now,
+          motivoRecusaCliente:
+            options.propostaStatus === StatusProposta.RECUSADA_PELO_CLIENTE
+              ? (options.motivo ?? null)
+              : proposta.motivoRecusaCliente,
         },
         include: this.includePropostaRelations(user),
       });
@@ -683,6 +1080,45 @@ export class PropostasService {
           message: options.message,
           createdById: user.sub,
         },
+      });
+
+      const propostaChat = await this.chatsService.ensurePropostaChat(tx, {
+        propostaId,
+        code: proposta.code,
+        ticketId,
+        actorId: user.sub,
+        clientId: proposta.clientId,
+        clientUserId: ticket.client?.userId,
+        quoteId: proposta.quoteId,
+        criadaPorId: proposta.criadaPorId,
+        enviadaPorId: proposta.enviadaPorId,
+        assignedToId: ticket.assignedToId,
+        requesterId: ticket.requesterId,
+      });
+      const ticketChat = await this.chatsService.ensureTicketChat(tx, {
+        ticketId,
+        subject: ticket.subject,
+        actorId: user.sub,
+        requesterId: ticket.requesterId,
+        assignedToId: ticket.assignedToId,
+        clientId: ticket.clientId,
+        clientUserId: ticket.client?.userId,
+        leadId: ticket.leadId,
+        quoteId: ticket.quoteId,
+        internalOnly: ticket.internalOnly,
+      });
+
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: propostaChat.id,
+        authorId: user.sub,
+        content: options.message,
+        visibility: ChatMessageVisibility.PUBLICA_CLIENTE,
+      });
+      await this.chatsService.createMessageInTransaction(tx, {
+        chatId: ticketChat.id,
+        authorId: user.sub,
+        content: options.message,
+        visibility: ChatMessageVisibility.PUBLICA_CLIENTE,
       });
 
       await tx.ticketHistory.create({
@@ -714,6 +1150,307 @@ export class PropostasService {
               link: `/tickets?ticket=${ticketId}`,
               metadata: {
                 propostaId,
+                versao: proposta.versao,
+                status: options.propostaStatus,
+              },
+            },
+          }),
+        ),
+      );
+
+      const logEmails = await Promise.all(
+        recipients.map((recipient, index) =>
+          tx.logEmail.create({
+            data: {
+              ticketId,
+              propostaId,
+              notificationId: notifications[index]?.id ?? null,
+              userId: recipient.userId,
+              emailDestino: recipient.email,
+              assunto: options.notificationTitle,
+              resumo: options.notificationMessage,
+              template: options.emailTemplate,
+              status: StatusLogEmail.PENDENTE,
+            },
+          }),
+        ),
+      );
+
+      return {
+        proposta: updatedProposta,
+        ticketStatus: updatedTicket.status,
+        logEmails,
+      };
+    });
+
+    if (options.propostaStatus === StatusProposta.RECUSADA_PELO_CLIENTE) {
+      await this.auditLogsService.create({
+        category: AuditLogCategory.TICKET,
+        action: AuditLogAction.PROPOSAL_REJECTED,
+        message: `Cliente recusou a proposta: ${proposta.code}.`,
+        targetType: 'Proposta',
+        targetId: propostaId,
+        userId: user.sub,
+        details: {
+          ticketId,
+          propostaId,
+          motivo: options.motivo ?? null,
+          notifiedUserIds: recipients.map((recipient) => recipient.userId),
+        },
+      });
+    }
+
+    await this.deliverDecisionEmails({
+      ticketId,
+      propostaId,
+      actorId: user.sub,
+      recipients: recipients.map((recipient, index) => ({
+        ...recipient,
+        logEmailId: result.logEmails[index]?.id,
+      })),
+      subject: options.notificationTitle,
+      message: options.notificationMessage,
+      link: `/tickets?ticket=${ticketId}`,
+    });
+
+    return {
+      proposta: result.proposta,
+      ticketStatus: result.ticketStatus,
+      mensagem: options.successMessage,
+    };
+  }
+
+  async approveByManagement(
+    user: AuthUser,
+    ticketId: string,
+    propostaId: string,
+  ) {
+    this.ensureManagementUser(user);
+    return this.handleManagementDecision(user, ticketId, propostaId, {
+      propostaStatus: StatusProposta.APROVADA_PELA_GESTAO,
+      propostaDateField: 'aprovadaPelaGestaoEm',
+      ticketStatus: TicketStatus.APROVADO_GESTAO,
+      historyTitle: 'Gestao aprovou a proposta',
+      message: 'A Gestao aprovou a proposta formal.',
+      notificationTitle: 'Gestao aprovou a proposta',
+      notificationMessage:
+        'A Gestao aprovou a proposta. O retorno esta disponivel para o Comercial.',
+      emailTemplate: 'GESTAO_APROVOU_PROPOSTA',
+      successMessage: 'Proposta aprovada pela Gestao.',
+      eventType: TicketHistoryEventType.APPROVED,
+    });
+  }
+
+  async requestManagementAdjustment(
+    user: AuthUser,
+    ticketId: string,
+    propostaId: string,
+    dto: ManagementPropostaDecisionDto,
+  ) {
+    this.ensureManagementUser(user);
+    const motivo = this.sanitize(dto.motivo);
+
+    if (!motivo) {
+      throw new BadRequestException('Informe o motivo do ajuste solicitado.');
+    }
+
+    return this.handleManagementDecision(user, ticketId, propostaId, {
+      propostaStatus: StatusProposta.AJUSTE_SOLICITADO_PELA_GESTAO,
+      propostaDateField: 'ajusteSolicitadoPelaGestaoEm',
+      ticketStatus: TicketStatus.AJUSTE_SOLICITADO,
+      historyTitle: 'Gestao solicitou ajuste na proposta',
+      message: `A Gestao solicitou ajuste na proposta: ${motivo}`,
+      notificationTitle: 'Gestao solicitou ajuste na proposta',
+      notificationMessage:
+        'A Gestao solicitou ajuste na proposta. O retorno foi enviado ao Comercial.',
+      emailTemplate: 'GESTAO_SOLICITOU_AJUSTE_PROPOSTA',
+      successMessage: 'Ajuste solicitado ao Comercial.',
+      eventType: TicketHistoryEventType.ADJUSTMENT_REQUESTED,
+      motivo,
+    });
+  }
+
+  async rejectByManagement(
+    user: AuthUser,
+    ticketId: string,
+    propostaId: string,
+    dto: ManagementPropostaDecisionDto,
+  ) {
+    this.ensureManagementUser(user);
+    const motivo = this.sanitize(dto.motivo);
+
+    if (!motivo) {
+      throw new BadRequestException('Informe o motivo da recusa.');
+    }
+
+    return this.handleManagementDecision(user, ticketId, propostaId, {
+      propostaStatus: StatusProposta.RECUSADA_PELA_GESTAO,
+      propostaDateField: 'recusadaPelaGestaoEm',
+      ticketStatus: TicketStatus.REPROVADO,
+      historyTitle: 'Gestao recusou a proposta',
+      message: `A Gestao recusou a proposta: ${motivo}`,
+      notificationTitle: 'Gestao recusou a proposta',
+      notificationMessage:
+        'A Gestao recusou a proposta. O retorno foi enviado ao Comercial.',
+      emailTemplate: 'GESTAO_RECUSOU_PROPOSTA',
+      successMessage: 'Proposta recusada pela Gestao.',
+      eventType: TicketHistoryEventType.REJECTED,
+      motivo,
+    });
+  }
+
+  private async handleManagementDecision(
+    user: AuthUser,
+    ticketId: string,
+    propostaId: string,
+    options: {
+      propostaStatus: StatusProposta;
+      propostaDateField:
+        | 'aprovadaPelaGestaoEm'
+        | 'ajusteSolicitadoPelaGestaoEm'
+        | 'recusadaPelaGestaoEm';
+      ticketStatus: TicketStatus;
+      historyTitle: string;
+      message: string;
+      notificationTitle: string;
+      notificationMessage: string;
+      emailTemplate: string;
+      successMessage: string;
+      eventType: TicketHistoryEventType;
+      motivo?: string;
+    },
+  ) {
+    const ticket = await this.getTicketOrThrow(ticketId, user);
+    const proposta = await this.prisma.proposta.findFirst({
+      where: {
+        id: propostaId,
+        ticketId,
+      },
+    });
+
+    if (!proposta) {
+      throw new NotFoundException('Proposta nao encontrada.');
+    }
+
+    if (proposta.status !== StatusProposta.ENVIADA_PARA_GESTAO) {
+      throw new BadRequestException(
+        'A proposta nao esta aguardando decisao da Gestao.',
+      );
+    }
+
+    const recipients = await this.getCommercialRecipients(ticket);
+    const now = new Date();
+    const previousTicketStatus = ticket.status;
+    let approvedNegotiatedValue: Prisma.Decimal | null = null;
+
+    if (options.propostaStatus === StatusProposta.APROVADA_PELA_GESTAO) {
+      approvedNegotiatedValue = proposta.valor;
+
+      if (
+        (!approvedNegotiatedValue || approvedNegotiatedValue.lte(0)) &&
+        proposta.quoteId
+      ) {
+        const quote = await this.prisma.quote.findUnique({
+          where: { id: proposta.quoteId },
+          select: {
+            price: true,
+          },
+        });
+
+        approvedNegotiatedValue = quote?.price ?? null;
+      }
+
+      if (!approvedNegotiatedValue || approvedNegotiatedValue.lte(0)) {
+        throw new BadRequestException(
+          'Informe o valor do servico negociado antes de aprovar a proposta.',
+        );
+      }
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedProposta = await tx.proposta.update({
+        where: { id: propostaId },
+        data: {
+          status: options.propostaStatus,
+          [options.propostaDateField]: now,
+        },
+        include: this.includePropostaRelations(user),
+      });
+
+      if (
+        options.propostaStatus === StatusProposta.APROVADA_PELA_GESTAO &&
+        proposta.opportunityId &&
+        approvedNegotiatedValue
+      ) {
+        await tx.opportunity.update({
+          where: { id: proposta.opportunityId },
+          data: {
+            value: approvedNegotiatedValue,
+            stage: OpportunityStage.GANHO,
+            status: OpportunityStatus.WON,
+          },
+        });
+      }
+
+      const updatedTicket = await tx.ticket.update({
+        where: { id: ticketId },
+        data: {
+          type:
+            options.propostaStatus ===
+            StatusProposta.AJUSTE_SOLICITADO_PELA_GESTAO
+              ? TicketType.AJUSTE_GESTAO
+              : ticket.type,
+          status: options.ticketStatus,
+          requiresActionRole: this.getActionRole(options.ticketStatus),
+          lastInteractionAt: now,
+        },
+        select: {
+          status: true,
+        },
+      });
+
+      await tx.ticketMessage.create({
+        data: {
+          ticketId,
+          senderType: MessageSenderType.INTERNO,
+          message: options.message,
+          isInternal: true,
+          createdById: user.sub,
+        },
+      });
+
+      await tx.ticketHistory.create({
+        data: {
+          ticketId,
+          eventType: options.eventType,
+          title: options.historyTitle,
+          description: options.message,
+          internalOnly: true,
+          createdById: user.sub,
+          metadata: {
+            propostaId,
+            propostaCode: proposta.code,
+            versao: proposta.versao,
+            motivo: options.motivo ?? null,
+            ticketStatusAnterior: previousTicketStatus,
+            ticketStatusNovo: options.ticketStatus,
+            propostaStatus: options.propostaStatus,
+          },
+        },
+      });
+
+      const notifications = await Promise.all(
+        recipients.map((recipient) =>
+          tx.notification.create({
+            data: {
+              userId: recipient.userId,
+              ticketId,
+              title: options.notificationTitle,
+              message: options.notificationMessage,
+              link: `/tickets?ticket=${ticketId}`,
+              metadata: {
+                propostaId,
+                propostaCode: proposta.code,
                 versao: proposta.versao,
                 status: options.propostaStatus,
               },
@@ -781,6 +1518,28 @@ export class PropostasService {
     const users = await this.prisma.user.findMany({
       where: {
         role: PrismaUserRole.COMERCIAL,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    return users.map((recipient) => ({
+      userId: recipient.id,
+      name: recipient.name,
+      email: recipient.email,
+    }));
+  }
+
+  private async getManagementRecipients() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: {
+          in: [PrismaUserRole.GESTAO, PrismaUserRole.ADMIN],
+        },
         isActive: true,
       },
       select: {

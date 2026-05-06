@@ -10,12 +10,14 @@ import {
   OpportunityStage,
   OpportunityStatus,
   Prisma,
+  StatusProposta,
   TimelineEventType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
+import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { UpdateOpportunityStageDto } from './dto/update-opportunity-stage.dto';
 
 @Injectable()
@@ -45,6 +47,75 @@ export class OpportunitiesService {
     }
 
     return OpportunityStatus.OPEN;
+  }
+
+  private isPositiveDecimal(value: Prisma.Decimal | null | undefined) {
+    return value !== null && value !== undefined && value.gt(0);
+  }
+
+  private sanitize(value?: string | null) {
+    const trimmed = value?.trim();
+    return trimmed || null;
+  }
+
+  private async resolveNegotiatedValueForGain(opportunity: {
+    id: string;
+    quoteId?: string | null;
+    value?: Prisma.Decimal | null;
+  }) {
+    if (this.isPositiveDecimal(opportunity.value)) {
+      return opportunity.value;
+    }
+
+    const latestProposta = await this.prisma.proposta.findFirst({
+      where: {
+        opportunityId: opportunity.id,
+        valor: {
+          not: null,
+        },
+        status: {
+          notIn: [
+            StatusProposta.RASCUNHO,
+            StatusProposta.CANCELADA,
+            StatusProposta.EXPIRADA,
+          ],
+        },
+      },
+      orderBy: [
+        {
+          versao: 'desc',
+        },
+        {
+          updatedAt: 'desc',
+        },
+      ],
+      select: {
+        valor: true,
+      },
+    });
+
+    const latestPropostaValue = latestProposta?.valor;
+
+    if (this.isPositiveDecimal(latestPropostaValue)) {
+      return latestPropostaValue;
+    }
+
+    if (opportunity.quoteId) {
+      const quote = await this.prisma.quote.findUnique({
+        where: { id: opportunity.quoteId },
+        select: {
+          price: true,
+        },
+      });
+
+      const quotePrice = quote?.price;
+
+      if (this.isPositiveDecimal(quotePrice)) {
+        return quotePrice;
+      }
+    }
+
+    return null;
   }
 
   async create(user: AuthUser, dto: CreateOpportunityDto) {
@@ -190,7 +261,11 @@ export class OpportunitiesService {
     });
   }
 
-  async updateStage(user: AuthUser, id: string, dto: UpdateOpportunityStageDto) {
+  async updateStage(
+    user: AuthUser,
+    id: string,
+    dto: UpdateOpportunityStageDto,
+  ) {
     this.ensureInternalUser(user);
 
     const opportunity = await this.prisma.opportunity.findUnique({
@@ -211,6 +286,17 @@ export class OpportunitiesService {
     if (dto.stage === OpportunityStage.PERDIDO && !dto.lostReason?.trim()) {
       throw new BadRequestException(
         'Informe o motivo da perda ao marcar a oportunidade como perdida.',
+      );
+    }
+
+    const negotiatedValue =
+      dto.stage === OpportunityStage.GANHO
+        ? await this.resolveNegotiatedValueForGain(opportunity)
+        : null;
+
+    if (dto.stage === OpportunityStage.GANHO && !negotiatedValue) {
+      throw new BadRequestException(
+        'Informe o valor do servico negociado antes de marcar a oportunidade como ganha.',
       );
     }
 
@@ -240,9 +326,10 @@ export class OpportunitiesService {
         data: {
           stage: dto.stage,
           status: nextStatus,
+          ...(negotiatedValue ? { value: negotiatedValue } : {}),
           lostReason:
             dto.stage === OpportunityStage.PERDIDO
-              ? dto.lostReason?.trim() ?? null
+              ? (dto.lostReason?.trim() ?? null)
               : null,
         },
       });
@@ -260,7 +347,7 @@ export class OpportunitiesService {
             to: dto.stage,
             lostReason:
               dto.stage === OpportunityStage.PERDIDO
-                ? dto.lostReason?.trim() ?? null
+                ? (dto.lostReason?.trim() ?? null)
                 : null,
           },
         },
@@ -281,8 +368,172 @@ export class OpportunitiesService {
         to: dto.stage,
         lostReason:
           dto.stage === OpportunityStage.PERDIDO
-            ? dto.lostReason?.trim() ?? null
+            ? (dto.lostReason?.trim() ?? null)
             : null,
+      },
+    });
+
+    return updatedOpportunity;
+  }
+
+  async update(user: AuthUser, id: string, dto: UpdateOpportunityDto) {
+    this.ensureInternalUser(user);
+
+    const opportunity = await this.prisma.opportunity.findUnique({
+      where: { id },
+      include: {
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException('Oportunidade nao encontrada.');
+    }
+
+    const nextTitle =
+      dto.title !== undefined ? this.sanitize(dto.title) : undefined;
+
+    if (dto.title !== undefined && !nextTitle) {
+      throw new BadRequestException('Informe o titulo da oportunidade.');
+    }
+
+    if (dto.quoteId) {
+      const quote = await this.prisma.quote.findUnique({
+        where: { id: dto.quoteId },
+        select: {
+          id: true,
+          clientId: true,
+        },
+      });
+
+      if (!quote || quote.clientId !== opportunity.clientId) {
+        throw new BadRequestException('Cotacao invalida para este cliente.');
+      }
+    }
+
+    const nextStage = dto.stage ?? opportunity.stage;
+    const nextLostReason =
+      nextStage === OpportunityStage.PERDIDO
+        ? (this.sanitize(dto.lostReason) ?? opportunity.lostReason ?? null)
+        : null;
+
+    if (nextStage === OpportunityStage.PERDIDO) {
+      if (!nextLostReason) {
+        throw new BadRequestException(
+          'Informe o motivo da perda ao marcar a oportunidade como perdida.',
+        );
+      }
+    }
+
+    const changedFields = [
+      nextTitle !== undefined && nextTitle !== opportunity.title
+        ? 'titulo'
+        : null,
+      dto.quoteId !== undefined && dto.quoteId !== opportunity.quoteId
+        ? 'cotacao'
+        : null,
+      dto.value !== undefined &&
+      String(dto.value ?? '') !== String(opportunity.value ?? '')
+        ? 'valor'
+        : null,
+      dto.stage !== undefined && dto.stage !== opportunity.stage
+        ? 'etapa'
+        : null,
+      dto.expectedCloseDate !== undefined &&
+      String(dto.expectedCloseDate ?? '') !==
+        String(opportunity.expectedCloseDate ?? '')
+        ? 'previsao de fechamento'
+        : null,
+      dto.preContract !== undefined &&
+      dto.preContract !== opportunity.preContract
+        ? 'pre-contrato'
+        : null,
+      dto.preContractNotes !== undefined &&
+      this.sanitize(dto.preContractNotes) !== opportunity.preContractNotes
+        ? 'observacoes do pre-contrato'
+        : null,
+      dto.lostReason !== undefined &&
+      this.sanitize(dto.lostReason) !== opportunity.lostReason
+        ? 'motivo da perda'
+        : null,
+    ].filter(Boolean);
+
+    const updateData: Prisma.OpportunityUncheckedUpdateInput = {
+      ...(nextTitle !== undefined ? { title: nextTitle as string } : {}),
+      ...(dto.quoteId !== undefined ? { quoteId: dto.quoteId } : {}),
+      ...(dto.value !== undefined
+        ? {
+            value: dto.value === null ? null : new Prisma.Decimal(dto.value),
+          }
+        : {}),
+      ...(dto.stage !== undefined
+        ? {
+            stage: dto.stage,
+            status: this.mapStageToStatus(dto.stage),
+          }
+        : {}),
+      ...(dto.expectedCloseDate !== undefined
+        ? {
+            expectedCloseDate: dto.expectedCloseDate
+              ? new Date(dto.expectedCloseDate)
+              : null,
+          }
+        : {}),
+      ...(dto.preContract !== undefined ? { preContract: dto.preContract } : {}),
+      ...(dto.preContractNotes !== undefined
+        ? { preContractNotes: this.sanitize(dto.preContractNotes) }
+        : {}),
+      ...(dto.stage !== undefined || dto.lostReason !== undefined
+        ? { lostReason: nextLostReason }
+        : {}),
+    };
+
+    const updatedOpportunity = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.opportunity.update({
+        where: { id },
+        data: updateData,
+        include: {
+          client: {
+            include: {
+              user: true,
+            },
+          },
+          quote: true,
+        },
+      });
+
+      if (changedFields.length > 0) {
+        await tx.timelineEvent.create({
+          data: {
+            clientId: opportunity.clientId,
+            type: TimelineEventType.NOTE_ADDED,
+            title: 'Oportunidade editada',
+            description: `Campos atualizados: ${changedFields.join(', ')}.`,
+            createdById: user.sub,
+            metadata: {
+              opportunityId: id,
+              changedFields,
+            },
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.CUSTOM,
+      message: `Oportunidade editada: ${updatedOpportunity.title}.`,
+      targetType: 'Opportunity',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        changedFields,
       },
     });
 

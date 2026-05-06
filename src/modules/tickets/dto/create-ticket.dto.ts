@@ -1,4 +1,10 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { TicketType } from '@prisma/client';
 
 export class CreateTicketDto {
@@ -25,6 +31,10 @@ export class CreateTicketDto {
   @IsOptional()
   @IsEnum(TicketType)
   type?: TicketType;
+
+  @IsOptional()
+  @IsBoolean()
+  isInternal?: boolean;
 
   @IsString()
   subject!: string;

@@ -17,9 +17,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateTimelineNoteDto } from './dto/create-timeline-note.dto';
+import { DecideClientDeletionDto } from './dto/decide-client-deletion.dto';
+import { RequestClientDeletionDto } from './dto/request-client-deletion.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
-@ApiTags('Clients')
+@ApiTags('Clientes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('clients')
@@ -59,6 +61,27 @@ export class ClientsController {
   @Get('dashboard/summary')
   getDashboardSummary(@CurrentUser() user: AuthUser) {
     return this.clientsService.getDashboardSummary(user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Get('deletion-requests')
+  getDeletionRequests(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: string,
+  ) {
+    return this.clientsService.getDeletionRequests(user, status);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO)
+  @Post('deletion-requests/:requestId/decision')
+  decideDeletionRequest(
+    @CurrentUser() user: AuthUser,
+    @Param('requestId') requestId: string,
+    @Body() dto: DecideClientDeletionDto,
+  ) {
+    return this.clientsService.decideDeletionRequest(user, requestId, dto);
   }
 
   @UseGuards(RolesGuard)
@@ -123,5 +146,16 @@ export class ClientsController {
     @Body() dto: UpdateClientDto,
   ) {
     return this.clientsService.update(user, id, dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Post(':id/deletion-request')
+  requestDeletion(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RequestClientDeletionDto,
+  ) {
+    return this.clientsService.requestDeletion(user, id, dto);
   }
 }

@@ -19,7 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import type { AuthUser } from '../auth/types/auth-user.type';
 
-@ApiTags('Users')
+@ApiTags('Usuarios')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)

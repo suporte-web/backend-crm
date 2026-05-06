@@ -21,6 +21,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { RespondQuoteDto } from './dto/respond-quote.dto';
+import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 
 @Injectable()
@@ -31,12 +32,77 @@ export class QuotesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private buildQuoteInclude() {
+    return {
+      client: {
+        include: {
+          user: true,
+        },
+      },
+      history: {
+        orderBy: {
+          createdAt: 'desc' as const,
+        },
+      },
+      tickets: {
+        include: {
+          client: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      },
+      propostas: {
+        orderBy: [
+          {
+            versao: 'desc' as const,
+          },
+          {
+            updatedAt: 'desc' as const,
+          },
+        ],
+      },
+    };
+  }
+
+  private isInternalUser(user: { role: string }) {
+    return ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role);
+  }
+
+  private sanitize(value?: string | null) {
+    const trimmed = value?.trim();
+    return trimmed || null;
+  }
+
+  private formatQuoteStatus(status: QuoteStatus) {
+    const labels: Record<QuoteStatus, string> = {
+      RECEIVED: 'Recebida',
+      IN_ANALYSIS: 'Em analise',
+      ANSWERED: 'Respondida',
+      APPROVED: 'Aprovada',
+      REJECTED: 'Rejeitada',
+    };
+
+    return labels[status];
+  }
+
+  private generateDisplayCode(prefix: 'COT' | 'PROP', source: string) {
+    let hash = 0;
+
+    for (const char of source) {
+      hash = (hash * 31 + char.charCodeAt(0)) % 1000000;
+    }
+
+    return `${prefix}-${String(hash).padStart(6, '0')}`;
+  }
+
   private ensureInternalUser(user: { sub: string; role: string }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'You do not have permission to perform this action',
+        'Voce nao tem permissao para executar esta acao.',
       );
     }
   }
@@ -59,26 +125,29 @@ export class QuotesService {
     const quote = await this.prisma.$transaction(async (tx) => {
       const createdQuote = await tx.quote.create({
         data: {
+          code: `TMP-${Date.now()}`,
           clientId,
           origin: dto.origin,
           destination: dto.destination,
           serviceType: dto.serviceType,
-          requestType: dto.requestType,
-          pickupAddress: dto.pickupAddress,
-          deliveryAddress: dto.deliveryAddress,
-          cargoDescription: dto.cargoDescription,
-          contactName: dto.contactName,
-          contactPhone: dto.contactPhone,
-          contactEmail: dto.contactEmail,
+          requestType: this.sanitize(dto.requestType),
+          pickupAddress: this.sanitize(dto.pickupAddress),
+          deliveryAddress: this.sanitize(dto.deliveryAddress),
+          cargoDescription: this.sanitize(dto.cargoDescription),
+          contactName: this.sanitize(dto.contactName),
+          contactPhone: this.sanitize(dto.contactPhone),
+          contactEmail: this.sanitize(dto.contactEmail),
           weight: dto.weight,
           volume: dto.volume,
           quantity: dto.quantity,
           merchandiseValue:
-            dto.merchandiseValue !== undefined ? dto.merchandiseValue : undefined,
+            dto.merchandiseValue !== undefined
+              ? dto.merchandiseValue
+              : undefined,
           desiredDeadline: dto.desiredDeadline
             ? new Date(dto.desiredDeadline)
             : null,
-          notes: dto.notes,
+          notes: this.sanitize(dto.notes),
           history: {
             create: {
               status: QuoteStatus.RECEIVED,
@@ -87,16 +156,18 @@ export class QuotesService {
           },
         },
         include: {
-          history: {
-            orderBy: {
-              createdAt: 'desc',
-            },
-          },
-          client: {
-            include: {
-              user: true,
-            },
-          },
+          ...this.buildQuoteInclude(),
+        },
+      });
+
+      const quoteCode = this.generateDisplayCode('COT', createdQuote.id);
+      const quoteWithCode = await tx.quote.update({
+        where: { id: createdQuote.id },
+        data: {
+          code: quoteCode,
+        },
+        include: {
+          ...this.buildQuoteInclude(),
         },
       });
 
@@ -107,10 +178,6 @@ export class QuotesService {
           title: shouldCreatePreContract
             ? `Pre-contrato - ${dto.serviceType}`
             : `Cotacao - ${dto.serviceType}`,
-          value:
-            dto.merchandiseValue !== undefined
-              ? dto.merchandiseValue
-              : undefined,
           stage: OpportunityStage.NOVO,
           preContract: shouldCreatePreContract,
           preContractNotes: shouldCreatePreContract
@@ -128,6 +195,7 @@ export class QuotesService {
           createdById: user?.sub,
           metadata: {
             quoteId: createdQuote.id,
+            quoteCode,
             opportunityId: opportunity.id,
             preContract: shouldCreatePreContract,
           },
@@ -194,7 +262,7 @@ export class QuotesService {
         tx,
       );
 
-      return createdQuote;
+      return quoteWithCode;
     });
 
     await this.auditLogsService.create({
@@ -218,11 +286,7 @@ export class QuotesService {
     return this.prisma.quote.findMany({
       where: { clientId },
       include: {
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
+        ...this.buildQuoteInclude(),
       },
       orderBy: {
         createdAt: 'desc',
@@ -247,7 +311,7 @@ export class QuotesService {
       );
 
       if (!isValidStatus) {
-        throw new BadRequestException('Invalid quote status');
+        throw new BadRequestException('Status da cotacao invalido.');
       }
 
       where.status = filters.status as QuoteStatus;
@@ -260,16 +324,7 @@ export class QuotesService {
     return this.prisma.quote.findMany({
       where,
       include: {
-        client: {
-          include: {
-            user: true,
-          },
-        },
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
+        ...this.buildQuoteInclude(),
       },
       orderBy: {
         createdAt: 'desc',
@@ -281,28 +336,222 @@ export class QuotesService {
     const quote = await this.prisma.quote.findUnique({
       where: { id },
       include: {
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        client: {
-          include: {
-            user: true,
-          },
-        },
+        ...this.buildQuoteInclude(),
       },
     });
 
     if (!quote) {
-      throw new NotFoundException('Quote not found');
+      throw new NotFoundException('Cotacao nao encontrada.');
     }
 
-    if (user.role === 'CLIENTE' && quote.client.userId !== user.sub) {
-      throw new NotFoundException('Quote not found');
+    if (user.role === 'CLIENTE' && quote.client?.userId !== user.sub) {
+      throw new NotFoundException('Cotacao nao encontrada.');
     }
 
     return quote;
+  }
+
+  async update(
+    user: { sub: string; role: string },
+    id: string,
+    dto: UpdateQuoteDto,
+  ) {
+    const quote = await this.findOne(user, id);
+    const isClientOwner =
+      user.role === 'CLIENTE' && quote.client.userId === user.sub;
+    const editableStatuses: QuoteStatus[] = [
+      QuoteStatus.RECEIVED,
+      QuoteStatus.IN_ANALYSIS,
+    ];
+    const canClientEdit =
+      isClientOwner && editableStatuses.includes(quote.status);
+
+    if (!this.isInternalUser({ role: user.role }) && !canClientEdit) {
+      throw new ForbiddenException('Voce nao pode editar esta cotacao.');
+    }
+
+    const changedFields = [
+      dto.origin !== undefined && dto.origin !== quote.origin ? 'origem' : null,
+      dto.destination !== undefined && dto.destination !== quote.destination
+        ? 'destino'
+        : null,
+      dto.serviceType !== undefined && dto.serviceType !== quote.serviceType
+        ? 'tipo de servico'
+        : null,
+      dto.requestType !== undefined &&
+      this.sanitize(dto.requestType) !== quote.requestType
+        ? 'tipo de solicitacao'
+        : null,
+      dto.pickupAddress !== undefined &&
+      this.sanitize(dto.pickupAddress) !== quote.pickupAddress
+        ? 'endereco de coleta'
+        : null,
+      dto.deliveryAddress !== undefined &&
+      this.sanitize(dto.deliveryAddress) !== quote.deliveryAddress
+        ? 'endereco de entrega'
+        : null,
+      dto.cargoDescription !== undefined &&
+      this.sanitize(dto.cargoDescription) !== quote.cargoDescription
+        ? 'descricao da carga'
+        : null,
+      dto.contactName !== undefined &&
+      this.sanitize(dto.contactName) !== quote.contactName
+        ? 'contato'
+        : null,
+      dto.contactPhone !== undefined &&
+      this.sanitize(dto.contactPhone) !== quote.contactPhone
+        ? 'telefone'
+        : null,
+      dto.contactEmail !== undefined &&
+      this.sanitize(dto.contactEmail) !== quote.contactEmail
+        ? 'e-mail'
+        : null,
+      dto.weight !== undefined && dto.weight !== quote.weight ? 'peso' : null,
+      dto.volume !== undefined && dto.volume !== quote.volume
+        ? 'volume'
+        : null,
+      dto.quantity !== undefined && dto.quantity !== quote.quantity
+        ? 'quantidade'
+        : null,
+      dto.merchandiseValue !== undefined &&
+      String(dto.merchandiseValue ?? '') !==
+        String(quote.merchandiseValue ?? '')
+        ? 'valor da mercadoria'
+        : null,
+      dto.desiredDeadline !== undefined &&
+      String(dto.desiredDeadline ?? '') !== String(quote.desiredDeadline ?? '')
+        ? 'prazo desejado'
+        : null,
+      dto.notes !== undefined && this.sanitize(dto.notes) !== quote.notes
+        ? 'observacoes'
+        : null,
+    ].filter(Boolean);
+
+    const updatedQuote = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.quote.update({
+        where: { id },
+        data: {
+          origin: dto.origin,
+          destination: dto.destination,
+          serviceType: dto.serviceType,
+          requestType:
+            dto.requestType !== undefined
+              ? this.sanitize(dto.requestType)
+              : undefined,
+          pickupAddress:
+            dto.pickupAddress !== undefined
+              ? this.sanitize(dto.pickupAddress)
+              : undefined,
+          deliveryAddress:
+            dto.deliveryAddress !== undefined
+              ? this.sanitize(dto.deliveryAddress)
+              : undefined,
+          cargoDescription:
+            dto.cargoDescription !== undefined
+              ? this.sanitize(dto.cargoDescription)
+              : undefined,
+          contactName:
+            dto.contactName !== undefined
+              ? this.sanitize(dto.contactName)
+              : undefined,
+          contactPhone:
+            dto.contactPhone !== undefined
+              ? this.sanitize(dto.contactPhone)
+              : undefined,
+          contactEmail:
+            dto.contactEmail !== undefined
+              ? this.sanitize(dto.contactEmail)
+              : undefined,
+          weight: dto.weight,
+          volume: dto.volume,
+          quantity: dto.quantity,
+          merchandiseValue: dto.merchandiseValue,
+          desiredDeadline:
+            dto.desiredDeadline !== undefined
+              ? dto.desiredDeadline
+                ? new Date(dto.desiredDeadline)
+                : null
+              : undefined,
+          notes: dto.notes !== undefined ? this.sanitize(dto.notes) : undefined,
+          history: {
+            create: {
+              status: quote.status,
+              notes: `Cotacao editada por ${user.role === 'CLIENTE' ? 'cliente' : 'equipe interna'}.`,
+            },
+          },
+        },
+        include: {
+          ...this.buildQuoteInclude(),
+        },
+      });
+
+      if (changedFields.length > 0) {
+        await tx.ticket.updateMany({
+          where: { quoteId: id },
+          data: {
+            subject: `Nova cotacao: ${updated.serviceType}`,
+            description: `Cliente ${
+              updated.client.companyName ?? updated.client.user.name
+            } enviou cotacao de ${updated.origin} para ${updated.destination}.`,
+            lastInteractionAt: new Date(),
+          },
+        });
+
+        if (updated.tickets.length > 0) {
+          await tx.ticketHistory.createMany({
+            data: updated.tickets.map((ticket) => ({
+              ticketId: ticket.id,
+              eventType: TicketHistoryEventType.STATUS_CHANGED,
+              title: 'Cotacao editada',
+              description: `Campos atualizados: ${changedFields.join(', ')}.`,
+              createdById: user.sub,
+              metadata: {
+                quoteId: id,
+                quoteCode: updated.code,
+                changedFields,
+              },
+            })),
+          });
+        }
+
+        if (
+          dto.serviceType !== undefined ||
+          dto.desiredDeadline !== undefined
+        ) {
+          await tx.opportunity.updateMany({
+            where: { quoteId: id },
+            data: {
+              ...(dto.serviceType !== undefined
+                ? { title: `Cotacao - ${updated.serviceType}` }
+                : {}),
+              ...(dto.desiredDeadline !== undefined
+                ? {
+                    expectedCloseDate: dto.desiredDeadline
+                      ? new Date(dto.desiredDeadline)
+                      : null,
+                  }
+                : {}),
+            },
+          });
+        }
+      }
+
+      return updated;
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.CUSTOM,
+      message: `Cotacao ${updatedQuote.code} editada.`,
+      targetType: 'Quote',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        changedFields,
+      },
+    });
+
+    return updatedQuote;
   }
 
   async updateStatus(
@@ -320,23 +569,21 @@ export class QuotesService {
         history: {
           create: {
             status: dto.status,
-            notes: dto.notes ?? `Status updated to ${dto.status}`,
+            notes:
+              dto.notes ??
+              `Status atualizado para ${this.formatQuoteStatus(dto.status)}.`,
           },
         },
       },
       include: {
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
+        ...this.buildQuoteInclude(),
       },
     });
 
     await this.auditLogsService.create({
       category: AuditLogCategory.QUOTE,
       action: AuditLogAction.QUOTE_STATUS_CHANGED,
-      message: `Status da cotacao alterado para ${dto.status}.`,
+      message: `Status da cotacao alterado para ${this.formatQuoteStatus(dto.status)}.`,
       targetType: 'Quote',
       targetId: id,
       userId: user.sub,
@@ -361,30 +608,25 @@ export class QuotesService {
       where: { id },
       data: {
         price: dto.price,
-        commercialNotes: dto.commercialNotes,
+        commercialNotes: this.sanitize(dto.commercialNotes),
         status: QuoteStatus.ANSWERED,
         history: {
           create: {
             status: QuoteStatus.ANSWERED,
-            notes: dto.commercialNotes ?? 'Commercial response sent',
+            notes: dto.commercialNotes ?? 'Resposta comercial enviada',
           },
         },
       },
       include: {
-        history: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        tickets: {
-          include: {
-            client: {
-              include: {
-                user: true,
-              },
-            },
-          },
-        },
+        ...this.buildQuoteInclude(),
+      },
+    });
+
+    await this.prisma.opportunity.updateMany({
+      where: { quoteId: id },
+      data: {
+        value: dto.price,
+        stage: OpportunityStage.PROPOSTA,
       },
     });
 
@@ -424,21 +666,23 @@ export class QuotesService {
             },
           });
 
-          await this.notificationsService.notifyUsers(
-            [updatedTicket.client?.userId],
-            {
-              ticketId: updatedTicket.id,
-              title: 'Sua solicitacao foi respondida',
-              message:
-                'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
-              actorId: user.sub,
-              emailSubject: 'Sua solicitacao foi respondida',
-              emailSummary:
-                dto.commercialNotes ??
-                `Proposta registrada no valor ${dto.price}.`,
-            },
-            tx,
-          );
+          if (updatedTicket.client?.userId) {
+            await this.notificationsService.notifyUsers(
+              [updatedTicket.client.userId],
+              {
+                ticketId: updatedTicket.id,
+                title: 'Sua solicitacao foi respondida',
+                message:
+                  'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
+                actorId: user.sub,
+                emailSubject: 'Sua solicitacao foi respondida',
+                emailSummary:
+                  this.sanitize(dto.commercialNotes) ??
+                  `Proposta registrada no valor ${dto.price}.`,
+              },
+              tx,
+            );
+          }
         }
       });
     }
@@ -456,5 +700,46 @@ export class QuotesService {
     });
 
     return updatedQuote;
+  }
+
+  async remove(user: { sub: string; role: string }, id: string) {
+    const quote = await this.findOne(user, id);
+    const isClientOwner =
+      user.role === 'CLIENTE' && quote.client.userId === user.sub;
+    const deletableStatuses: QuoteStatus[] = [
+      QuoteStatus.RECEIVED,
+      QuoteStatus.IN_ANALYSIS,
+    ];
+    const canClientDelete =
+      isClientOwner && deletableStatuses.includes(quote.status);
+
+    if (!this.isInternalUser({ role: user.role }) && !canClientDelete) {
+      throw new ForbiddenException('Voce nao pode excluir esta cotacao.');
+    }
+
+    await this.prisma.quote.delete({
+      where: { id },
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.QUOTE_DELETED,
+      message: `Cotacao ${quote.code} excluida.`,
+      targetType: 'Quote',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        quoteId: id,
+        quoteCode: quote.code,
+        clientId: quote.clientId,
+        clientName:
+          quote.client?.companyName ?? quote.client?.user?.name ?? null,
+        clientEmail: quote.client?.user?.email ?? null,
+        previousStatus: quote.status,
+        serviceType: quote.serviceType,
+      },
+    });
+
+    return { message: 'Cotacao excluida com sucesso.' };
   }
 }

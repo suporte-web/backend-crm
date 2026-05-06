@@ -10,7 +10,7 @@ import type { AuthUser } from '../auth/types/auth-user.type';
 import { AuditLogsService } from './audit-logs.service';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 
-@ApiTags('Audit Logs')
+@ApiTags('Logs de Auditoria')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.GESTAO)

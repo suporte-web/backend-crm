@@ -30,7 +30,7 @@ import { PortalContentService } from './portal-content.service';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { diskStorage } = require('multer');
 
-@ApiTags('Portal Content')
+@ApiTags('Conteudo do Portal')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('portal-content')

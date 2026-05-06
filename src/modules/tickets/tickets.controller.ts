@@ -23,7 +23,7 @@ import {
 } from './dto/ticket-actions.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 
-@ApiTags('Tickets')
+@ApiTags('Atendimentos')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('tickets')

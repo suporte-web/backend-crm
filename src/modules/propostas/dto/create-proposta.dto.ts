@@ -6,6 +6,7 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreatePropostaDto {
   @IsString()
@@ -28,6 +29,7 @@ export class CreatePropostaDto {
   destino?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   valor?: number;
 
@@ -44,6 +46,7 @@ export class CreatePropostaDto {
   observacoes?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @IsPositive()
   validadeDias?: number;

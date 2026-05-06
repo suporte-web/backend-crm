@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuditLogAction, AuditLogCategory, AuditLogLevel, UserRole } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -55,10 +56,12 @@ export class AuthService {
       sub: string;
       email: string;
       role: UserRole;
+      mustChangePassword: boolean;
     } = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      mustChangePassword: user.mustChangePassword,
     };
 
     await this.auditLogsService.create({
@@ -77,6 +80,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        mustChangePassword: user.mustChangePassword,
         clientProfile: user.clientProfile ?? null,
       },
     };
@@ -84,6 +88,19 @@ export class AuthService {
 
   async me(userId: string) {
     return this.usersService.findOne(userId);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.usersService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+
+    return {
+      message: 'Senha atualizada com sucesso.',
+      user,
+    };
   }
 }
 

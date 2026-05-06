@@ -39,6 +39,7 @@ export class UsersService {
         name: dto.name,
         email: dto.email,
         passwordHash,
+        mustChangePassword: true,
         role: dto.role,
         isActive: dto.isActive ?? true,
         clientProfile:
@@ -68,6 +69,7 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
         clientProfile: {
@@ -110,6 +112,7 @@ export class UsersService {
         email: true,
         role: true,
         isActive: true,
+        mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
         clientProfile: {
@@ -139,6 +142,7 @@ export class UsersService {
         email: true,
         role: true,
         isActive: true,
+        mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
         clientProfile: {
@@ -158,7 +162,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Usuario nao encontrado.');
     }
 
     return user;
@@ -177,6 +181,7 @@ export class UsersService {
         email: true,
         role: true,
         isActive: true,
+        mustChangePassword: true,
       },
       orderBy: {
         name: 'asc',
@@ -191,6 +196,69 @@ export class UsersService {
     });
   }
 
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado.');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new BadRequestException('Senha atual invalida.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        mustChangePassword: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: true,
+      },
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.USER_UPDATED,
+      message: `Senha atualizada por ${updated.email}.`,
+      targetType: 'User',
+      targetId: updated.id,
+      userId: updated.id,
+      details: {
+        mustChangePassword: false,
+      },
+    });
+
+    return updated;
+  }
+
   async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
@@ -198,7 +266,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Usuario nao encontrado.');
     }
 
     if (dto.email) {
@@ -252,6 +320,7 @@ export class UsersService {
         email: true,
         role: true,
         isActive: true,
+        mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
         clientProfile: {
@@ -292,7 +361,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Usuario nao encontrado.');
     }
 
     await this.prisma.user.delete({
@@ -308,6 +377,6 @@ export class UsersService {
       userId: actor?.sub,
     });
 
-    return { message: 'User deleted successfully' };
+    return { message: 'Usuario removido com sucesso.' };
   }
 }
