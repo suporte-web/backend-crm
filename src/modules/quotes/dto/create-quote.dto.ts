@@ -10,19 +10,19 @@ import {
 } from 'class-validator';
 
 export class CreateQuoteDto {
-  @ApiProperty({ description: 'Cidade ou ponto de origem da cotacao.' })
+  @ApiProperty({ description: 'Cidade ou ponto de origem da cotação.' })
   @IsString()
   origin!: string;
 
-  @ApiProperty({ description: 'Cidade ou ponto de destino da cotacao.' })
+  @ApiProperty({ description: 'Cidade ou ponto de destino da cotação.' })
   @IsString()
   destination!: string;
 
-  @ApiProperty({ description: 'Tipo de servico solicitado.' })
+  @ApiProperty({ description: 'Tipo de serviço solicitado.' })
   @IsString()
   serviceType!: string;
 
-  @ApiPropertyOptional({ description: 'Modalidade da solicitacao, como avulsa ou contrato.' })
+  @ApiPropertyOptional({ description: 'Modalidade da solicitação, como avulsa ou contrato.' })
   @IsOptional()
   @IsString()
   requestType?: string;
@@ -37,22 +37,22 @@ export class CreateQuoteDto {
   @IsString()
   deliveryAddress?: string;
 
-  @ApiPropertyOptional({ description: 'Descricao da carga, mercadoria ou servico.' })
+  @ApiPropertyOptional({ description: 'Descrição da carga, mercadoria ou serviço.' })
   @IsOptional()
   @IsString()
   cargoDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Nome do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'Nome do contato responsável.' })
   @IsOptional()
   @IsString()
   contactName?: string;
 
-  @ApiPropertyOptional({ description: 'Telefone do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'Telefone do contato responsável.' })
   @IsOptional()
   @IsString()
   contactPhone?: string;
 
-  @ApiPropertyOptional({ description: 'E-mail do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'E-mail do contato responsável.' })
   @IsOptional()
   @IsEmail()
   contactEmail?: string;
@@ -86,7 +86,7 @@ export class CreateQuoteDto {
   @IsString()
   desiredDeadline?: string;
 
-  @ApiPropertyOptional({ description: 'Observacoes adicionais da solicitacao.' })
+  @ApiPropertyOptional({ description: 'Observações adicionais da solicitação.' })
   @IsOptional()
   @IsString()
   notes?: string;

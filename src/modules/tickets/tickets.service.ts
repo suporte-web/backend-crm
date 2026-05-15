@@ -69,7 +69,7 @@ export class TicketsService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar este recurso.',
+        'Você não tem permissão para acessar este recurso.',
       );
     }
   }
@@ -414,7 +414,7 @@ export class TicketsService {
       });
     } else if (user.role !== 'ADMIN') {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar tickets.',
+        'Você não tem permissão para acessar tickets.',
       );
     }
 
@@ -432,12 +432,12 @@ export class TicketsService {
       user.role === 'CLIENTE' &&
       (ticket.internalOnly || ticket.client?.userId !== user.sub)
     ) {
-      throw new NotFoundException('Ticket nao encontrado.');
+      throw new NotFoundException('Ticket não encontrado.');
     }
 
     if (!this.isInternalUser(user) && user.role !== 'CLIENTE') {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar tickets.',
+        'Você não tem permissão para acessar tickets.',
       );
     }
   }
@@ -548,8 +548,8 @@ export class TicketsService {
         tx,
         ticket,
         actorId,
-        'Sua solicitacao foi respondida',
-        'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
+        'Sua solicitação foi respondida',
+        'Nossa equipe respondeu sua solicitação. Acesse o ticket para visualizar a devolutiva.',
       );
     }
 
@@ -558,8 +558,8 @@ export class TicketsService {
         tx,
         ticket,
         actorId,
-        'Ticket aguardando acao comercial',
-        'O ticket foi atualizado e exige acao do Comercial.',
+        'Ticket aguardando ação comercial',
+        'O ticket foi atualizado e exige ação do Comercial.',
       );
     }
 
@@ -568,8 +568,8 @@ export class TicketsService {
         tx,
         ticket,
         actorId,
-        'Negociacao aguardando aprovacao da Gestao',
-        'Uma negociacao foi enviada para aprovacao da Gestao.',
+        'Negociacao aguardando aprovação da Gestão',
+        'Uma negociacao foi enviada para aprovação da Gestão.',
       );
     }
   }
@@ -603,13 +603,13 @@ export class TicketsService {
       : null;
 
     if (dto.quoteId && !quote) {
-      throw new BadRequestException('Cotacao invalida para este ticket.');
+      throw new BadRequestException('Cotação invalida para este ticket.');
     }
 
     if (quote) {
       if (client && quote.clientId !== client.id) {
         throw new BadRequestException(
-          'Cotacao nao pertence ao cliente informado.',
+          'Cotação não pertence ao cliente informado.',
         );
       }
       client = quote.client;
@@ -635,7 +635,7 @@ export class TicketsService {
     if (opportunity) {
       if (client && opportunity.clientId !== client.id) {
         throw new BadRequestException(
-          'Oportunidade nao pertence ao cliente informado.',
+          'Oportunidade não pertence ao cliente informado.',
         );
       }
       client = opportunity.client;
@@ -653,7 +653,7 @@ export class TicketsService {
 
     if (!client && !lead) {
       throw new BadRequestException(
-        'Informe um cliente, cotacao, oportunidade ou lead.',
+        'Informe um cliente, cotação, oportunidade ou lead.',
       );
     }
 
@@ -670,7 +670,7 @@ export class TicketsService {
     const description = this.sanitize(dto.description);
 
     if (!subject || !description) {
-      throw new BadRequestException('Informe assunto e descricao do ticket.');
+      throw new BadRequestException('Informe assunto e descrição do ticket.');
     }
 
     if (
@@ -681,7 +681,7 @@ export class TicketsService {
       !dto.opportunityId
     ) {
       throw new BadRequestException(
-        'Informe um cliente, cotacao, oportunidade ou lead.',
+        'Informe um cliente, cotação, oportunidade ou lead.',
       );
     }
 
@@ -789,8 +789,8 @@ export class TicketsService {
             ? 'Novo lead direcionado ao Comercial'
             : 'Ticket interno direcionado ao Comercial',
           lead
-            ? 'A Gestao direcionou um lead para atendimento comercial.'
-            : 'A Gestao abriu um ticket interno para acompanhamento comercial.',
+            ? 'A Gestão direcionou um lead para atendimento comercial.'
+            : 'A Gestão abriu um ticket interno para acompanhamento comercial.',
         );
       } else if (createdTicket.client?.userId) {
         await this.notifyClient(
@@ -798,7 +798,7 @@ export class TicketsService {
           createdTicket,
           user.sub,
           'Ticket aberto no CRM',
-          'Uma solicitacao foi registrada para acompanhamento pelo portal.',
+          'Uma solicitação foi registrada para acompanhamento pelo portal.',
         );
       }
 
@@ -854,7 +854,7 @@ export class TicketsService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Ticket nao encontrado.');
+      throw new NotFoundException('Ticket não encontrado.');
     }
 
     this.assertTicketAccess(user, ticket);
@@ -874,7 +874,7 @@ export class TicketsService {
     ];
 
     if (closedStatuses.includes(ticket.status)) {
-      throw new BadRequestException('Ticket encerrado nao pode ser iniciado.');
+      throw new BadRequestException('Ticket encerrado não pode ser iniciado.');
     }
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
@@ -901,8 +901,8 @@ export class TicketsService {
         tx,
         updated,
         user.sub,
-        'Sua cotacao esta em analise',
-        'Nossa equipe comercial iniciou a analise da sua solicitacao.',
+        'Sua cotação está em análise',
+        'Nossa equipe comercial iniciou a análise da sua solicitação.',
       );
 
       return updated;
@@ -997,9 +997,9 @@ export class TicketsService {
               eventType: isInternalNote
                 ? TicketHistoryEventType.INTERNAL_NOTE
                 : TicketHistoryEventType.MESSAGE_SENT,
-              title: isInternalNote ? 'Observacao interna' : 'Mensagem enviada',
+              title: isInternalNote ? 'Observação interna' : 'Mensagem enviada',
               description: isInternalNote
-                ? 'Observacao interna registrada.'
+                ? 'Observação interna registrada.'
                 : 'Nova mensagem registrada no ticket.',
               internalOnly: isInternalNote,
               createdById: user.sub,
@@ -1044,8 +1044,8 @@ export class TicketsService {
           tx,
           updated,
           user.sub,
-          'Sua solicitacao foi respondida',
-          'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
+          'Sua solicitação foi respondida',
+          'Nossa equipe respondeu sua solicitação. Acesse o ticket para visualizar a devolutiva.',
         );
       }
 
@@ -1075,12 +1075,12 @@ export class TicketsService {
     const message = this.sanitize(dto.message);
 
     if (!message) {
-      throw new BadRequestException('Informe a pre-proposta ou pre-contrato.');
+      throw new BadRequestException('Informe a pré-proposta ou pré-contrato.');
     }
 
     if (ticket.prospectId && !ticket.clientId) {
       throw new BadRequestException(
-        'Prospect precisa virar cliente ativo antes de contrato ou pre-contrato.',
+        'Prospect precisa virar cliente ativo antes de contrato ou pré-contrato.',
       );
     }
 
@@ -1262,9 +1262,9 @@ export class TicketsService {
           history: {
             create: {
               eventType: TicketHistoryEventType.PRE_PROPOSAL_SENT,
-              title: 'Pre-proposta enviada',
+              title: 'Pré-proposta enviada',
               description:
-                'Pre-proposta/pre-contrato enviado para analise do cliente.',
+                'Pré-proposta/pré-contrato enviado para análise do cliente.',
               createdById: user.sub,
               metadata: {
                 propostaId,
@@ -1283,8 +1283,8 @@ export class TicketsService {
         tx,
         updated,
         user.sub,
-        'Pre-proposta disponivel para analise',
-        'Sua proposta esta disponivel para analise. Acesse o ticket para aprovar, recusar ou solicitar ajuste.',
+        'Pré-proposta disponível para análise',
+        'Sua proposta está disponível para análise. Acesse o ticket para aprovar, recusar ou solicitar ajuste.',
       );
 
       return updated;
@@ -1299,7 +1299,7 @@ export class TicketsService {
     dto: ClientTicketDecisionDto,
   ) {
     if (user.role !== 'CLIENTE') {
-      throw new ForbiddenException('Apenas o cliente pode executar esta acao.');
+      throw new ForbiddenException('Apenas o cliente pode executar esta ação.');
     }
 
     const ticket = await this.findOne(user, id);
@@ -1311,7 +1311,7 @@ export class TicketsService {
 
     if (!allowedClientDecisionStatuses.includes(ticket.status)) {
       throw new BadRequestException(
-        'Este ticket nao esta aguardando acao do cliente.',
+        'Este ticket não está aguardando ação do cliente.',
       );
     }
 
@@ -1321,8 +1321,8 @@ export class TicketsService {
         propostaStatus: StatusProposta.APROVADA_PELO_CLIENTE,
         propostaDateField: 'aprovadaPeloClienteEm',
         eventType: TicketHistoryEventType.APPROVED,
-        title: 'Cliente aprovou a pre-negociacao',
-        message: 'Cliente aprovou a proposta/pre-negociacao.',
+        title: 'Cliente aprovou a pré-negociacao',
+        message: 'Cliente aprovou a proposta/pré-negociacao.',
       },
       REQUEST_ADJUSTMENT: {
         status: TicketStatus.AJUSTE_SOLICITADO,
@@ -1330,15 +1330,15 @@ export class TicketsService {
         propostaDateField: 'ajusteSolicitadoPeloClienteEm',
         eventType: TicketHistoryEventType.ADJUSTMENT_REQUESTED,
         title: 'Cliente solicitou ajuste',
-        message: 'Cliente solicitou ajuste na proposta/pre-negociacao.',
+        message: 'Cliente solicitou ajuste na proposta/pré-negociacao.',
       },
       REJECT: {
         status: TicketStatus.REPROVADO,
         propostaStatus: StatusProposta.RECUSADA_PELO_CLIENTE,
         propostaDateField: 'recusadaPeloClienteEm',
         eventType: TicketHistoryEventType.REJECTED,
-        title: 'Cliente recusou a pre-negociacao',
-        message: 'Cliente recusou a proposta/pre-negociacao.',
+        title: 'Cliente recusou a pré-negociacao',
+        message: 'Cliente recusou a proposta/pré-negociacao.',
       },
     }[dto.action];
 
@@ -1466,12 +1466,12 @@ export class TicketsService {
 
     if (ticket.status !== TicketStatus.APROVADO_CLIENTE) {
       throw new BadRequestException(
-        'Envio para Gestao permitido apenas depois da aprovacao do cliente.',
+        'Envio para Gestão permitido apenas depois da aprovação do cliente.',
       );
     }
 
     const publicMessage =
-      this.sanitize(dto.message) ?? 'Sua negociacao esta em validacao interna.';
+      this.sanitize(dto.message) ?? 'Sua negociacao está em validacao interna.';
 
     const updatedTicket = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.ticket.update({
@@ -1492,8 +1492,8 @@ export class TicketsService {
           history: {
             create: {
               eventType: TicketHistoryEventType.APPROVAL_SENT,
-              title: 'Enviado para aprovacao da Gestao',
-              description: 'Negociacao enviada para aprovacao da Gestao.',
+              title: 'Enviado para aprovação da Gestão',
+              description: 'Negociacao enviada para aprovação da Gestão.',
               internalOnly: ticket.internalOnly,
               createdById: user.sub,
             },
@@ -1532,16 +1532,16 @@ export class TicketsService {
         tx,
         updated,
         user.sub,
-        'Negociacao aguardando aprovacao da Gestao',
-        'Uma negociacao foi enviada para aprovacao da Gestao.',
+        'Negociacao aguardando aprovação da Gestão',
+        'Uma negociacao foi enviada para aprovação da Gestão.',
       );
       if (!ticket.internalOnly) {
         await this.notifyClient(
           tx,
           updated,
           user.sub,
-          'Sua negociacao esta em validacao interna',
-          'Sua negociacao esta em validacao interna.',
+          'Sua negociacao está em validacao interna',
+          'Sua negociacao está em validacao interna.',
         );
       }
 
@@ -1557,14 +1557,14 @@ export class TicketsService {
     dto: ManagementTicketDecisionDto,
   ) {
     if (!['ADMIN', 'GESTAO'].includes(user.role)) {
-      throw new ForbiddenException('Apenas Gestao pode executar esta acao.');
+      throw new ForbiddenException('Apenas Gestão pode executar esta ação.');
     }
 
     const ticket = await this.findOne(user, id);
 
     if (ticket.status !== TicketStatus.AGUARDANDO_GESTAO) {
       throw new BadRequestException(
-        'Ticket nao esta aguardando aprovacao da Gestao.',
+        'Ticket não está aguardando aprovação da Gestão.',
       );
     }
 
@@ -1572,23 +1572,23 @@ export class TicketsService {
       APPROVE: {
         status: TicketStatus.APROVADO_GESTAO,
         eventType: TicketHistoryEventType.APPROVED,
-        title: 'Gestao aprovou a negociacao',
-        commercialMessage: 'Gestao aprovou a negociacao.',
+        title: 'Gestão aprovou a negociacao',
+        commercialMessage: 'Gestão aprovou a negociacao.',
         clientMessage:
-          'Sua negociacao foi aprovada. O servico seguira para execucao.',
+          'Sua negociacao foi aprovada. O serviço seguirá para execução.',
       },
       REQUEST_ADJUSTMENT: {
         status: TicketStatus.AJUSTE_SOLICITADO,
         eventType: TicketHistoryEventType.ADJUSTMENT_REQUESTED,
-        title: 'Gestao solicitou ajuste',
-        commercialMessage: 'Gestao solicitou ajuste na negociacao.',
+        title: 'Gestão solicitou ajuste',
+        commercialMessage: 'Gestão solicitou ajuste na negociacao.',
         clientMessage: 'Sua negociacao precisa de ajustes internos.',
       },
       REJECT: {
         status: TicketStatus.REPROVADO,
         eventType: TicketHistoryEventType.REJECTED,
-        title: 'Gestao reprovou a negociacao',
-        commercialMessage: 'Gestao reprovou a negociacao.',
+        title: 'Gestão reprovou a negociacao',
+        commercialMessage: 'Gestão reprovou a negociacao.',
         clientMessage: 'Sua negociacao foi reavaliada pela equipe.',
       },
     }[dto.action];
@@ -1651,7 +1651,7 @@ export class TicketsService {
 
         if (!negotiatedValue || negotiatedValue.lte(0)) {
           throw new BadRequestException(
-            'Informe o valor do servico negociado antes de aprovar a negociacao.',
+            'Informe o valor do serviço negociado antes de aprovar a negociacao.',
           );
         }
 

@@ -19,7 +19,7 @@ export class QueryDeliveriesDto {
   ufDest?: string;
 
   @ApiPropertyOptional({
-    description: 'Numero do CTRC para busca parcial',
+    description: 'Número do CTRC para busca parcial',
     example: '12345',
   })
   @IsOptional()

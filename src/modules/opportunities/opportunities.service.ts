@@ -32,7 +32,7 @@ export class OpportunitiesService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar este recurso.',
+        'Você não tem permissão para acessar este recurso.',
       );
     }
   }
@@ -129,7 +129,7 @@ export class OpportunitiesService {
     });
 
     if (!client) {
-      throw new NotFoundException('Cliente nao encontrado.');
+      throw new NotFoundException('Cliente não encontrado.');
     }
 
     if (dto.quoteId) {
@@ -142,7 +142,7 @@ export class OpportunitiesService {
       });
 
       if (!quote || quote.clientId !== dto.clientId) {
-        throw new BadRequestException('Cotacao invalida para este cliente.');
+        throw new BadRequestException('Cotação invalida para este cliente.');
       }
     }
 
@@ -280,7 +280,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException('Oportunidade nao encontrada.');
+      throw new NotFoundException('Oportunidade não encontrada.');
     }
 
     if (dto.stage === OpportunityStage.PERDIDO && !dto.lostReason?.trim()) {
@@ -296,7 +296,7 @@ export class OpportunitiesService {
 
     if (dto.stage === OpportunityStage.GANHO && !negotiatedValue) {
       throw new BadRequestException(
-        'Informe o valor do servico negociado antes de marcar a oportunidade como ganha.',
+        'Informe o valor do serviço negociado antes de marcar a oportunidade como ganha.',
       );
     }
 
@@ -391,7 +391,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException('Oportunidade nao encontrada.');
+      throw new NotFoundException('Oportunidade não encontrada.');
     }
 
     const nextTitle =
@@ -411,7 +411,7 @@ export class OpportunitiesService {
       });
 
       if (!quote || quote.clientId !== opportunity.clientId) {
-        throw new BadRequestException('Cotacao invalida para este cliente.');
+        throw new BadRequestException('Cotação invalida para este cliente.');
       }
     }
 
@@ -454,7 +454,7 @@ export class OpportunitiesService {
         : null,
       dto.preContractNotes !== undefined &&
       this.sanitize(dto.preContractNotes) !== opportunity.preContractNotes
-        ? 'observacoes do pre-contrato'
+        ? 'observações do pré-contrato'
         : null,
       dto.lostReason !== undefined &&
       this.sanitize(dto.lostReason) !== opportunity.lostReason

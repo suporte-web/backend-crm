@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   Prisma,
   TicketHistoryEventType,
+  TicketType,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -34,10 +35,33 @@ export class NotificationsService {
     return tx ?? this.prisma;
   }
 
-  async getUserIdsByRoles(
-    roles: UserRole[],
-    tx?: Prisma.TransactionClient,
-  ) {
+  private buildNotificationWhere(
+    user: AuthUser,
+    extra?: Prisma.NotificationWhereInput,
+  ): Prisma.NotificationWhereInput {
+    const base: Prisma.NotificationWhereInput = {
+      userId: user.sub,
+      ...extra,
+    };
+
+    if (user.role !== UserRole.CLIENTE) {
+      return base;
+    }
+
+    return {
+      ...base,
+      title: {
+        in: ['Sua solicitação foi respondida', 'Cotação respondida'],
+      },
+      ticket: {
+        is: {
+          type: TicketType.COTACAO,
+        },
+      },
+    };
+  }
+
+  async getUserIdsByRoles(roles: UserRole[], tx?: Prisma.TransactionClient) {
     const client = this.getClient(tx);
 
     const users = await client.user.findMany({
@@ -71,7 +95,9 @@ export class NotificationsService {
   ) {
     const client = this.getClient(tx);
     const recipients = this.normalizeRecipients(userIds);
-    const link = input.link ?? (input.ticketId ? `/tickets?ticket=${input.ticketId}` : null);
+    const link =
+      input.link ??
+      (input.ticketId ? `/tickets?ticket=${input.ticketId}` : null);
     const recipientUsers =
       recipients.length > 0
         ? await client.user.findMany({
@@ -138,7 +164,7 @@ export class NotificationsService {
         data: {
           ticketId: input.ticketId,
           eventType: TicketHistoryEventType.NOTIFICATION_SENT,
-          title: 'Notificacao enviada',
+          title: 'Notificação enviada',
           description: input.message,
           createdById: input.actorId ?? null,
           metadata: {
@@ -188,9 +214,7 @@ export class NotificationsService {
 
   async findMine(user: AuthUser) {
     return this.prisma.notification.findMany({
-      where: {
-        userId: user.sub,
-      },
+      where: this.buildNotificationWhere(user),
       include: {
         ticket: {
           select: {
@@ -210,26 +234,19 @@ export class NotificationsService {
 
   async unreadCount(user: AuthUser) {
     const count = await this.prisma.notification.count({
-      where: {
-        userId: user.sub,
-        readAt: null,
-      },
+      where: this.buildNotificationWhere(user, { readAt: null }),
     });
 
     return { count };
   }
 
   async markRead(user: AuthUser, id: string) {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id },
+    const notification = await this.prisma.notification.findFirst({
+      where: this.buildNotificationWhere(user, { id }),
     });
 
     if (!notification) {
-      throw new NotFoundException('Notificacao nao encontrada.');
-    }
-
-    if (notification.userId !== user.sub) {
-      throw new ForbiddenException('Notificacao nao encontrada.');
+      throw new NotFoundException('Notificação não encontrada.');
     }
 
     return this.prisma.notification.update({
@@ -242,10 +259,7 @@ export class NotificationsService {
 
   async markAllRead(user: AuthUser) {
     await this.prisma.notification.updateMany({
-      where: {
-        userId: user.sub,
-        readAt: null,
-      },
+      where: this.buildNotificationWhere(user, { readAt: null }),
       data: {
         readAt: new Date(),
       },

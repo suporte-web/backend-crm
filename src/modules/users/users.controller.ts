@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  ParseEnumPipe,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -16,22 +17,21 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../auth/enums/user-role.enum';
+import { UserRole as AuthUserRole } from '../auth/enums/user-role.enum';
 import type { AuthUser } from '../auth/types/auth-user.type';
 
-@ApiTags('Usuarios')
+@ApiTags('Usuários')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+@Roles(AuthUserRole.ADMIN, AuthUserRole.GESTAO, AuthUserRole.COMERCIAL)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateUserDto) {
     return this.usersService.create(dto, user);
   }
-
 
   @Get()
   findAll() {

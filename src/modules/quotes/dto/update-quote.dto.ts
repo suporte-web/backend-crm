@@ -9,22 +9,22 @@ import {
 } from 'class-validator';
 
 export class UpdateQuoteDto {
-  @ApiPropertyOptional({ description: 'Cidade ou ponto de origem da cotacao.' })
+  @ApiPropertyOptional({ description: 'Cidade ou ponto de origem da cotação.' })
   @IsOptional()
   @IsString()
   origin?: string;
 
-  @ApiPropertyOptional({ description: 'Cidade ou ponto de destino da cotacao.' })
+  @ApiPropertyOptional({ description: 'Cidade ou ponto de destino da cotação.' })
   @IsOptional()
   @IsString()
   destination?: string;
 
-  @ApiPropertyOptional({ description: 'Tipo de servico solicitado.' })
+  @ApiPropertyOptional({ description: 'Tipo de serviço solicitado.' })
   @IsOptional()
   @IsString()
   serviceType?: string;
 
-  @ApiPropertyOptional({ description: 'Modalidade da solicitacao, como avulsa ou contrato.' })
+  @ApiPropertyOptional({ description: 'Modalidade da solicitação, como avulsa ou contrato.' })
   @IsOptional()
   @IsString()
   requestType?: string;
@@ -39,22 +39,22 @@ export class UpdateQuoteDto {
   @IsString()
   deliveryAddress?: string;
 
-  @ApiPropertyOptional({ description: 'Descricao da carga, mercadoria ou servico.' })
+  @ApiPropertyOptional({ description: 'Descrição da carga, mercadoria ou serviço.' })
   @IsOptional()
   @IsString()
   cargoDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Nome do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'Nome do contato responsável.' })
   @IsOptional()
   @IsString()
   contactName?: string;
 
-  @ApiPropertyOptional({ description: 'Telefone do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'Telefone do contato responsável.' })
   @IsOptional()
   @IsString()
   contactPhone?: string;
 
-  @ApiPropertyOptional({ description: 'E-mail do contato responsavel.' })
+  @ApiPropertyOptional({ description: 'E-mail do contato responsável.' })
   @IsOptional()
   @IsEmail()
   contactEmail?: string;
@@ -88,7 +88,7 @@ export class UpdateQuoteDto {
   @IsString()
   desiredDeadline?: string;
 
-  @ApiPropertyOptional({ description: 'Observacoes adicionais da solicitacao.' })
+  @ApiPropertyOptional({ description: 'Observações adicionais da solicitação.' })
   @IsOptional()
   @IsString()
   notes?: string;

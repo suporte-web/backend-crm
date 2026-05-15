@@ -4,7 +4,12 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
-import { AuditLogAction, AuditLogCategory, AuditLogLevel, UserRole } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogCategory,
+  AuditLogLevel,
+  UserRole,
+} from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
@@ -64,6 +69,11 @@ export class AuthService {
       mustChangePassword: user.mustChangePassword,
     };
 
+    const [accessToken, screenPermissions] = await Promise.all([
+      this.jwtService.signAsync(payload),
+      this.usersService.findRoleScreenPermissions(user.role),
+    ]);
+
     await this.auditLogsService.create({
       category: AuditLogCategory.AUTH,
       action: AuditLogAction.LOGIN,
@@ -74,7 +84,7 @@ export class AuthService {
     });
 
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: accessToken,
       user: {
         id: user.id,
         name: user.name,
@@ -82,6 +92,7 @@ export class AuthService {
         role: user.role,
         mustChangePassword: user.mustChangePassword,
         clientProfile: user.clientProfile ?? null,
+        screenPermissions,
       },
     };
   }
@@ -103,4 +114,3 @@ export class AuthService {
     };
   }
 }
-

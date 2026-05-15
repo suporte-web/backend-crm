@@ -187,7 +187,7 @@ export class EntradasService {
   private ensureCanAccess(user: { role: string }) {
     if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar a Central de Entradas.',
+        'Você não tem permissão para acessar a Central de Entradas.',
       );
     }
   }
@@ -195,7 +195,7 @@ export class EntradasService {
   private ensureCanManage(user: AuthUser) {
     if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para executar esta acao.',
+        'Você não tem permissão para executar esta ação.',
       );
     }
   }
@@ -213,7 +213,7 @@ export class EntradasService {
     }
 
     throw new ForbiddenException(
-      'Comercial pode acessar entradas de cotacao ou atribuídas a ele.',
+      'Comercial pode acessar entradas de cotação ou atribuídas a ele.',
     );
   }
 
@@ -410,14 +410,14 @@ export class EntradasService {
           subject: `Entrada do site: ${nomeSolicitante}`,
           description:
             mensagem ??
-            `Solicitacao recebida pelo formulario publico do site.`,
+            `Solicitação recebida pelo formulario publico do site.`,
           lastInteractionAt: new Date(),
           messages: {
             create: {
               senderType: MessageSenderType.CLIENTE,
               message:
                 mensagem ??
-                `Solicitacao recebida pelo formulario publico do site.`,
+                `Solicitação recebida pelo formulario publico do site.`,
               isInternal: true,
             },
           },
@@ -495,7 +495,7 @@ export class EntradasService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Entrada nao encontrada.');
+      throw new NotFoundException('Entrada não encontrada.');
     }
 
     this.assertCommercialCanHandle(user, ticket);
@@ -609,7 +609,7 @@ export class EntradasService {
 
     if (dto.prospectId && dto.clientId) {
       throw new BadRequestException(
-        'Informe prospectId ou clientId, nao os dois.',
+        'Informe prospectId ou clientId, não os dois.',
       );
     }
 
@@ -619,7 +619,7 @@ export class EntradasService {
       });
 
       if (!client) {
-        throw new NotFoundException('Cliente nao encontrado.');
+        throw new NotFoundException('Cliente não encontrado.');
       }
 
       return this.prisma.ticket.update({
@@ -654,7 +654,7 @@ export class EntradasService {
       });
 
       if (!prospect) {
-        throw new NotFoundException('Prospect nao encontrado.');
+        throw new NotFoundException('Prospect não encontrado.');
       }
 
       return this.prisma.ticket.update({
@@ -745,12 +745,12 @@ export class EntradasService {
 
     if (!ticket.prospectId && !ticket.clientId) {
       throw new BadRequestException(
-        'Vincule um prospect antes de criar a cotacao.',
+        'Vincule um prospect antes de criar a cotação.',
       );
     }
 
     if (ticket.quoteId) {
-      throw new BadRequestException('Esta entrada ja possui cotacao vinculada.');
+      throw new BadRequestException('Esta entrada já possui cotação vinculada.');
     }
 
     const origin = this.sanitize(dto.origin);
@@ -759,7 +759,7 @@ export class EntradasService {
 
     if (!origin || !destination || !serviceType) {
       throw new BadRequestException(
-        'Informe origem, destino e tipo de servico da cotacao.',
+        'Informe origem, destino e tipo de serviço da cotação.',
       );
     }
 
@@ -800,7 +800,7 @@ export class EntradasService {
           history: {
             create: {
               status: QuoteStatus.RECEIVED,
-              notes: 'Cotacao criada a partir de ticket de entrada do site.',
+              notes: 'Cotação criada a partir de ticket de entrada do site.',
             },
           },
         },
@@ -824,9 +824,9 @@ export class EntradasService {
           history: {
             create: {
               eventType: TicketHistoryEventType.STATUS_CHANGED,
-              title: 'Cotacao criada',
+              title: 'Cotação criada',
               description:
-                'Cotacao criada apos vinculacao de prospect ou cliente ativo.',
+                'Cotação criada após vinculacao de prospect ou cliente ativo.',
               createdById: user.sub,
               internalOnly: true,
               metadata: {
@@ -915,12 +915,12 @@ export class EntradasService {
       });
 
       if (!assignee || !assignee.isActive) {
-        throw new NotFoundException('Responsavel nao encontrado.');
+        throw new NotFoundException('Responsável não encontrado.');
       }
 
       if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(assignee.role)) {
         throw new BadRequestException(
-          'Responsavel precisa ser usuario interno.',
+          'Responsável precisa ser usuário interno.',
         );
       }
     }
@@ -937,8 +937,8 @@ export class EntradasService {
             eventType: TicketHistoryEventType.STATUS_CHANGED,
             title: 'Entrada transferida',
             description: dto.responsavelId
-              ? 'Responsavel da entrada foi alterado.'
-              : 'Responsavel da entrada foi removido.',
+              ? 'Responsável da entrada foi alterado.'
+              : 'Responsável da entrada foi removido.',
             createdById: user.sub,
             internalOnly: true,
             metadata: {

@@ -23,7 +23,7 @@ describe('ChatsService visibility rules', () => {
     jest.clearAllMocks();
   });
 
-  it('cliente nao ve mensagens internas', () => {
+  it('cliente não vê mensagens internas', () => {
     const service = createService({});
 
     expect(
@@ -36,7 +36,7 @@ describe('ChatsService visibility rules', () => {
     ).toBe(false);
   });
 
-  it('comercial ve mensagens gestao/comercial quando participante', () => {
+  it('comercial vê mensagens gestão/comercial quando participante', () => {
     const service = createService({});
 
     expect(
@@ -49,7 +49,7 @@ describe('ChatsService visibility rules', () => {
     ).toBe(true);
   });
 
-  it('API filtra mensagens nao autorizadas antes de retornar ao cliente', async () => {
+  it('API filtra mensagens não autorizadas antes de retornar ao cliente', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const service = createService({
       chat: {
@@ -92,7 +92,7 @@ describe('ChatsService visibility rules', () => {
     );
   });
 
-  it('API bloqueia chamada direta de usuario que nao participa do chat', async () => {
+  it('API bloqueia chamada direta de usuário que não participa do chat', async () => {
     const service = createService({
       chat: {
         findUnique: jest.fn().mockResolvedValue({
@@ -120,7 +120,7 @@ describe('ChatsService visibility rules', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('mensagem privada so fica visivel para usuario explicitamente autorizado', () => {
+  it('mensagem privada só fica visivel para usuário explicitamente autorizado', () => {
     const service = createService({});
 
     expect(
@@ -141,7 +141,7 @@ describe('ChatsService visibility rules', () => {
     ).toBe(false);
   });
 
-  it('envia mensagem publica quando visibilidade nao foi informada', async () => {
+  it('envia mensagem publica quando visibilidade não foi informada', async () => {
     const create = jest.fn().mockResolvedValue({
       id: 'message-1',
       chatId: 'chat-1',
@@ -254,7 +254,7 @@ describe('TicketsService segmented access', () => {
     );
   }
 
-  it('gestao ve tickets criados por ela', async () => {
+  it('gestão vê tickets criados por ela', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const service = createTicketsService({
       prisma: {
@@ -279,7 +279,7 @@ describe('TicketsService segmented access', () => {
     );
   });
 
-  it('cliente nao recebe notificacao de mensagem interna', async () => {
+  it('cliente não recebe notificação de mensagem interna', async () => {
     const ticket = {
       id: 'ticket-1',
       subject: 'Ticket interno',
@@ -332,7 +332,7 @@ describe('TicketsService segmented access', () => {
     );
   });
 
-  it('recusa do cliente notifica comercial e gestao', async () => {
+  it('recusa do cliente notifica comercial e gestão', async () => {
     const ticket = {
       id: 'ticket-1',
       subject: 'Proposta',
@@ -398,14 +398,14 @@ describe('TicketsService segmented access', () => {
     expect(notifyUsers).toHaveBeenCalledWith(
       ['commercial-user'],
       expect.objectContaining({
-        title: 'Cliente recusou a pre-negociacao',
+        title: 'Cliente recusou a pré-negociacao',
       }),
       expect.anything(),
     );
     expect(notifyRoles).toHaveBeenCalledWith(
       [UserRole.GESTAO, UserRole.ADMIN],
       expect.objectContaining({
-        title: 'Cliente recusou a pre-negociacao',
+        title: 'Cliente recusou a pré-negociacao',
       }),
       expect.anything(),
     );

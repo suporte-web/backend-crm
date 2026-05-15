@@ -42,7 +42,7 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
       return result.rows;
     } catch {
       throw new InternalServerErrorException(
-        'Nao foi possivel consultar o banco de entregas.',
+        'Não foi possível consultar o banco de entregas.',
       );
     }
   }

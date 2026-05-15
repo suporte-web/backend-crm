@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
 import { LeadsService } from './leads.service';
@@ -76,6 +77,18 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Post(':id/convert-to-client')
+  convertToClient(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ConvertLeadToClientDto,
+  ) {
+    return this.leadsService.convertToClient(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
   @Post('import/csv')
   @UseInterceptors(
@@ -117,7 +130,7 @@ export class LeadsController {
     @Body() dto: ImportLeadsCsvDto,
   ) {
     if (!file) {
-      throw new BadRequestException('Arquivo CSV nao enviado.');
+      throw new BadRequestException('Arquivo CSV não enviado.');
     }
 
     return this.leadsService.importCsv(user, file, dto);

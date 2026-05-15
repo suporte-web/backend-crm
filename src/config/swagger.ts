@@ -4,7 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 export function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('API do Portal CRM')
-    .setDescription('Documentacao da API do portal do cliente e da operacao interna')
+    .setDescription('Documentação da API do portal do cliente e da operação interna')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

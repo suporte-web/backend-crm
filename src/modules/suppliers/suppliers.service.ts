@@ -15,7 +15,7 @@ export class SuppliersService {
 
   private ensureInternalUser(user: AuthUser) {
     if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
-      throw new ForbiddenException('Voce nao tem permissao para convidar fornecedores.');
+      throw new ForbiddenException('Você não tem permissão para convidar fornecedores.');
     }
   }
 

@@ -25,7 +25,7 @@ type DeliveryRow = {
   cidade_dest: string;
   uf_dest: string;
   status_entrega: 'Entregue' | 'Pendente' | 'Em atraso';
-  em_atraso: 'Sim' | 'Nao';
+  em_atraso: 'Sim' | 'Não';
   sla_entrega: 'DENTRO DO SLA' | 'FORA DO SLA' | '-';
   classificacao_rota: string;
 };

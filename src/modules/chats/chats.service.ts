@@ -156,7 +156,7 @@ export class ChatsService {
     });
 
     if (count !== userIds.length) {
-      throw new BadRequestException('Um ou mais participantes sao invalidos.');
+      throw new BadRequestException('Um ou mais participantes são invalidos.');
     }
   }
 
@@ -236,12 +236,12 @@ export class ChatsService {
     );
 
     if (!participant) {
-      throw new NotFoundException('Chat nao encontrado.');
+      throw new NotFoundException('Chat não encontrado.');
     }
 
     if (!this.isInternalRole(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para alterar este chat.',
+        'Você não tem permissão para alterar este chat.',
       );
     }
   }
@@ -263,7 +263,7 @@ export class ChatsService {
         return null;
       }
 
-      throw new NotFoundException('Chat nao encontrado.');
+      throw new NotFoundException('Chat não encontrado.');
     }
 
     return participant;
@@ -309,7 +309,7 @@ export class ChatsService {
   ) {
     if (!this.canUseVisibility(user.role, visibility)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para usar esta visibilidade.',
+        'Você não tem permissão para usar esta visibilidade.',
       );
     }
 
@@ -318,7 +318,7 @@ export class ChatsService {
       (!authorizedUserIds || authorizedUserIds.length === 0)
     ) {
       throw new BadRequestException(
-        'Informe usuarios autorizados para mensagem privada.',
+        'Informe usuários autorizados para mensagem privada.',
       );
     }
   }
@@ -341,7 +341,7 @@ export class ChatsService {
     });
 
     if (!chat) {
-      throw new NotFoundException('Chat nao encontrado.');
+      throw new NotFoundException('Chat não encontrado.');
     }
 
     return chat;
@@ -363,19 +363,19 @@ export class ChatsService {
       });
 
       if (!ticket) {
-        throw new NotFoundException('Ticket nao encontrado.');
+        throw new NotFoundException('Ticket não encontrado.');
       }
 
       if (
         user.role === UserRole.CLIENTE &&
         (ticket.internalOnly || ticket.client?.userId !== user.sub)
       ) {
-        throw new NotFoundException('Ticket nao encontrado.');
+        throw new NotFoundException('Ticket não encontrado.');
       }
 
       if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para acessar este ticket.',
+          'Você não tem permissão para acessar este ticket.',
         );
       }
 
@@ -408,16 +408,16 @@ export class ChatsService {
       });
 
       if (!client) {
-        throw new NotFoundException('Cliente nao encontrado.');
+        throw new NotFoundException('Cliente não encontrado.');
       }
 
       if (user.role === UserRole.CLIENTE && client.userId !== user.sub) {
-        throw new NotFoundException('Cliente nao encontrado.');
+        throw new NotFoundException('Cliente não encontrado.');
       }
 
       if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para acessar este cliente.',
+          'Você não tem permissão para acessar este cliente.',
         );
       }
 
@@ -443,19 +443,19 @@ export class ChatsService {
       });
 
       if (!quote) {
-        throw new NotFoundException('Cotacao nao encontrada.');
+        throw new NotFoundException('Cotação não encontrada.');
       }
 
       if (
         user.role === UserRole.CLIENTE &&
         (!quote.client?.userId || quote.client.userId !== user.sub)
       ) {
-        throw new NotFoundException('Cotacao nao encontrada.');
+        throw new NotFoundException('Cotação não encontrada.');
       }
 
       if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para acessar esta cotacao.',
+          'Você não tem permissão para acessar esta cotação.',
         );
       }
 
@@ -481,19 +481,19 @@ export class ChatsService {
       });
 
       if (!proposta) {
-        throw new NotFoundException('Proposta nao encontrada.');
+        throw new NotFoundException('Proposta não encontrada.');
       }
 
       if (
         user.role === UserRole.CLIENTE &&
         (!proposta.client?.userId || proposta.client.userId !== user.sub)
       ) {
-        throw new NotFoundException('Proposta nao encontrada.');
+        throw new NotFoundException('Proposta não encontrada.');
       }
 
       if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para acessar esta proposta.',
+          'Você não tem permissão para acessar esta proposta.',
         );
       }
 
@@ -521,11 +521,11 @@ export class ChatsService {
     });
 
     if (!lead) {
-      throw new NotFoundException('Lead nao encontrado.');
+      throw new NotFoundException('Lead não encontrado.');
     }
 
     if (!this.isInternalRole(user.role)) {
-      throw new ForbiddenException('Leads sao restritos a usuarios internos.');
+      throw new ForbiddenException('Leads são restritos a usuários internos.');
     }
 
     return {
@@ -1112,7 +1112,7 @@ export class ChatsService {
 
         if (unauthorized) {
           throw new ForbiddenException(
-            'Mensagem privada contem usuario fora do chat.',
+            'Mensagem privada contém usuário fora do chat.',
           );
         }
       }
@@ -1205,12 +1205,12 @@ export class ChatsService {
       });
 
       if (!message) {
-        throw new NotFoundException('Mensagem nao encontrada.');
+        throw new NotFoundException('Mensagem não encontrada.');
       }
 
       if (message.authorId !== user.sub && user.role !== UserRole.ADMIN) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para editar esta mensagem.',
+          'Você não tem permissão para editar esta mensagem.',
         );
       }
 
@@ -1233,7 +1233,7 @@ export class ChatsService {
 
         if (unauthorized) {
           throw new ForbiddenException(
-            'Mensagem privada contem usuario fora do chat.',
+            'Mensagem privada contém usuário fora do chat.',
           );
         }
       }
@@ -1299,12 +1299,12 @@ export class ChatsService {
       });
 
       if (!message) {
-        throw new NotFoundException('Mensagem nao encontrada.');
+        throw new NotFoundException('Mensagem não encontrada.');
       }
 
       if (message.authorId !== user.sub && user.role !== UserRole.ADMIN) {
         throw new ForbiddenException(
-          'Voce nao tem permissao para excluir esta mensagem.',
+          'Você não tem permissão para excluir esta mensagem.',
         );
       }
 

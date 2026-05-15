@@ -36,7 +36,7 @@ const PROPOSTA_EDITAVEL: StatusProposta[] = [
 ];
 
 const MENSAGEM_PROPOSTA_CLIENTE =
-  'Sua proposta esta disponivel para analise. Acesse o ticket para visualizar, aprovar, solicitar ajuste ou recusar.';
+  'Sua proposta está disponível para análise. Acesse o ticket para visualizar, aprovar, solicitar ajuste ou recusar.';
 
 type EmailRecipient = {
   userId: string;
@@ -99,20 +99,20 @@ export class PropostasService {
   private ensureInternalUser(user: AuthUser) {
     if (!this.isInternalUser(user)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar este recurso.',
+        'Você não tem permissão para acessar este recurso.',
       );
     }
   }
 
   private ensureClientUser(user: AuthUser) {
     if (user.role !== 'CLIENTE') {
-      throw new ForbiddenException('Apenas o cliente pode executar esta acao.');
+      throw new ForbiddenException('Apenas o cliente pode executar esta ação.');
     }
   }
 
   private ensureManagementUser(user: AuthUser) {
     if (!['ADMIN', 'GESTAO'].includes(user.role)) {
-      throw new ForbiddenException('Apenas a Gestao pode executar esta acao.');
+      throw new ForbiddenException('Apenas a Gestão pode executar esta ação.');
     }
   }
 
@@ -270,14 +270,14 @@ export class PropostasService {
   private assertTicketAccess(user: AuthUser, ticket: TicketWithAccessData) {
     if (user.role === 'CLIENTE') {
       if (ticket.internalOnly || ticket.client?.userId !== user.sub) {
-        throw new NotFoundException('Ticket nao encontrado.');
+        throw new NotFoundException('Ticket não encontrado.');
       }
       return;
     }
 
     if (!this.isInternalUser(user)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar tickets.',
+        'Você não tem permissão para acessar tickets.',
       );
     }
   }
@@ -308,7 +308,7 @@ export class PropostasService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Ticket nao encontrado.');
+      throw new NotFoundException('Ticket não encontrado.');
     }
 
     this.assertTicketAccess(user, ticket);
@@ -424,7 +424,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new NotFoundException('Proposta nao encontrada.');
+      throw new NotFoundException('Proposta não encontrada.');
     }
 
     return proposta;
@@ -549,7 +549,7 @@ export class PropostasService {
 
     if (!PROPOSTA_EDITAVEL.includes(proposta.status)) {
       throw new BadRequestException(
-        'Esta proposta nao pode ser editada no status atual.',
+        'Esta proposta não pode ser editada no status atual.',
       );
     }
 
@@ -608,7 +608,7 @@ export class PropostasService {
 
     if (!ticket.client?.user?.email || !ticket.client.userId) {
       throw new BadRequestException(
-        'Ticket precisa ter um cliente com usuario e e-mail para envio da proposta.',
+        'Ticket precisa ter um cliente com usuário e e-mail para envio da proposta.',
       );
     }
     const clientUserId = ticket.client.userId;
@@ -622,12 +622,12 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new NotFoundException('Proposta nao encontrada.');
+      throw new NotFoundException('Proposta não encontrada.');
     }
 
     if (!PROPOSTA_EDITAVEL.includes(proposta.status)) {
       throw new BadRequestException(
-        'Esta proposta nao pode ser enviada ao cliente no status atual.',
+        'Esta proposta não pode ser enviada ao cliente no status atual.',
       );
     }
 
@@ -637,7 +637,7 @@ export class PropostasService {
 
     const now = new Date();
     const link = `/tickets?ticket=${ticketId}`;
-    const emailSubject = 'Proposta disponivel para analise';
+    const emailSubject = 'Proposta disponível para análise';
     const pendingData = this.buildPropostaData(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -680,7 +680,7 @@ export class PropostasService {
         data: {
           ticketId,
           senderType: MessageSenderType.INTERNO,
-          message: 'O Comercial enviou uma proposta para analise do cliente.',
+          message: 'O Comercial enviou uma proposta para análise do cliente.',
           attachments: this.buildMessageAttachments(proposta),
           createdById: user.sub,
         },
@@ -712,7 +712,7 @@ export class PropostasService {
         internalOnly: ticket.internalOnly,
       });
       const publicProposalMessage =
-        'O Comercial enviou uma proposta para analise do cliente.';
+        'O Comercial enviou uma proposta para análise do cliente.';
 
       await this.chatsService.createMessageInTransaction(tx, {
         chatId: propostaChat.id,
@@ -732,7 +732,7 @@ export class PropostasService {
           ticketId,
           eventType: TicketHistoryEventType.PRE_PROPOSAL_SENT,
           title: 'Proposta enviada ao cliente',
-          description: 'Proposta enviada para analise do cliente.',
+          description: 'Proposta enviada para análise do cliente.',
           createdById: user.sub,
           metadata: {
             propostaId,
@@ -829,7 +829,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new NotFoundException('Proposta nao encontrada.');
+      throw new NotFoundException('Proposta não encontrada.');
     }
 
     const allowedStatusesForManagementSend: StatusProposta[] = [
@@ -838,7 +838,7 @@ export class PropostasService {
 
     if (!allowedStatusesForManagementSend.includes(proposta.status)) {
       throw new BadRequestException(
-        'A proposta precisa estar aprovada pelo cliente para seguir para a Gestao.',
+        'A proposta precisa estar aprovada pelo cliente para seguir para a Gestão.',
       );
     }
 
@@ -872,7 +872,7 @@ export class PropostasService {
         data: {
           ticketId,
           eventType: TicketHistoryEventType.APPROVAL_SENT,
-          title: 'Proposta enviada para aprovacao da Gestao',
+          title: 'Proposta enviada para aprovação da Gestão',
           description: `A proposta ${proposta.code} foi enviada para aprovacao da Gestao.`,
           createdById: user.sub,
           metadata: {
@@ -934,9 +934,9 @@ export class PropostasService {
             data: {
               userId: recipient.userId,
               ticketId,
-              title: 'Proposta aguardando aprovacao da Gestao',
+              title: 'Proposta aguardando aprovação da Gestão',
               message:
-                'Uma proposta formal foi enviada para analise e aprovacao da Gestao.',
+                'Uma proposta formal foi enviada para análise e aprovação da Gestão.',
               link: `/tickets?ticket=${ticketId}`,
               metadata: {
                 propostaId,
@@ -953,7 +953,7 @@ export class PropostasService {
     return {
       proposta: await this.findOne(user, ticketId, propostaId),
       ticketStatus: TicketStatus.AGUARDANDO_GESTAO,
-      mensagem: 'Proposta enviada para aprovacao da Gestao.',
+      mensagem: 'Proposta enviada para aprovação da Gestão.',
     };
   }
 
@@ -966,7 +966,7 @@ export class PropostasService {
       historyTitle: 'Cliente aprovou a proposta',
       notificationTitle: 'Cliente aprovou a proposta',
       notificationMessage:
-        'O cliente aprovou a proposta. Envie para aprovacao da Gestao.',
+        'O cliente aprovou a proposta. Envie para aprovação da Gestão.',
       emailTemplate: 'CLIENTE_APROVOU_PROPOSTA',
       successMessage: 'Proposta aprovada com sucesso.',
       eventType: TicketHistoryEventType.APPROVED,
@@ -1062,7 +1062,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new NotFoundException('Proposta nao encontrada.');
+      throw new NotFoundException('Proposta não encontrada.');
     }
 
     if (proposta.status !== StatusProposta.ENVIADA_AO_CLIENTE) {
@@ -1278,13 +1278,13 @@ export class PropostasService {
       propostaStatus: StatusProposta.APROVADA_PELA_GESTAO,
       propostaDateField: 'aprovadaPelaGestaoEm',
       ticketStatus: TicketStatus.APROVADO_GESTAO,
-      historyTitle: 'Gestao aprovou a proposta',
-      message: 'A Gestao aprovou a proposta formal.',
-      notificationTitle: 'Gestao aprovou a proposta',
+      historyTitle: 'Gestão aprovou a proposta',
+      message: 'A Gestão aprovou a proposta formal.',
+      notificationTitle: 'Gestão aprovou a proposta',
       notificationMessage:
-        'A Gestao aprovou a proposta. O retorno esta disponivel para o Comercial.',
+        'A Gestão aprovou a proposta. O retorno está disponível para o Comercial.',
       emailTemplate: 'GESTAO_APROVOU_PROPOSTA',
-      successMessage: 'Proposta aprovada pela Gestao.',
+      successMessage: 'Proposta aprovada pela Gestão.',
       eventType: TicketHistoryEventType.APPROVED,
     });
   }
@@ -1306,11 +1306,11 @@ export class PropostasService {
       propostaStatus: StatusProposta.AJUSTE_SOLICITADO_PELA_GESTAO,
       propostaDateField: 'ajusteSolicitadoPelaGestaoEm',
       ticketStatus: TicketStatus.AJUSTE_SOLICITADO,
-      historyTitle: 'Gestao solicitou ajuste na proposta',
+      historyTitle: 'Gestão solicitou ajuste na proposta',
       message: `A Gestao solicitou ajuste na proposta: ${motivo}`,
-      notificationTitle: 'Gestao solicitou ajuste na proposta',
+      notificationTitle: 'Gestão solicitou ajuste na proposta',
       notificationMessage:
-        'A Gestao solicitou ajuste na proposta. O retorno foi enviado ao Comercial.',
+        'A Gestão solicitou ajuste na proposta. O retorno foi enviado ao Comercial.',
       emailTemplate: 'GESTAO_SOLICITOU_AJUSTE_PROPOSTA',
       successMessage: 'Ajuste solicitado ao Comercial.',
       eventType: TicketHistoryEventType.ADJUSTMENT_REQUESTED,
@@ -1335,13 +1335,13 @@ export class PropostasService {
       propostaStatus: StatusProposta.RECUSADA_PELA_GESTAO,
       propostaDateField: 'recusadaPelaGestaoEm',
       ticketStatus: TicketStatus.REPROVADO,
-      historyTitle: 'Gestao recusou a proposta',
+      historyTitle: 'Gestão recusou a proposta',
       message: `A Gestao recusou a proposta: ${motivo}`,
-      notificationTitle: 'Gestao recusou a proposta',
+      notificationTitle: 'Gestão recusou a proposta',
       notificationMessage:
-        'A Gestao recusou a proposta. O retorno foi enviado ao Comercial.',
+        'A Gestão recusou a proposta. O retorno foi enviado ao Comercial.',
       emailTemplate: 'GESTAO_RECUSOU_PROPOSTA',
-      successMessage: 'Proposta recusada pela Gestao.',
+      successMessage: 'Proposta recusada pela Gestão.',
       eventType: TicketHistoryEventType.REJECTED,
       motivo,
     });
@@ -1377,12 +1377,12 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new NotFoundException('Proposta nao encontrada.');
+      throw new NotFoundException('Proposta não encontrada.');
     }
 
     if (proposta.status !== StatusProposta.ENVIADA_PARA_GESTAO) {
       throw new BadRequestException(
-        'A proposta nao esta aguardando decisao da Gestao.',
+        'A proposta não está aguardando decisão da Gestão.',
       );
     }
 
@@ -1410,7 +1410,7 @@ export class PropostasService {
 
       if (!approvedNegotiatedValue || approvedNegotiatedValue.lte(0)) {
         throw new BadRequestException(
-          'Informe o valor do servico negociado antes de aprovar a proposta.',
+          'Informe o valor do serviço negociado antes de aprovar a proposta.',
         );
       }
     }
@@ -1652,7 +1652,7 @@ export class PropostasService {
           where: { id: input.logEmailId },
           data: {
             status: StatusLogEmail.IGNORADO,
-            mensagemErro: 'EMAIL_WEBHOOK_URL nao configurado.',
+            mensagemErro: 'EMAIL_WEBHOOK_URL não configurado.',
           },
         }),
         this.prisma.ticketHistory.create({
@@ -1660,7 +1660,7 @@ export class PropostasService {
             ticketId: input.ticketId,
             eventType: TicketHistoryEventType.EMAIL_SENT,
             title: 'Envio de e-mail ignorado',
-            description: 'EMAIL_WEBHOOK_URL nao configurado.',
+            description: 'EMAIL_WEBHOOK_URL não configurado.',
             createdById: input.actorId,
             metadata: {
               propostaId: input.propostaId,

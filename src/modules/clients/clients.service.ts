@@ -39,7 +39,7 @@ export class ClientsService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar este recurso.',
+        'Você não tem permissão para acessar este recurso.',
       );
     }
   }
@@ -49,7 +49,7 @@ export class ClientsService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para aprovar esta solicitacao.',
+        'Você não tem permissão para aprovar esta solicitação.',
       );
     }
   }
@@ -62,7 +62,7 @@ export class ClientsService {
   private formatQuoteStatus(status: QuoteStatus) {
     const labels: Record<QuoteStatus, string> = {
       RECEIVED: 'Recebida',
-      IN_ANALYSIS: 'Em analise',
+      IN_ANALYSIS: 'Em análise',
       ANSWERED: 'Respondida',
       APPROVED: 'Aprovada',
       REJECTED: 'Rejeitada',
@@ -100,6 +100,7 @@ export class ClientsService {
                 id: true,
                 name: true,
                 email: true,
+                role: true,
               },
             },
           },
@@ -111,7 +112,7 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Cliente nao encontrado.');
+      throw new NotFoundException('Cliente não encontrado.');
     }
 
     return client;
@@ -125,7 +126,7 @@ export class ClientsService {
         type: 'QUOTE_CREATED',
         date: quote.createdAt,
         quoteId: quote.id,
-        title: 'Cotacao criada',
+        title: 'Cotação criada',
         description: `${quote.origin} -> ${quote.destination}`,
         status: quote.status,
       };
@@ -136,7 +137,7 @@ export class ClientsService {
         type: 'QUOTE_STATUS',
         date: history.createdAt,
         quoteId: quote.id,
-        title: 'Status da cotacao atualizado',
+        title: 'Status da cotação atualizado',
         description:
           history.notes ??
           `Status alterado para ${this.formatQuoteStatus(history.status)}.`,
@@ -149,7 +150,12 @@ export class ClientsService {
 
   private buildStoredTimelineEvents(
     timelineEvents: (TimelineEvent & {
-      createdBy: { id: string; name: string; email: string } | null;
+      createdBy: {
+        id: string;
+        name: string;
+        email: string;
+        role: UserRole;
+      } | null;
     })[],
   ) {
     return timelineEvents.map((event) => ({
@@ -166,7 +172,12 @@ export class ClientsService {
 
   private buildCombinedTimeline(client: {
     timelineEvents: (TimelineEvent & {
-      createdBy: { id: string; name: string; email: string } | null;
+      createdBy: {
+        id: string;
+        name: string;
+        email: string;
+        role: UserRole;
+      } | null;
     })[];
     quotes: (Quote & { history: QuoteHistory[] })[];
   }) {
@@ -194,7 +205,7 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Perfil do cliente nao encontrado.');
+      throw new NotFoundException('Perfil do cliente não encontrado.');
     }
 
     return client;
@@ -464,16 +475,42 @@ export class ClientsService {
     return this.buildCombinedTimeline(client);
   }
 
-  async createTimelineNote(user: AuthUser, id: string, dto: CreateTimelineNoteDto) {
+  async createTimelineNote(
+    user: AuthUser,
+    id: string,
+    dto: CreateTimelineNoteDto,
+  ) {
     this.ensureInternalUser(user);
     await this.getClientOrFail(id);
+
+    const contactedAt = dto.contactedAt?.trim();
+    const parsedContactedAt = contactedAt ? new Date(contactedAt) : null;
+    const hasValidContactedAt =
+      parsedContactedAt instanceof Date &&
+      !Number.isNaN(parsedContactedAt.getTime());
+    const contactDate = hasValidContactedAt ? parsedContactedAt : null;
+    const contactChannel = this.sanitize(dto.contactChannel);
+    const contactPerson = this.sanitize(dto.contactPerson);
+    const metadata =
+      contactChannel || contactPerson || hasValidContactedAt
+        ? {
+            kind: 'CONTACT',
+            contactChannel,
+            contactPerson,
+            contactedAt: contactDate
+              ? contactDate.toISOString()
+              : contactedAt || null,
+          }
+        : undefined;
 
     return this.prisma.timelineEvent.create({
       data: {
         clientId: id,
         type: TimelineEventType.NOTE_ADDED,
-        title: dto.title?.trim() || 'Observacao adicionada',
+        title: dto.title?.trim() || 'Contato registrado',
         description: dto.description.trim(),
+        metadata,
+        ...(contactDate ? { createdAt: contactDate } : {}),
         createdById: user.sub,
       },
       include: {
@@ -482,6 +519,7 @@ export class ClientsService {
             id: true,
             name: true,
             email: true,
+            role: true,
           },
         },
       },
@@ -618,7 +656,7 @@ export class ClientsService {
       });
 
       if (emailInUse && emailInUse.id !== existingClient.userId) {
-        throw new BadRequestException('E-mail ja esta em uso.');
+        throw new BadRequestException('E-mail já está em uso.');
       }
     }
 
@@ -637,7 +675,7 @@ export class ClientsService {
       dto.status !== undefined && dto.status !== existingClient.status ? 'status' : null,
       dto.internalOwnerId !== undefined &&
       dto.internalOwnerId !== existingClient.internalOwnerId
-        ? 'responsavel interno'
+        ? 'responsável interno'
         : null,
     ].filter(Boolean);
 
@@ -733,7 +771,7 @@ export class ClientsService {
           status as ClientDeletionRequestStatus,
         )
       ) {
-        throw new BadRequestException('Status de solicitacao invalido.');
+        throw new BadRequestException('Status de solicitação invalido.');
       }
 
       where.status = status as ClientDeletionRequestStatus;
@@ -793,7 +831,7 @@ export class ClientsService {
 
     if (pendingRequest) {
       throw new BadRequestException(
-        'Ja existe uma solicitacao de exclusao pendente para este cliente.',
+        'Já existe uma solicitação de exclusão pendente para este cliente.',
       );
     }
 
@@ -832,10 +870,10 @@ export class ClientsService {
       data: {
         clientId: id,
         type: TimelineEventType.NOTE_ADDED,
-        title: 'Solicitacao de exclusao criada',
+        title: 'Solicitação de exclusão criada',
         description:
           this.sanitize(dto.reason) ??
-          'Solicitacao enviada para aprovacao da Gestao.',
+          'Solicitação enviada para aprovação da Gestão.',
         createdById: user.sub,
         metadata: {
           deletionRequestId: request.id,
@@ -862,7 +900,7 @@ export class ClientsService {
     await this.notificationsService.notifyRoles(
       [UserRole.ADMIN, UserRole.GESTAO],
       {
-        title: 'Solicitacao de exclusao de cliente',
+        title: 'Solicitação de exclusão de cliente',
         message: `${
           client.companyName ?? client.user.name
         } foi enviado para aprovacao de exclusao.`,
@@ -884,7 +922,7 @@ export class ClientsService {
     requestId: string,
     dto: DecideClientDeletionDto,
   ) {
-    this.ensureManagementUser(user); 
+    this.ensureManagementUser(user);
 
     const request = await this.prisma.clientDeletionRequest.findUnique({
       where: { id: requestId },
@@ -905,12 +943,12 @@ export class ClientsService {
     });
 
     if (!request) {
-      throw new NotFoundException('Solicitacao de exclusao nao encontrada.');
+      throw new NotFoundException('Solicitação de exclusão não encontrada.');
     }
 
     if (request.status !== ClientDeletionRequestStatus.PENDENTE) {
       throw new BadRequestException(
-        'Esta solicitacao de exclusao ja foi analisada.',
+        'Esta solicitação de exclusão já foi analisada.',
       );
     }
 
@@ -951,10 +989,10 @@ export class ClientsService {
           data: {
             clientId: request.clientId,
             type: TimelineEventType.NOTE_ADDED,
-            title: 'Solicitacao de exclusao recusada',
+            title: 'Solicitação de exclusão recusada',
             description:
               managementResponse ??
-              'A Gestao recusou a solicitacao de exclusao do cliente.',
+              'A Gestão recusou a solicitação de exclusão do cliente.',
             createdById: user.sub,
             metadata: {
               deletionRequestId: requestId,
@@ -980,7 +1018,7 @@ export class ClientsService {
       });
 
       await this.notificationsService.notifyUsers([request.requestedBy.id], {
-        title: 'Exclusao de cliente recusada',
+        title: 'Exclusão de cliente recusada',
         message: `A solicitacao de exclusao de ${
           request.clientNameSnapshot ?? request.client?.companyName ?? 'cliente'
         } foi recusada.`,
@@ -994,14 +1032,14 @@ export class ClientsService {
       });
 
       return {
-        message: 'Solicitacao de exclusao recusada.',
+        message: 'Solicitação de exclusão recusada.',
         request: rejected,
       };
     }
 
     if (!request.client || !request.client.user) {
       throw new BadRequestException(
-        'O cliente vinculado a esta solicitacao nao esta mais disponivel.',
+        'O cliente vinculado a esta solicitação não está mais disponível.',
       );
     }
 
@@ -1066,7 +1104,7 @@ export class ClientsService {
     });
 
     return {
-      message: 'Cliente excluido com aprovacao da Gestao.',
+      message: 'Cliente excluido com aprovação da Gestão.',
       request: {
         id: requestId,
         status: ClientDeletionRequestStatus.APROVADA,

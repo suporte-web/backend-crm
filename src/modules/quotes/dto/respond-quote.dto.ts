@@ -8,7 +8,7 @@ export class RespondQuoteDto {
   @IsNumber()
   price!: number;
 
-  @ApiPropertyOptional({ description: 'Observacoes comerciais enviadas ao cliente.' })
+  @ApiPropertyOptional({ description: 'Observações comerciais enviadas ao cliente.' })
   @IsOptional()
   @IsString()
   commercialNotes?: string;

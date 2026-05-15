@@ -58,7 +58,7 @@ export class OpportunitiesController {
     @Body() dto: UpdateOpportunityStageDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Id da oportunidade e obrigatorio.');
+      throw new BadRequestException('Id da oportunidade e obrigatório.');
     }
 
     return this.opportunitiesService.updateStage(user, id, dto);
@@ -71,7 +71,7 @@ export class OpportunitiesController {
     @Body() dto: UpdateOpportunityDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Id da oportunidade e obrigatorio.');
+      throw new BadRequestException('Id da oportunidade e obrigatório.');
     }
 
     return this.opportunitiesService.update(user, id, dto);

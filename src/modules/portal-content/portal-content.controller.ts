@@ -103,7 +103,7 @@ export class PortalContentController {
     @Req() request: Request,
   ) {
     if (!file) {
-      throw new BadRequestException('Arquivo nao enviado.');
+      throw new BadRequestException('Arquivo não enviado.');
     }
 
     return {

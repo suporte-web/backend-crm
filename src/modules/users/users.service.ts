@@ -10,11 +10,23 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import {
   AuditLogAction,
   AuditLogCategory,
+  RoleScreenPermission,
   TimelineEventType,
   UserRole,
 } from '@prisma/client';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { UpdateRoleScreenPermissionsDto } from './dto/update-role-screen-permissions.dto';
+
+const roleScreenPermissionSelect = {
+  id: true,
+  role: true,
+  screenKey: true,
+  screenLabel: true,
+  isEnabled: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 @Injectable()
 export class UsersService {
@@ -29,7 +41,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('E-mail ja esta em uso.');
+      throw new BadRequestException('E-mail já está em uso.');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -101,36 +113,52 @@ export class UsersService {
       },
     });
 
-    return user;
+    return {
+      ...user,
+      screenPermissions: await this.findRoleScreenPermissions(user.role),
+    };
   }
 
   async findAll() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        mustChangePassword: true,
-        createdAt: true,
-        updatedAt: true,
-        clientProfile: {
-          select: {
-            id: true,
-            document: true,
-            phone: true,
-            companyName: true,
-            segment: true,
-            status: true,
-            internalOwnerId: true,
-            createdAt: true,
-            updatedAt: true,
+    const [users, permissions] = await Promise.all([
+      this.prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          mustChangePassword: true,
+          createdAt: true,
+          updatedAt: true,
+          clientProfile: {
+            select: {
+              id: true,
+              document: true,
+              phone: true,
+              companyName: true,
+              segment: true,
+              status: true,
+              internalOwnerId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.roleScreenPermission.findMany({
+        select: roleScreenPermissionSelect,
+        orderBy: [{ role: 'asc' }, { screenKey: 'asc' }],
+      }),
+    ]);
+
+    const permissionsByRole = this.groupScreenPermissionsByRole(permissions);
+
+    return users.map((user) => ({
+      ...user,
+      screenPermissions: permissionsByRole.get(user.role) ?? [],
+    }));
   }
 
   async findOne(id: string) {
@@ -162,10 +190,13 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Usuario nao encontrado.');
+      throw new NotFoundException('Usuário não encontrado.');
     }
 
-    return user;
+    return {
+      ...user,
+      screenPermissions: await this.findRoleScreenPermissions(user.role),
+    };
   }
 
   async findInternalUsers() {
@@ -211,7 +242,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Usuario nao encontrado.');
+      throw new NotFoundException('Usuário não encontrado.');
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(
@@ -256,7 +287,10 @@ export class UsersService {
       },
     });
 
-    return updated;
+    return {
+      ...updated,
+      screenPermissions: await this.findRoleScreenPermissions(updated.role),
+    };
   }
 
   async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {
@@ -266,7 +300,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException('Usuario nao encontrado.');
+      throw new NotFoundException('Usuário não encontrado.');
     }
 
     if (dto.email) {
@@ -275,7 +309,7 @@ export class UsersService {
       });
 
       if (emailInUse && emailInUse.id !== id) {
-        throw new BadRequestException('E-mail ja esta em uso.');
+        throw new BadRequestException('E-mail já está em uso.');
       }
     }
 
@@ -352,7 +386,92 @@ export class UsersService {
       },
     });
 
-    return updatedUser;
+    return {
+      ...updatedUser,
+      screenPermissions: await this.findRoleScreenPermissions(updatedUser.role),
+    };
+  }
+
+  async findScreenPermissions() {
+    const permissions = await this.prisma.roleScreenPermission.findMany({
+      select: roleScreenPermissionSelect,
+      orderBy: [{ role: 'asc' }, { screenKey: 'asc' }],
+    });
+    const permissionsByRole = this.groupScreenPermissionsByRole(permissions);
+
+    return Object.values(UserRole).map((role) => ({
+      role,
+      screens: permissionsByRole.get(role) ?? [],
+    }));
+  }
+
+  async findRoleScreenPermissions(role: UserRole) {
+    return this.prisma.roleScreenPermission.findMany({
+      where: { role },
+      select: roleScreenPermissionSelect,
+      orderBy: { screenKey: 'asc' },
+    });
+  }
+
+  async updateRoleScreenPermissions(
+    role: UserRole,
+    dto: UpdateRoleScreenPermissionsDto,
+    actor?: AuthUser,
+  ) {
+    const screens = dto.screens.map((screen) => ({
+      screenKey: screen.screenKey.trim(),
+      screenLabel: screen.screenLabel?.trim(),
+      isEnabled: screen.isEnabled,
+    }));
+
+    const invalidScreen = screens.find((screen) => !screen.screenKey);
+
+    if (invalidScreen) {
+      throw new BadRequestException('Chave da tela não pode ser vazia.');
+    }
+
+    await this.prisma.$transaction(
+      screens.map((screen) =>
+        this.prisma.roleScreenPermission.upsert({
+          where: {
+            role_screenKey: {
+              role,
+              screenKey: screen.screenKey,
+            },
+          },
+          create: {
+            role,
+            screenKey: screen.screenKey,
+            screenLabel: screen.screenLabel,
+            isEnabled: screen.isEnabled,
+          },
+          update: {
+            screenLabel: screen.screenLabel,
+            isEnabled: screen.isEnabled,
+          },
+        }),
+      ),
+    );
+
+    const updatedPermissions = await this.findRoleScreenPermissions(role);
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.CUSTOM,
+      message: `Permissoes de telas atualizadas para o perfil ${role}.`,
+      targetType: 'RoleScreenPermission',
+      targetId: role,
+      userId: actor?.sub,
+      details: {
+        role,
+        screens,
+      },
+    });
+
+    return {
+      role,
+      screens: updatedPermissions,
+    };
   }
 
   async remove(id: string, actor?: AuthUser) {
@@ -361,7 +480,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException('Usuario nao encontrado.');
+      throw new NotFoundException('Usuário não encontrado.');
     }
 
     await this.prisma.user.delete({
@@ -377,6 +496,15 @@ export class UsersService {
       userId: actor?.sub,
     });
 
-    return { message: 'Usuario removido com sucesso.' };
+    return { message: 'Usuário removido com sucesso.' };
+  }
+
+  private groupScreenPermissionsByRole(permissions: RoleScreenPermission[]) {
+    return permissions.reduce((grouped, permission) => {
+      const rolePermissions = grouped.get(permission.role) ?? [];
+      rolePermissions.push(permission);
+      grouped.set(permission.role, rolePermissions);
+      return grouped;
+    }, new Map<UserRole, RoleScreenPermission[]>());
   }
 }

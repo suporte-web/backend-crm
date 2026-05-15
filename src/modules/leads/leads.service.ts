@@ -16,11 +16,14 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
+  TimelineEventType,
 } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { readFile, unlink } from 'fs/promises';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
@@ -76,7 +79,7 @@ export class LeadsService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para acessar este recurso.',
+        'Você não tem permissão para acessar este recurso.',
       );
     }
   }
@@ -692,7 +695,7 @@ export class LeadsService {
     });
 
     if (!lead) {
-      throw new NotFoundException('Lead nao encontrado.');
+      throw new NotFoundException('Lead não encontrado.');
     }
 
     return lead;
@@ -741,6 +744,181 @@ export class LeadsService {
     );
   }
 
+  async convertToClient(
+    user: AuthUser,
+    leadId: string,
+    dto: ConvertLeadToClientDto,
+  ) {
+    this.ensureInternalUser(user);
+
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead não encontrado.');
+    }
+
+    const document = this.sanitizeText(dto.document);
+    if (!document) {
+      throw new BadRequestException('Informe o CNPJ/documento do cliente.');
+    }
+
+    const email = this.sanitizeText(dto.email) ?? this.sanitizeText(lead.email);
+    if (!email) {
+      throw new BadRequestException(
+        'Informe o e-mail do cliente para criar acesso ao portal.',
+      );
+    }
+
+    const name = this.sanitizeText(dto.name) ?? lead.name;
+    const companyName =
+      this.sanitizeText(dto.companyName) ??
+      this.sanitizeText(lead.company) ??
+      name;
+    const phone = this.sanitizeText(dto.phone) ?? this.sanitizeText(lead.phone);
+    const segment = this.sanitizeText(dto.segment);
+    const status = this.sanitizeText(dto.status) ?? 'PENDENTE';
+    const internalOwnerId = this.sanitizeText(dto.internalOwnerId) ?? user.sub;
+
+    const [existingUser, existingClientDocument] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true, email: true },
+      }),
+      this.prisma.client.findFirst({
+        where: { document },
+        select: { id: true, document: true },
+      }),
+    ]);
+
+    if (existingUser) {
+      throw new ConflictException('Já existe um usuário com este e-mail.');
+    }
+
+    if (existingClientDocument) {
+      throw new ConflictException('Já existe um cliente com este documento.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    return this.prisma.$transaction(async (tx) => {
+      const clientUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash,
+          mustChangePassword: true,
+          role: UserRole.CLIENTE,
+          isActive: true,
+          clientProfile: {
+            create: {
+              document,
+              phone,
+              companyName,
+              segment,
+              status,
+              internalOwnerId,
+              notes: lead.notes,
+              timelineEvents: {
+                create: {
+                  type: TimelineEventType.LEAD_CREATED,
+                  title: 'Cliente convertido de lead',
+                  description: `Cliente criado a partir do lead ${lead.name}.`,
+                  metadata: {
+                    leadId: lead.id,
+                    leadSource: lead.source,
+                  },
+                  createdById: user.sub,
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          mustChangePassword: true,
+          createdAt: true,
+          updatedAt: true,
+          clientProfile: {
+            select: {
+              id: true,
+              document: true,
+              phone: true,
+              companyName: true,
+              segment: true,
+              status: true,
+              internalOwnerId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+
+      const updatedLead = await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          status: 'converted',
+          updatedById: user.sub,
+          timeline: {
+            create: {
+              type: LeadTimelineEventType.UPDATED,
+              title: 'Lead convertido em cliente',
+              description: `Cliente criado com o documento ${document}.`,
+              metadata: {
+                clientId: clientUser.clientProfile?.id,
+                userId: clientUser.id,
+                document,
+              },
+              createdById: user.sub,
+            },
+          },
+        },
+        include: {
+          timeline: {
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          updatedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      return {
+        lead: updatedLead,
+        user: clientUser,
+        client: clientUser.clientProfile,
+      };
+    });
+  }
+
   async importCsv(user: AuthUser, file: UploadFile, dto: ImportLeadsCsvDto) {
     this.ensureInternalUser(user);
 
@@ -776,7 +954,7 @@ export class LeadsService {
             jobId: job.id,
             rowNumber: mapped.rowNumber,
             status: LeadImportRowStatus.SKIPPED,
-            reason: 'Linha ignorada: nome obrigatorio ausente.',
+            reason: 'Linha ignorada: nome obrigatório ausente.',
             rawData: rawRow,
           });
           continue;
@@ -993,7 +1171,7 @@ export class LeadsService {
     });
 
     if (!job) {
-      throw new NotFoundException('Importacao nao encontrada.');
+      throw new NotFoundException('Importação não encontrada.');
     }
 
     return job;
@@ -1004,7 +1182,7 @@ export class LeadsService {
 
     if (!expectedToken) {
       throw new ForbiddenException(
-        'Token de verificacao do WhatsApp nao configurado.',
+        'Token de verificação do WhatsApp não configurado.',
       );
     }
 
@@ -1014,7 +1192,7 @@ export class LeadsService {
       input.verifyToken !== expectedToken
     ) {
       throw new ForbiddenException(
-        'Verificacao do webhook do WhatsApp recusada.',
+        'Verificação do webhook do WhatsApp recusada.',
       );
     }
 
@@ -1057,7 +1235,7 @@ export class LeadsService {
 
     if (!configuredToken) {
       throw new ForbiddenException(
-        'Token de integracao do WhatsApp nao configurado.',
+        'Token de integração do WhatsApp não configurado.',
       );
     }
 
@@ -1065,7 +1243,7 @@ export class LeadsService {
       !context.integrationToken ||
       context.integrationToken !== configuredToken
     ) {
-      throw new ForbiddenException('Token de integracao invalido.');
+      throw new ForbiddenException('Token de integração invalido.');
     }
 
     const phone = this.sanitizeText(dto.phone);
@@ -1076,7 +1254,7 @@ export class LeadsService {
     const normalizedPhone = this.normalizePhone(phone);
     if (!normalizedPhone) {
       throw new BadRequestException(
-        'Telefone invalido para integracao de WhatsApp.',
+        'Telefone invalido para integração de WhatsApp.',
       );
     }
 
@@ -1209,7 +1387,7 @@ export class LeadsService {
     return {
       created: true,
       lead: createdLead,
-      message: 'Lead criado via integracao de WhatsApp.',
+      message: 'Lead criado via integração de WhatsApp.',
     };
   }
 }

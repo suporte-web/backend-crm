@@ -20,7 +20,7 @@ import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { UpdateQuoteStatusDto } from './dto/update-quote-status.dto';
 import { QuotesService } from './quotes.service';
 
-@ApiTags('Cotacoes')
+@ApiTags('Cotações')
 @Controller('quotes')
 export class QuotesController {
   constructor(
@@ -40,7 +40,7 @@ export class QuotesController {
     });
 
     if (!client) {
-      throw new NotFoundException('Perfil do cliente nao encontrado.');
+      throw new NotFoundException('Perfil do cliente não encontrado.');
     }
 
     return this.quotesService.create(client.id, dto, user);
@@ -68,7 +68,7 @@ export class QuotesController {
     });
 
     if (!client) {
-      throw new NotFoundException('Perfil do cliente nao encontrado.');
+      throw new NotFoundException('Perfil do cliente não encontrado.');
     }
 
     return this.quotesService.findMine(client.id);
@@ -82,7 +82,7 @@ export class QuotesController {
     @Param('id') id: string,
   ) {
     if (!id) {
-      throw new BadRequestException('Informe o identificador da cotacao.');
+      throw new BadRequestException('Informe o identificador da cotação.');
     }
 
     return this.quotesService.findOne(user, id);
@@ -97,7 +97,7 @@ export class QuotesController {
     @Body() dto: UpdateQuoteDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Informe o identificador da cotacao.');
+      throw new BadRequestException('Informe o identificador da cotação.');
     }
 
     return this.quotesService.update(user, id, dto);
@@ -112,7 +112,7 @@ export class QuotesController {
     @Body() dto: UpdateQuoteStatusDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Informe o identificador da cotacao.');
+      throw new BadRequestException('Informe o identificador da cotação.');
     }
 
     return this.quotesService.updateStatus(user, id, dto);
@@ -127,7 +127,7 @@ export class QuotesController {
     @Body() dto: RespondQuoteDto,
   ) {
     if (!id) {
-      throw new BadRequestException('Informe o identificador da cotacao.');
+      throw new BadRequestException('Informe o identificador da cotação.');
     }
 
     return this.quotesService.respond(user, id, dto);
@@ -141,7 +141,7 @@ export class QuotesController {
     @Param('id') id: string,
   ) {
     if (!id) {
-      throw new BadRequestException('Informe o identificador da cotacao.');
+      throw new BadRequestException('Informe o identificador da cotação.');
     }
 
     return this.quotesService.remove(user, id);

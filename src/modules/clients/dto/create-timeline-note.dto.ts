@@ -7,4 +7,16 @@ export class CreateTimelineNoteDto {
 
   @IsString()
   description!: string;
+
+  @IsOptional()
+  @IsString()
+  contactChannel?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPerson?: string;
+
+  @IsOptional()
+  @IsString()
+  contactedAt?: string;
 }

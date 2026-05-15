@@ -184,10 +184,10 @@ export class AuditLogsService {
     const rows = await this.findAll(user, { ...filters, take: filters.take ?? '1000' });
     const headers = [
       'Data',
-      'Usuario',
+      'Usuário',
       'Email',
       'Categoria',
-      'Acao',
+      'Ação',
       'Nivel',
       'Sucesso',
       'Mensagem',
@@ -201,7 +201,7 @@ export class AuditLogsService {
       row.category,
       row.action,
       row.level,
-      row.success ? 'Sim' : 'Nao',
+      row.success ? 'Sim' : 'Não',
       row.message,
       [row.targetType, row.targetId].filter(Boolean).join(':') || '-',
       row.ipAddress ?? '-',

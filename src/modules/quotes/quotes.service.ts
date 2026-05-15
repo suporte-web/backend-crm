@@ -93,7 +93,7 @@ export class QuotesService {
   private formatQuoteStatus(status: QuoteStatus) {
     const labels: Record<QuoteStatus, string> = {
       RECEIVED: 'Recebida',
-      IN_ANALYSIS: 'Em analise',
+      IN_ANALYSIS: 'Em análise',
       ANSWERED: 'Respondida',
       APPROVED: 'Aprovada',
       REJECTED: 'Rejeitada',
@@ -132,7 +132,7 @@ export class QuotesService {
 
     if (!allowedRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'Voce nao tem permissao para executar esta acao.',
+        'Você não tem permissão para executar esta ação.',
       );
     }
   }
@@ -146,7 +146,7 @@ export class QuotesService {
     });
 
     if (!client) {
-      throw new NotFoundException('Cliente nao encontrado.');
+      throw new NotFoundException('Cliente não encontrado.');
     }
 
     const shouldCreatePreContract =
@@ -179,7 +179,7 @@ export class QuotesService {
           history: {
             create: {
               status: QuoteStatus.RECEIVED,
-              notes: 'Cotacao criada pelo cliente',
+              notes: 'Cotação criada pelo cliente',
             },
           },
         },
@@ -209,7 +209,7 @@ export class QuotesService {
           stage: OpportunityStage.NOVO,
           preContract: shouldCreatePreContract,
           preContractNotes: shouldCreatePreContract
-            ? 'Pre-contrato criado automaticamente a partir da cotacao do cliente.'
+            ? 'Pré-contrato criado automaticamente a partir da cotação do cliente.'
             : undefined,
         },
       });
@@ -218,7 +218,7 @@ export class QuotesService {
         data: {
           clientId,
           type: TimelineEventType.OPPORTUNITY_CREATED,
-          title: 'Oportunidade criada pela cotacao',
+          title: 'Oportunidade criada pela cotação',
           description: `Cotacao ${createdQuote.serviceType} entrou no pipeline comercial.`,
           createdById: user?.sub,
           metadata: {
@@ -254,9 +254,9 @@ export class QuotesService {
           history: {
             create: {
               eventType: TicketHistoryEventType.CREATED,
-              title: 'Cotacao recebida',
+              title: 'Cotação recebida',
               description:
-                'Ticket criado automaticamente a partir da cotacao do cliente.',
+                'Ticket criado automaticamente a partir da cotação do cliente.',
               createdById: user?.sub ?? client.userId,
             },
           },
@@ -267,11 +267,11 @@ export class QuotesService {
         [client.userId],
         {
           ticketId: ticket.id,
-          title: 'Sua cotacao foi recebida',
+          title: 'Sua cotação foi recebida',
           message:
-            'Sua cotacao foi enviada com sucesso. Nossa equipe comercial ira analisar e retornara em breve.',
+            'Sua cotação foi enviada com sucesso. Nossa equipe comercial irá analisar e retornará em breve.',
           actorId: user?.sub ?? client.userId,
-          emailSubject: 'Sua cotacao foi recebida',
+          emailSubject: 'Sua cotação foi recebida',
         },
         tx,
       );
@@ -280,11 +280,11 @@ export class QuotesService {
         [UserRole.COMERCIAL, UserRole.ADMIN],
         {
           ticketId: ticket.id,
-          title: 'Nova cotacao recebida no CRM',
+          title: 'Nova cotação recebida no CRM',
           message:
-            'Nova cotacao recebida. Acesse o ticket para iniciar o atendimento.',
+            'Nova cotação recebida. Acesse o ticket para iniciar o atendimento.',
           actorId: user?.sub ?? client.userId,
-          emailSubject: 'Nova cotacao recebida no CRM',
+          emailSubject: 'Nova cotação recebida no CRM',
           emailSummary: `${client.companyName ?? client.user.name} - ${dto.serviceType}`,
         },
         tx,
@@ -339,7 +339,7 @@ export class QuotesService {
       );
 
       if (!isValidStatus) {
-        throw new BadRequestException('Status da cotacao invalido.');
+        throw new BadRequestException('Status da cotação invalido.');
       }
 
       where.status = filters.status as QuoteStatus;
@@ -369,11 +369,11 @@ export class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundException('Cotacao nao encontrada.');
+      throw new NotFoundException('Cotação não encontrada.');
     }
 
     if (user.role === 'CLIENTE' && quote.client?.userId !== user.sub) {
-      throw new NotFoundException('Cotacao nao encontrada.');
+      throw new NotFoundException('Cotação não encontrada.');
     }
 
     return quote;
@@ -395,7 +395,7 @@ export class QuotesService {
       isClientOwner && editableStatuses.includes(quote.status);
 
     if (!this.isInternalUser({ role: user.role }) && !canClientEdit) {
-      throw new ForbiddenException('Voce nao pode editar esta cotacao.');
+      throw new ForbiddenException('Você não pode editar esta cotação.');
     }
 
     const changedFields = [
@@ -404,11 +404,11 @@ export class QuotesService {
         ? 'destino'
         : null,
       dto.serviceType !== undefined && dto.serviceType !== quote.serviceType
-        ? 'tipo de servico'
+        ? 'tipo de serviço'
         : null,
       dto.requestType !== undefined &&
       this.sanitize(dto.requestType) !== quote.requestType
-        ? 'tipo de solicitacao'
+        ? 'tipo de solicitação'
         : null,
       dto.pickupAddress !== undefined &&
       this.sanitize(dto.pickupAddress) !== quote.pickupAddress
@@ -420,7 +420,7 @@ export class QuotesService {
         : null,
       dto.cargoDescription !== undefined &&
       this.sanitize(dto.cargoDescription) !== quote.cargoDescription
-        ? 'descricao da carga'
+        ? 'descrição da carga'
         : null,
       dto.contactName !== undefined &&
       this.sanitize(dto.contactName) !== quote.contactName
@@ -530,7 +530,7 @@ export class QuotesService {
             data: updated.tickets.map((ticket) => ({
               ticketId: ticket.id,
               eventType: TicketHistoryEventType.STATUS_CHANGED,
-              title: 'Cotacao editada',
+              title: 'Cotação editada',
               description: `Campos atualizados: ${changedFields.join(', ')}.`,
               createdById: user.sub,
               metadata: {
@@ -624,7 +624,7 @@ export class QuotesService {
               eventType: TicketHistoryEventType.STATUS_CHANGED,
               title: 'Prospect aguardando cadastro',
               description:
-                'Cotacao aprovada. O prospect precisa completar cadastro antes de contrato, operacao, entrega ou rastreamento.',
+                'Cotação aprovada. O prospect precisa completar cadastro antes de contrato, operação, entrega ou rastreamento.',
               createdById: user.sub,
               internalOnly: true,
               metadata: {
@@ -722,8 +722,8 @@ export class QuotesService {
                     ? 'Resposta comercial registrada'
                     : 'Proposta enviada ao cliente',
                   description: prospectFlow
-                    ? 'Resposta comercial registrada para cotacao de prospect. O cadastro precisa ser concluido antes de contrato.'
-                    : 'Resposta comercial registrada na cotacao.',
+                    ? 'Resposta comercial registrada para cotação de prospect. O cadastro precisa ser concluído antes de contrato.'
+                    : 'Resposta comercial registrada na cotação.',
                   createdById: user.sub,
                   internalOnly: prospectFlow,
                 },
@@ -743,11 +743,11 @@ export class QuotesService {
               [updatedTicket.client.userId],
               {
                 ticketId: updatedTicket.id,
-                title: 'Sua solicitacao foi respondida',
+                title: 'Sua solicitação foi respondida',
                 message:
-                  'Nossa equipe respondeu sua solicitacao. Acesse o ticket para visualizar a devolutiva.',
+                  'Nossa equipe respondeu sua solicitação. Acesse o ticket para visualizar a devolutiva.',
                 actorId: user.sub,
-                emailSubject: 'Sua solicitacao foi respondida',
+                emailSubject: 'Sua solicitação foi respondida',
                 emailSummary:
                   this.sanitize(dto.commercialNotes) ??
                   `Proposta registrada no valor ${dto.price}.`,
@@ -762,7 +762,7 @@ export class QuotesService {
     await this.auditLogsService.create({
       category: AuditLogCategory.QUOTE,
       action: AuditLogAction.QUOTE_RESPONDED,
-      message: 'Proposta comercial enviada para cotacao.',
+      message: 'Proposta comercial enviada para cotação.',
       targetType: 'Quote',
       targetId: id,
       userId: user.sub,
@@ -786,7 +786,7 @@ export class QuotesService {
       isClientOwner && deletableStatuses.includes(quote.status);
 
     if (!this.isInternalUser({ role: user.role }) && !canClientDelete) {
-      throw new ForbiddenException('Voce nao pode excluir esta cotacao.');
+      throw new ForbiddenException('Você não pode excluir esta cotação.');
     }
 
     await this.prisma.quote.delete({
@@ -812,6 +812,6 @@ export class QuotesService {
       },
     });
 
-    return { message: 'Cotacao excluida com sucesso.' };
+    return { message: 'Cotação excluida com sucesso.' };
   }
 }
