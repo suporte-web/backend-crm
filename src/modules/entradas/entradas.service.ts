@@ -864,7 +864,7 @@ export class EntradasService {
     await this.auditLogsService.create({
       category: AuditLogCategory.QUOTE,
       action: AuditLogAction.QUOTE_CREATED,
-      message: `Cotacao criada a partir da entrada ${ticket.protocolo ?? id}.`,
+      message: `Cotação criada a partir da entrada ${ticket.protocolo ?? id}.`,
       targetType: 'Quote',
       targetId: quote.id,
       userId: user.sub,

@@ -44,6 +44,8 @@ export class NotificationsService {
       ...extra,
     };
 
+    return base;
+
     if (user.role !== UserRole.CLIENTE) {
       return base;
     }

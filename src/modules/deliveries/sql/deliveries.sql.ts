@@ -88,10 +88,19 @@ function getBaseSelect() {
 function buildOptionalFilters(
   filters: QueryDeliveriesDto,
   startIndex: number,
+  clientDocument?: string,
 ): SqlQuery {
   const values: Array<string> = [];
   const clauses: string[] = [];
   let currentIndex = startIndex;
+
+  if (clientDocument !== undefined) {
+    values.push(clientDocument);
+    clauses.push(
+      `regexp_replace(coalesce(cgc_pag::text, ''), '\\D', '', 'g') = $${currentIndex}`,
+    );
+    currentIndex += 1;
+  }
 
   if (filters.ufDest?.trim()) {
     values.push(filters.ufDest.trim().toUpperCase());
@@ -129,10 +138,13 @@ function buildOptionalFilters(
   };
 }
 
-export function buildDeliveriesQuery(filters: QueryDeliveriesDto): SqlQuery {
+export function buildDeliveriesQuery(
+  filters: QueryDeliveriesDto,
+  clientDocument?: string,
+): SqlQuery {
   const dataRef = filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
   const baseValues = [DEFAULT_SIGLA_FILIAL, dataRef];
-  const optionalFilters = buildOptionalFilters(filters, 3);
+  const optionalFilters = buildOptionalFilters(filters, 3, clientDocument);
 
   return {
     text: `
@@ -177,10 +189,11 @@ export function buildDeliveriesQuery(filters: QueryDeliveriesDto): SqlQuery {
 
 export function buildDeliveriesSummaryQuery(
   filters: QueryDeliveriesDto,
+  clientDocument?: string,
 ): SqlQuery {
   const dataRef = filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
   const baseValues = [DEFAULT_SIGLA_FILIAL, dataRef];
-  const optionalFilters = buildOptionalFilters(filters, 3);
+  const optionalFilters = buildOptionalFilters(filters, 3, clientDocument);
 
   return {
     text: `

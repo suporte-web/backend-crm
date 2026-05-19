@@ -26,6 +26,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
+import { ConvertLeadToProspectDto } from './dto/convert-lead-to-prospect.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
 import { LeadsService } from './leads.service';
@@ -85,6 +86,18 @@ export class LeadsController {
     @Body() dto: ConvertLeadToClientDto,
   ) {
     return this.leadsService.convertToClient(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Post(':id/convert-to-prospect')
+  convertToProspect(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: ConvertLeadToProspectDto,
+  ) {
+    return this.leadsService.convertToProspect(user, id, dto);
   }
 
   @ApiBearerAuth()

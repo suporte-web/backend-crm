@@ -604,7 +604,62 @@ export class PropostasService {
     dto: UpdatePropostaDto = {},
   ) {
     this.ensureInternalUser(user);
-    const ticket = await this.getTicketOrThrow(ticketId, user);
+    let ticket = await this.getTicketOrThrow(ticketId, user);
+
+    const proposta = await this.prisma.proposta.findFirst({
+      where: {
+        id: propostaId,
+        ticketId,
+      },
+      include: {
+        client: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        quote: {
+          include: {
+            client: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!proposta) {
+      throw new NotFoundException('Proposta não encontrada.');
+    }
+
+    const fallbackClient = proposta.client ?? proposta.quote?.client ?? null;
+
+    if (
+      (!ticket.client?.user?.email || !ticket.client.userId) &&
+      fallbackClient?.user?.email
+    ) {
+      await this.prisma.ticket.update({
+        where: { id: ticketId },
+        data: {
+          clientId: fallbackClient.id,
+          internalOnly: false,
+        },
+      });
+      ticket = await this.getTicketOrThrow(ticketId, user);
+    }
 
     if (!ticket.client?.user?.email || !ticket.client.userId) {
       throw new BadRequestException(
@@ -613,17 +668,6 @@ export class PropostasService {
     }
     const clientUserId = ticket.client.userId;
     const clientUser = ticket.client.user;
-
-    const proposta = await this.prisma.proposta.findFirst({
-      where: {
-        id: propostaId,
-        ticketId,
-      },
-    });
-
-    if (!proposta) {
-      throw new NotFoundException('Proposta não encontrada.');
-    }
 
     if (!PROPOSTA_EDITAVEL.includes(proposta.status)) {
       throw new BadRequestException(

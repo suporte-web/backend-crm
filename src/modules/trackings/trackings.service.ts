@@ -16,11 +16,8 @@ export class TrackingsService {
   async queryTracking(dto: QueryTrackingDto) {
     const payload: Record<string, string> = {
       cnpj: dto.cnpj,
+      senha: dto.senha ?? '',
     };
-
-    if (dto.senha) {
-      payload.senha = dto.senha;
-    }
 
     if (dto.siglaEmp) {
       payload.sigla_emp = dto.siglaEmp;
@@ -41,32 +38,38 @@ export class TrackingsService {
       );
     }
 
-    const formData = new URLSearchParams();
-
-    Object.entries(payload).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          'https://ssw.inf.br/api/tracking',
-          formData.toString(),
+          'https://ssw.inf.br/api/trackingdest',
+          payload,
           {
             timeout: 15000,
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
+              'Content-Type': 'application/json',
             },
             responseType: 'text',
           },
         ),
       );
 
+      const responseText =
+        typeof response.data === 'string'
+          ? response.data.trim()
+          : response.data;
+
+      if (
+        typeof responseText === 'string' &&
+        (responseText.startsWith('{') || responseText.startsWith('['))
+      ) {
+        return JSON.parse(responseText);
+      }
+
       const parser = new XMLParser({
         ignoreAttributes: false,
       });
 
-      return parser.parse(response.data);
+      return parser.parse(responseText);
     } catch (error: any) {
       if (error.code === 'ECONNABORTED') {
         throw new GatewayTimeoutException(

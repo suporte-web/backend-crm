@@ -15,6 +15,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { UserRole } from '../auth/enums/user-role.enum';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
@@ -68,6 +69,7 @@ export class ChatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private isInternalRole(role: string) {
@@ -323,6 +325,34 @@ export class ChatsService {
     }
   }
 
+  private getMessageNotificationRecipients(
+    chat: ChatWithParticipants,
+    authorId: string,
+    visibility: ChatMessageVisibility,
+    authorizedUserIds?: string[],
+  ) {
+    const privateRecipients = new Set(authorizedUserIds ?? []);
+
+    return chat.participants
+      .filter((participant) => {
+        if (!participant.canRead || participant.userId === authorId) {
+          return false;
+        }
+
+        if (visibility === ChatMessageVisibility.PRIVADA_USUARIOS) {
+          return privateRecipients.has(participant.userId);
+        }
+
+        return this.canViewVisibility(
+          participant.user.role,
+          visibility,
+          true,
+          false,
+        );
+      })
+      .map((participant) => participant.userId);
+  }
+
   private async getChatOrThrow(tx: PrismaClientLike, chatId: string) {
     const chat = await tx.chat.findUnique({
       where: { id: chatId },
@@ -345,6 +375,15 @@ export class ChatsService {
     }
 
     return chat;
+  }
+
+  private isUniqueConstraintError(error: unknown) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2002'
+    );
   }
 
   private async getEntityContext(
@@ -539,7 +578,10 @@ export class ChatsService {
   }
 
   async create(user: AuthUser, dto: CreateChatDto) {
-    const result = await this.prisma.$transaction(async (tx) => {
+    let result: { chat: ChatWithParticipants; created: boolean };
+
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
       const context = await this.getEntityContext(
         tx,
         user,
@@ -617,7 +659,59 @@ export class ChatsService {
       });
 
       return { chat, created: true };
-    });
+      });
+    } catch (error) {
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      result = await this.prisma.$transaction(async (tx) => {
+        const context = await this.getEntityContext(
+          tx,
+          user,
+          dto.entityType,
+          dto.entityId,
+          dto.title,
+        );
+        const participants = this.uniqueParticipants([
+          ...context.defaultParticipants,
+          ...(dto.participants ?? []),
+        ]);
+
+        await this.validateParticipantsExist(tx, participants);
+
+        const existing = await tx.chat.findUnique({
+          where: {
+            entityType_entityId: {
+              entityType: context.entityType,
+              entityId: context.entityId,
+            },
+          },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    role: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!existing) {
+          throw error;
+        }
+
+        await this.upsertChatParticipants(tx, existing.id, participants);
+        const updated = await this.getChatOrThrow(tx, existing.id);
+
+        this.assertParticipant(user, updated);
+        return { chat: updated, created: false };
+      });
+    }
 
     if (result.created) {
       await this.auditLogsService.create({
@@ -1096,7 +1190,7 @@ export class ChatsService {
 
     this.assertCanUseVisibility(user, visibility, dto.authorizedUserIds);
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const chat = await this.getChatOrThrow(tx, chatId);
       this.assertParticipant(user, chat, true);
 
@@ -1152,8 +1246,36 @@ export class ChatsService {
         createdMessage.createdAt,
       );
 
-      return createdMessage;
+      return {
+        message: createdMessage,
+        recipientIds: this.getMessageNotificationRecipients(
+          chat,
+          user.sub,
+          visibility,
+          dto.authorizedUserIds,
+        ),
+        chatTitle: chat.title,
+        ticketId: chat.ticketId,
+      };
     });
+
+    const message = result.message;
+
+    if (result.recipientIds.length > 0) {
+      await this.notificationsService.notifyUsers(result.recipientIds, {
+        ticketId: result.ticketId ?? null,
+        title: 'Nova mensagem no chat',
+        message: `${user.email} enviou uma nova mensagem${result.chatTitle ? ` em ${result.chatTitle}` : ''}.`,
+        link: `/chat?chat=${chatId}`,
+        actorId: user.sub,
+        metadata: {
+          type: 'CHAT_MESSAGE',
+          chatId,
+          visibility,
+          messageId: message.id,
+        },
+      });
+    }
 
     await this.auditLogsService.create({
       category: AuditLogCategory.CHAT,

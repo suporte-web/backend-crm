@@ -11,7 +11,10 @@ import {
   LeadImportRowStatus,
   LeadTimelineEventType,
   Prisma,
+  EntradaOrigem,
   MessageSenderType,
+  ProspectPortalAccessStatus,
+  ProspectStatusCadastral,
   TicketHistoryEventType,
   TicketStatus,
   TicketType,
@@ -24,6 +27,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
+import { ConvertLeadToProspectDto } from './dto/convert-lead-to-prospect.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
@@ -865,6 +869,13 @@ export class LeadsService {
         data: {
           status: 'converted',
           updatedById: user.sub,
+          metadata: {
+            ...(this.ensureObject(lead.metadata) ? (lead.metadata as Prisma.JsonObject) : {}),
+            conversionTarget: 'client',
+            clientId: clientUser.clientProfile?.id ?? null,
+            clientUserId: clientUser.id,
+            convertedAt: new Date().toISOString(),
+          },
           timeline: {
             create: {
               type: LeadTimelineEventType.UPDATED,
@@ -915,6 +926,141 @@ export class LeadsService {
         lead: updatedLead,
         user: clientUser,
         client: clientUser.clientProfile,
+      };
+    });
+  }
+
+  async convertToProspect(
+    user: AuthUser,
+    leadId: string,
+    dto: ConvertLeadToProspectDto,
+  ) {
+    this.ensureInternalUser(user);
+
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead nÃ£o encontrado.');
+    }
+
+    const email = this.sanitizeText(dto.email) ?? this.sanitizeText(lead.email);
+    const telefone =
+      this.sanitizeText(dto.telefone) ?? this.sanitizeText(lead.phone);
+    const document = this.sanitizeText(dto.document);
+
+    const duplicateCriteria: Prisma.ProspectWhereInput[] = [];
+
+    if (email) {
+      duplicateCriteria.push({ email: { equals: email, mode: 'insensitive' } });
+    }
+
+    if (telefone) {
+      duplicateCriteria.push({
+        telefone: { equals: telefone, mode: 'insensitive' },
+      });
+    }
+
+    if (document) {
+      duplicateCriteria.push({
+        document: { equals: document, mode: 'insensitive' },
+      });
+    }
+
+    const existingProspect = duplicateCriteria.length
+      ? await this.prisma.prospect.findFirst({
+          where: { OR: duplicateCriteria },
+        })
+      : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const prospect =
+        existingProspect ??
+        (await tx.prospect.create({
+          data: {
+            nomeRazaoSocial:
+              this.sanitizeText(dto.nomeRazaoSocial) ??
+              this.sanitizeText(lead.company) ??
+              lead.name,
+            nomeContato: this.sanitizeText(dto.nomeContato) ?? lead.name,
+            email,
+            telefone,
+            document,
+            cidade: this.sanitizeText(dto.cidade),
+            estado: this.sanitizeText(dto.estado),
+            origem: EntradaOrigem.MANUAL,
+            statusCadastral: ProspectStatusCadastral.PROSPECT,
+            portalAccessStatus: ProspectPortalAccessStatus.SEM_ACESSO,
+          },
+        }));
+
+      const updatedLead = await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          status: 'converted_to_prospect',
+          updatedById: user.sub,
+          metadata: {
+            ...(this.ensureObject(lead.metadata)
+              ? (lead.metadata as Prisma.JsonObject)
+              : {}),
+            conversionTarget: 'prospect',
+            prospectId: prospect.id,
+            convertedAt: new Date().toISOString(),
+            reusedExistingProspect: Boolean(existingProspect),
+          },
+          timeline: {
+            create: {
+              type: LeadTimelineEventType.UPDATED,
+              title: existingProspect
+                ? 'Lead vinculado a prospect'
+                : 'Lead convertido em prospect',
+              description: existingProspect
+                ? 'Lead qualificado e vinculado a um prospect existente.'
+                : 'Prospect criado sem acesso ao portal. A cotacao deve ser criada somente quando houver demanda.',
+              metadata: {
+                prospectId: prospect.id,
+                reusedExistingProspect: Boolean(existingProspect),
+              },
+              createdById: user.sub,
+            },
+          },
+        },
+        include: {
+          timeline: {
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          updatedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      return {
+        lead: updatedLead,
+        prospect,
       };
     });
   }

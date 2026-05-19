@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateInternalQuoteDto } from './dto/create-internal-quote.dto';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { RespondQuoteDto } from './dto/respond-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
@@ -44,6 +45,16 @@ export class QuotesController {
     }
 
     return this.quotesService.create(client.id, dto, user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('internal')
+  createInternal(
+    @CurrentUser() user: { sub: string; role: string },
+    @Body() dto: CreateInternalQuoteDto,
+  ) {
+    return this.quotesService.createInternal(user, dto);
   }
 
   @ApiBearerAuth()

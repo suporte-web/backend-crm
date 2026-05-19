@@ -20,6 +20,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CreateInternalQuoteDto } from './dto/create-internal-quote.dto';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { RespondQuoteDto } from './dto/respond-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
@@ -205,7 +206,7 @@ export class QuotesService {
           quoteId: createdQuote.id,
           title: shouldCreatePreContract
             ? `Pre-contrato - ${dto.serviceType}`
-            : `Cotacao - ${dto.serviceType}`,
+            : `Cotação - ${dto.serviceType}`,
           stage: OpportunityStage.NOVO,
           preContract: shouldCreatePreContract,
           preContractNotes: shouldCreatePreContract
@@ -219,7 +220,7 @@ export class QuotesService {
           clientId,
           type: TimelineEventType.OPPORTUNITY_CREATED,
           title: 'Oportunidade criada pela cotação',
-          description: `Cotacao ${createdQuote.serviceType} entrou no pipeline comercial.`,
+          description: `Cotação ${createdQuote.serviceType} entrou no pipeline comercial.`,
           createdById: user?.sub,
           metadata: {
             quoteId: createdQuote.id,
@@ -247,7 +248,7 @@ export class QuotesService {
               senderType: MessageSenderType.CLIENTE,
               message:
                 dto.notes?.trim() ||
-                `Cotacao criada para ${dto.serviceType}: ${dto.origin} -> ${dto.destination}.`,
+                `Cotação criada para ${dto.serviceType}: ${dto.origin} -> ${dto.destination}.`,
               createdById: user?.sub,
             },
           },
@@ -296,7 +297,7 @@ export class QuotesService {
     await this.auditLogsService.create({
       category: AuditLogCategory.QUOTE,
       action: AuditLogAction.QUOTE_CREATED,
-      message: `Cotacao criada para ${client.companyName ?? client.user.name}.`,
+      message: `Cotação criada para ${client.companyName ?? client.user.name}.`,
       targetType: 'Quote',
       targetId: quote.id,
       userId: user?.sub ?? client.userId,
@@ -304,6 +305,212 @@ export class QuotesService {
         clientId,
         serviceType: dto.serviceType,
         requestType: dto.requestType ?? null,
+      },
+    });
+
+    return quote;
+  }
+
+  async createInternal(
+    user: { sub: string; role: string },
+    dto: CreateInternalQuoteDto,
+  ) {
+    this.ensureInternalUser(user);
+
+    if (dto.clientId && dto.prospectId) {
+      throw new BadRequestException(
+        'Informe clientId ou prospectId, nÃ£o os dois.',
+      );
+    }
+
+    if (!dto.clientId && !dto.prospectId) {
+      throw new BadRequestException(
+        'Informe um cliente ou prospect para criar a cotaÃ§Ã£o.',
+      );
+    }
+
+    const [client, prospect] = await Promise.all([
+      dto.clientId
+        ? this.prisma.client.findUnique({
+            where: { id: dto.clientId },
+            include: { user: true },
+          })
+        : null,
+      dto.prospectId
+        ? this.prisma.prospect.findUnique({
+            where: { id: dto.prospectId },
+          })
+        : null,
+    ]);
+
+    if (dto.clientId && !client) {
+      throw new NotFoundException('Cliente nÃ£o encontrado.');
+    }
+
+    if (dto.prospectId && !prospect) {
+      throw new NotFoundException('Prospect nÃ£o encontrado.');
+    }
+
+    const origin = this.sanitize(dto.origin);
+    const destination = this.sanitize(dto.destination);
+    const serviceType = this.sanitize(dto.serviceType);
+
+    if (!origin || !destination || !serviceType) {
+      throw new BadRequestException(
+        'Informe origem, destino e tipo de serviÃ§o da cotaÃ§Ã£o.',
+      );
+    }
+
+    const requesterName =
+      client?.companyName ??
+      client?.user?.name ??
+      prospect?.nomeRazaoSocial ??
+      'Prospect';
+
+    const quote = await this.prisma.$transaction(async (tx) => {
+      const createdQuote = await tx.quote.create({
+        data: {
+          code: `TMP-${Date.now()}`,
+          clientId: client?.id,
+          prospectId: prospect?.id,
+          origin,
+          destination,
+          serviceType,
+          requestType: this.sanitize(dto.requestType),
+          pickupAddress: this.sanitize(dto.pickupAddress),
+          deliveryAddress: this.sanitize(dto.deliveryAddress),
+          cargoDescription: this.sanitize(dto.cargoDescription),
+          contactName:
+            this.sanitize(dto.contactName) ??
+            client?.user?.name ??
+            prospect?.nomeContato,
+          contactPhone:
+            this.sanitize(dto.contactPhone) ??
+            client?.phone ??
+            prospect?.telefone,
+          contactEmail:
+            this.sanitize(dto.contactEmail) ??
+            client?.user?.email ??
+            prospect?.email,
+          weight: dto.weight,
+          volume: dto.volume,
+          quantity: dto.quantity,
+          merchandiseValue:
+            dto.merchandiseValue !== undefined
+              ? dto.merchandiseValue
+              : undefined,
+          desiredDeadline: this.sanitize(dto.desiredDeadline),
+          notes: this.sanitize(dto.notes),
+          history: {
+            create: {
+              status: QuoteStatus.RECEIVED,
+              notes: 'Cotação criada pela equipe comercial.',
+            },
+          },
+        },
+      });
+
+      const quoteCode = this.generateDisplayCode('COT', createdQuote.id);
+
+      await tx.quote.update({
+        where: { id: createdQuote.id },
+        data: {
+          code: quoteCode,
+        },
+      });
+
+      let opportunityId: string | undefined;
+
+      if (client) {
+        const opportunity = await tx.opportunity.create({
+          data: {
+            clientId: client.id,
+            quoteId: createdQuote.id,
+            title: `Cotacao - ${serviceType}`,
+            stage: OpportunityStage.NOVO,
+          },
+        });
+        opportunityId = opportunity.id;
+
+        await tx.timelineEvent.create({
+          data: {
+            clientId: client.id,
+            type: TimelineEventType.OPPORTUNITY_CREATED,
+            title: 'Oportunidade criada pela cotaÃ§Ã£o',
+            description: `Cotacao ${serviceType} criada pela equipe comercial.`,
+            createdById: user.sub,
+            metadata: {
+              quoteId: createdQuote.id,
+              quoteCode,
+              opportunityId,
+              source: 'internal_commercial',
+            },
+          },
+        });
+      }
+
+      await tx.ticket.create({
+        data: {
+          clientId: client?.id,
+          prospectId: prospect?.id,
+          quoteId: createdQuote.id,
+          opportunityId,
+          requesterId: user.sub,
+          type: TicketType.COTACAO,
+          status: TicketStatus.COTACAO_CRIADA,
+          requiresActionRole: UserRole.COMERCIAL,
+          internalOnly: Boolean(prospect && !client),
+          lastInteractionAt: new Date(),
+          subject: `Cotacao criada: ${serviceType}`,
+          description: `${requesterName} possui cotacao de ${origin} para ${destination}.`,
+          messages: {
+            create: {
+              senderType: MessageSenderType.INTERNO,
+              message:
+                this.sanitize(dto.notes) ??
+                `Cotacao criada para ${serviceType}: ${origin} -> ${destination}.`,
+              isInternal: Boolean(prospect && !client),
+              createdById: user.sub,
+            },
+          },
+          history: {
+            create: {
+              eventType: TicketHistoryEventType.CREATED,
+              title: 'Cotação criada',
+              description:
+                'Cotação criada pela equipe comercial qualificação.',
+              internalOnly: Boolean(prospect && !client),
+              createdById: user.sub,
+              metadata: {
+                quoteId: createdQuote.id,
+                quoteCode,
+                clientId: client?.id ?? null,
+                prospectId: prospect?.id ?? null,
+              },
+            },
+          },
+        },
+      });
+
+      return tx.quote.findUniqueOrThrow({
+        where: { id: createdQuote.id },
+        include: {
+          ...this.buildQuoteInclude(),
+        },
+      });
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.QUOTE,
+      action: AuditLogAction.QUOTE_CREATED,
+      message: `Cotacao ${quote.code} criada pela equipe comercial.`,
+      targetType: 'Quote',
+      targetId: quote.id,
+      userId: user.sub,
+      details: {
+        clientId: client?.id ?? null,
+        prospectId: prospect?.id ?? null,
+        serviceType,
       },
     });
 

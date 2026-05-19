@@ -14,17 +14,17 @@ export class DeliveriesController {
 
   @Get()
   findAll(
-    @CurrentUser() _user: { sub: string; role: string },
+    @CurrentUser() user: { sub: string; role: string },
     @Query() filters: QueryDeliveriesDto,
   ) {
-    return this.deliveriesService.findAll(filters);
+    return this.deliveriesService.findAll(filters, user);
   }
 
   @Get('resumo')
   getSummary(
-    @CurrentUser() _user: { sub: string; role: string },
+    @CurrentUser() user: { sub: string; role: string },
     @Query() filters: QueryDeliveriesDto,
   ) {
-    return this.deliveriesService.getSummary(filters);
+    return this.deliveriesService.getSummary(filters, user);
   }
 }
