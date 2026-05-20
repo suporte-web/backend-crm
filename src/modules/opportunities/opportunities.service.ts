@@ -483,7 +483,9 @@ export class OpportunitiesService {
               : null,
           }
         : {}),
-      ...(dto.preContract !== undefined ? { preContract: dto.preContract } : {}),
+      ...(dto.preContract !== undefined
+        ? { preContract: dto.preContract }
+        : {}),
       ...(dto.preContractNotes !== undefined
         ? { preContractNotes: this.sanitize(dto.preContractNotes) }
         : {}),

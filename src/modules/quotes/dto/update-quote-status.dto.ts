@@ -7,7 +7,9 @@ export class UpdateQuoteStatusDto {
   @IsEnum(QuoteStatus)
   status!: QuoteStatus;
 
-  @ApiPropertyOptional({ description: 'Observação opcional para registrar no histórico.' })
+  @ApiPropertyOptional({
+    description: 'Observação opcional para registrar no histórico.',
+  })
   @IsOptional()
   @IsString()
   notes?: string;

@@ -870,7 +870,9 @@ export class LeadsService {
           status: 'converted',
           updatedById: user.sub,
           metadata: {
-            ...(this.ensureObject(lead.metadata) ? (lead.metadata as Prisma.JsonObject) : {}),
+            ...(this.ensureObject(lead.metadata)
+              ? (lead.metadata as Prisma.JsonObject)
+              : {}),
             conversionTarget: 'client',
             clientId: clientUser.clientProfile?.id ?? null,
             clientUserId: clientUser.id,

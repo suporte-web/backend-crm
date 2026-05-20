@@ -208,7 +208,10 @@ export class EntradasService {
       return;
     }
 
-    if (ticket.type === TicketType.COTACAO || ticket.assignedToId === user.sub) {
+    if (
+      ticket.type === TicketType.COTACAO ||
+      ticket.assignedToId === user.sub
+    ) {
       return;
     }
 
@@ -321,9 +324,14 @@ export class EntradasService {
     };
   }
 
-  private buildWhere(user: { sub: string; role: string }, filters: EntradaFilters) {
+  private buildWhere(
+    user: { sub: string; role: string },
+    filters: EntradaFilters,
+  ) {
     const status = this.normalizeStatus(filters.status);
-    const tipo = filters.tipo ? this.normalizeTicketType(filters.tipo) : undefined;
+    const tipo = filters.tipo
+      ? this.normalizeTicketType(filters.tipo)
+      : undefined;
     const origem = this.normalizeOrigin(filters.origem ?? EntradaOrigem.SITE);
     const createdAt: Prisma.DateTimeFilter = {};
     const dateFrom = this.parseDateStart(filters.dateFrom);
@@ -387,7 +395,9 @@ export class EntradasService {
     }
 
     if (!emailSolicitante && !telefoneSolicitante) {
-      throw new BadRequestException('Informe e-mail ou telefone do solicitante.');
+      throw new BadRequestException(
+        'Informe e-mail ou telefone do solicitante.',
+      );
     }
 
     const ticket = await this.prisma.$transaction(async (tx) => {
@@ -409,8 +419,7 @@ export class EntradasService {
               : (dto.formPayload as Prisma.InputJsonValue),
           subject: `Entrada do site: ${nomeSolicitante}`,
           description:
-            mensagem ??
-            `Solicitação recebida pelo formulario publico do site.`,
+            mensagem ?? `Solicitação recebida pelo formulario publico do site.`,
           lastInteractionAt: new Date(),
           messages: {
             create: {
@@ -750,7 +759,9 @@ export class EntradasService {
     }
 
     if (ticket.quoteId) {
-      throw new BadRequestException('Esta entrada já possui cotação vinculada.');
+      throw new BadRequestException(
+        'Esta entrada já possui cotação vinculada.',
+      );
     }
 
     const origin = this.sanitize(dto.origin);

@@ -20,6 +20,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PropostasModule } from './modules/propostas/propostas.module';
 import { ChatsModule } from './modules/chats/chats.module';
 import { EntradasModule } from './modules/entradas/entradas.module';
+import { HelpCenterModule } from './modules/help-center/help-center.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { EntradasModule } from './modules/entradas/entradas.module';
     PropostasModule,
     ChatsModule,
     EntradasModule,
+    HelpCenterModule,
   ],
 })
 export class AppModule {}

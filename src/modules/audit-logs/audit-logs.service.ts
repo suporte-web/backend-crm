@@ -31,7 +31,9 @@ export class AuditLogsService {
 
   private ensureCanView(user: AuthUser) {
     if (!['ADMIN', 'GESTAO'].includes(user.role)) {
-      throw new ForbiddenException('Acesso aos logs restrito a ADMIN e GESTAO.');
+      throw new ForbiddenException(
+        'Acesso aos logs restrito a ADMIN e GESTAO.',
+      );
     }
   }
 
@@ -181,7 +183,10 @@ export class AuditLogsService {
   }
 
   async exportCsv(user: AuthUser, filters: QueryAuditLogsDto) {
-    const rows = await this.findAll(user, { ...filters, take: filters.take ?? '1000' });
+    const rows = await this.findAll(user, {
+      ...filters,
+      take: filters.take ?? '1000',
+    });
     const headers = [
       'Data',
       'Usuário',

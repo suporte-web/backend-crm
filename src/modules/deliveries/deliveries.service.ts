@@ -65,7 +65,10 @@ export class DeliveriesService {
     return this.normalizeDocument(client?.document) || '__NO_CLIENT_DOCUMENT__';
   }
 
-  async findAll(filters: QueryDeliveriesDto, user: { sub: string; role: string }) {
+  async findAll(
+    filters: QueryDeliveriesDto,
+    user: { sub: string; role: string },
+  ) {
     const clientDocument = await this.getClientDocumentFilter(user);
     const query = buildDeliveriesQuery(filters, clientDocument);
 
@@ -75,7 +78,10 @@ export class DeliveriesService {
     );
   }
 
-  async getSummary(filters: QueryDeliveriesDto, user: { sub: string; role: string }) {
+  async getSummary(
+    filters: QueryDeliveriesDto,
+    user: { sub: string; role: string },
+  ) {
     const clientDocument = await this.getClientDocumentFilter(user);
     const query = buildDeliveriesSummaryQuery(filters, clientDocument);
     const [summary] =

@@ -24,7 +24,10 @@ export class AuditLogsController {
   }
 
   @Get('summary')
-  getSummary(@CurrentUser() user: AuthUser, @Query() filters: QueryAuditLogsDto) {
+  getSummary(
+    @CurrentUser() user: AuthUser,
+    @Query() filters: QueryAuditLogsDto,
+  ) {
     return this.auditLogsService.getSummary(user, filters);
   }
 
@@ -36,7 +39,10 @@ export class AuditLogsController {
     @Res() response: Response,
   ) {
     const csv = await this.auditLogsService.exportCsv(user, filters);
-    const suffix = filters.dateFrom || filters.dateTo || new Date().toISOString().slice(0, 10);
+    const suffix =
+      filters.dateFrom ||
+      filters.dateTo ||
+      new Date().toISOString().slice(0, 10);
 
     response.setHeader(
       'Content-Disposition',

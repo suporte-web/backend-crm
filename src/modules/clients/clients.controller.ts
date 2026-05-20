@@ -26,7 +26,7 @@ import { UpdateClientDto } from './dto/update-client.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('clients')
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) { }
+  constructor(private readonly clientsService: ClientsService) {}
 
   @Get('me')
   findMine(@CurrentUser() user: AuthUser) {
@@ -34,14 +34,24 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get('owners/summary')
   getOwnersSummary(@CurrentUser() user: AuthUser) {
     return this.clientsService.getOwnersSummary(user);
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get()
   findAll(
     @CurrentUser() user: AuthUser,
@@ -57,7 +67,12 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get('dashboard/summary')
   getDashboardSummary(@CurrentUser() user: AuthUser) {
     return this.clientsService.getDashboardSummary(user);
@@ -85,21 +100,36 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get(':id/summary')
   getSummary(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.getSummary(user, id);
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get(':id/detail')
   getDetail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.getDetail(user, id);
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get(':id/timeline')
   getTimeline(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.getTimeline(user, id);
@@ -117,7 +147,12 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get('my-portfolio')
   getMyPortfolio(
     @CurrentUser() user: AuthUser,
@@ -131,7 +166,12 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.clientsService.findOne(user, id);

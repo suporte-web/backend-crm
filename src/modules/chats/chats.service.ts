@@ -582,83 +582,83 @@ export class ChatsService {
 
     try {
       result = await this.prisma.$transaction(async (tx) => {
-      const context = await this.getEntityContext(
-        tx,
-        user,
-        dto.entityType,
-        dto.entityId,
-        dto.title,
-      );
-      const participants = this.uniqueParticipants([
-        ...context.defaultParticipants,
-        ...(dto.participants ?? []),
-      ]);
+        const context = await this.getEntityContext(
+          tx,
+          user,
+          dto.entityType,
+          dto.entityId,
+          dto.title,
+        );
+        const participants = this.uniqueParticipants([
+          ...context.defaultParticipants,
+          ...(dto.participants ?? []),
+        ]);
 
-      await this.validateParticipantsExist(tx, participants);
+        await this.validateParticipantsExist(tx, participants);
 
-      const existing = await tx.chat.findUnique({
-  where: {
-    entityType_entityId: {
-      entityType: context.entityType,
-      entityId: context.entityId,
-    },
-  },
-  include: {
-    participants: {
-      include: {
-        user: {
-          select: {
-            id: true,
-            role: true,
+        const existing = await tx.chat.findUnique({
+          where: {
+            entityType_entityId: {
+              entityType: context.entityType,
+              entityId: context.entityId,
+            },
           },
-        },
-      },
-    },
-  },
-});
-
-      if (existing) {
-        await this.upsertChatParticipants(tx, existing.id, participants);
-        const updated = await this.getChatOrThrow(tx, existing.id);
-
-        this.assertParticipant(user, updated);
-        return { chat: updated, created: false };
-      }
-
-      const chat = await tx.chat.create({
-        data: {
-          entityType: context.entityType,
-          entityId: context.entityId,
-          title: context.title,
-          leadId: context.leadId,
-          clientId: context.clientId,
-          quoteId: context.quoteId,
-          propostaId: context.propostaId,
-          ticketId: context.ticketId,
-          createdById: user.sub,
-          participants: {
-            create: participants.map((participant) => ({
-              userId: participant.userId,
-              canRead: participant.canRead ?? true,
-              canWrite: participant.canWrite ?? true,
-            })),
-          },
-        },
-        include: {
-          participants: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  role: true,
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    role: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      return { chat, created: true };
+        if (existing) {
+          await this.upsertChatParticipants(tx, existing.id, participants);
+          const updated = await this.getChatOrThrow(tx, existing.id);
+
+          this.assertParticipant(user, updated);
+          return { chat: updated, created: false };
+        }
+
+        const chat = await tx.chat.create({
+          data: {
+            entityType: context.entityType,
+            entityId: context.entityId,
+            title: context.title,
+            leadId: context.leadId,
+            clientId: context.clientId,
+            quoteId: context.quoteId,
+            propostaId: context.propostaId,
+            ticketId: context.ticketId,
+            createdById: user.sub,
+            participants: {
+              create: participants.map((participant) => ({
+                userId: participant.userId,
+                canRead: participant.canRead ?? true,
+                canWrite: participant.canWrite ?? true,
+              })),
+            },
+          },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    role: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        return { chat, created: true };
       });
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {

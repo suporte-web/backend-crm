@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { AuditLogAction, AuditLogCategory } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -15,7 +19,9 @@ export class SuppliersService {
 
   private ensureInternalUser(user: AuthUser) {
     if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
-      throw new ForbiddenException('Você não tem permissão para convidar fornecedores.');
+      throw new ForbiddenException(
+        'Você não tem permissão para convidar fornecedores.',
+      );
     }
   }
 

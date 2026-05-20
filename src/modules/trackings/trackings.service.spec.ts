@@ -16,4 +16,3 @@ describe('TrackingsService', () => {
     expect(service).toBeDefined();
   });
 });
-

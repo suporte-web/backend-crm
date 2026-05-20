@@ -121,9 +121,7 @@ export class PropostasService {
     return trimmed || null;
   }
 
-  private toPositiveDecimal(
-    value: number | Prisma.Decimal | null | undefined,
-  ) {
+  private toPositiveDecimal(value: number | Prisma.Decimal | null | undefined) {
     if (value === undefined || value === null) {
       return null;
     }

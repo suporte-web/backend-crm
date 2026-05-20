@@ -142,7 +142,8 @@ export function buildDeliveriesQuery(
   filters: QueryDeliveriesDto,
   clientDocument?: string,
 ): SqlQuery {
-  const dataRef = filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
+  const dataRef =
+    filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
   const baseValues = [DEFAULT_SIGLA_FILIAL, dataRef];
   const optionalFilters = buildOptionalFilters(filters, 3, clientDocument);
 
@@ -191,7 +192,8 @@ export function buildDeliveriesSummaryQuery(
   filters: QueryDeliveriesDto,
   clientDocument?: string,
 ): SqlQuery {
-  const dataRef = filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
+  const dataRef =
+    filters.dataRef?.trim() || new Date().toISOString().slice(0, 10);
   const baseValues = [DEFAULT_SIGLA_FILIAL, dataRef];
   const optionalFilters = buildOptionalFilters(filters, 3, clientDocument);
 

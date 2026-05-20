@@ -43,10 +43,7 @@ export class PortalContentController {
 
   @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.MARKETING)
   @Post()
-  create(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreatePortalContentDto,
-  ) {
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreatePortalContentDto) {
     return this.portalContentService.create(user.sub, dto);
   }
 
@@ -85,7 +82,9 @@ export class PortalContentController {
 
         if (!allowedMimeTypes.includes(file.mimetype)) {
           callback(
-            new BadRequestException('Envie uma imagem ou video em formato suportado.'),
+            new BadRequestException(
+              'Envie uma imagem ou video em formato suportado.',
+            ),
             false,
           );
           return;

@@ -41,7 +41,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get()
   findAll(
     @CurrentUser() user: AuthUser,
@@ -54,7 +59,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get('import-jobs')
   getImportJobs(@CurrentUser() user: AuthUser) {
     return this.leadsService.getImportJobs(user);
@@ -62,7 +72,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get('import-jobs/:id')
   getImportJob(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.leadsService.getImportJob(user, id);
@@ -70,7 +85,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateLeadDto) {
     return this.leadsService.createManual(user, dto);
@@ -102,7 +122,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Post('import/csv')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -114,7 +139,10 @@ export class LeadsController {
           callback: (error: Error | null, fileName: string) => void,
         ) => {
           const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          callback(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`);
+          callback(
+            null,
+            `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
+          );
         },
       }),
       fileFilter: (
@@ -123,10 +151,17 @@ export class LeadsController {
         callback: (error: Error | null, acceptFile: boolean) => void,
       ) => {
         const extension = extname(file.originalname).toLowerCase();
-        const allowedMimeTypes = ['text/csv', 'application/vnd.ms-excel', 'text/plain'];
+        const allowedMimeTypes = [
+          'text/csv',
+          'application/vnd.ms-excel',
+          'text/plain',
+        ];
 
         if (!allowedMimeTypes.includes(file.mimetype) && extension !== '.csv') {
-          callback(new BadRequestException('Envie um arquivo CSV valido.'), false);
+          callback(
+            new BadRequestException('Envie um arquivo CSV valido.'),
+            false,
+          );
           return;
         }
 
@@ -139,7 +174,8 @@ export class LeadsController {
   )
   importCsv(
     @CurrentUser() user: AuthUser,
-    @UploadedFile() file: { path: string; originalname: string; mimetype: string },
+    @UploadedFile()
+    file: { path: string; originalname: string; mimetype: string },
     @Body() dto: ImportLeadsCsvDto,
   ) {
     if (!file) {
@@ -198,7 +234,12 @@ export class LeadsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.leadsService.findOne(user, id);

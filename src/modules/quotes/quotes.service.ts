@@ -477,8 +477,7 @@ export class QuotesService {
             create: {
               eventType: TicketHistoryEventType.CREATED,
               title: 'Cotação criada',
-              description:
-                'Cotação criada pela equipe comercial qualificação.',
+              description: 'Cotação criada pela equipe comercial qualificação.',
               internalOnly: Boolean(prospect && !client),
               createdById: user.sub,
               metadata: {
@@ -642,9 +641,7 @@ export class QuotesService {
         ? 'e-mail'
         : null,
       dto.weight !== undefined && dto.weight !== quote.weight ? 'peso' : null,
-      dto.volume !== undefined && dto.volume !== quote.volume
-        ? 'volume'
-        : null,
+      dto.volume !== undefined && dto.volume !== quote.volume ? 'volume' : null,
       dto.quantity !== undefined && dto.quantity !== quote.quantity
         ? 'quantidade'
         : null,
@@ -837,8 +834,7 @@ export class QuotesService {
               metadata: {
                 quoteId: id,
                 prospectId: quote.prospectId,
-                statusCadastral:
-                  ProspectStatusCadastral.AGUARDANDO_CADASTRO,
+                statusCadastral: ProspectStatusCadastral.AGUARDANDO_CADASTRO,
               },
             })),
           });
@@ -902,7 +898,9 @@ export class QuotesService {
       await this.prisma.$transaction(async (tx) => {
         for (const ticket of updatedQuote.tickets) {
           const hasClientUser = Boolean(ticket.client?.userId);
-          const prospectFlow = Boolean(updatedQuote.prospectId && !hasClientUser);
+          const prospectFlow = Boolean(
+            updatedQuote.prospectId && !hasClientUser,
+          );
           const updatedTicket = await tx.ticket.update({
             where: { id: ticket.id },
             data: {

@@ -118,7 +118,9 @@ export class ClientsService {
     return client;
   }
 
-  private buildQuoteTimelineEvents(quotes: (Quote & { history: QuoteHistory[] })[]) {
+  private buildQuoteTimelineEvents(
+    quotes: (Quote & { history: QuoteHistory[] })[],
+  ) {
     return quotes.flatMap((quote) => {
       const createdEvent = {
         id: `quote-created-${quote.id}`,
@@ -405,7 +407,9 @@ export class ClientsService {
           totalOpportunities === 0
             ? 0
             : Number(
-                ((wonOpportunities.length / totalOpportunities) * 100).toFixed(1),
+                ((wonOpportunities.length / totalOpportunities) * 100).toFixed(
+                  1,
+                ),
               ),
         openValue: openOpportunities.reduce(
           (total, opportunity) => total + this.toNumber(opportunity.value),
@@ -459,7 +463,10 @@ export class ClientsService {
           client.opportunities.length === 0
             ? 0
             : Number(
-                ((wonOpportunities.length / client.opportunities.length) * 100).toFixed(1),
+                (
+                  (wonOpportunities.length / client.opportunities.length) *
+                  100
+                ).toFixed(1),
               ),
         openValue: openOpportunities.reduce(
           (total, opportunity) => total + this.toNumber(opportunity.value),
@@ -529,44 +536,45 @@ export class ClientsService {
   async getDashboardSummary(user: AuthUser) {
     this.ensureInternalUser(user);
 
-    const [clients, opportunities, quotes, tickets, users, leads] = await Promise.all([
-      this.prisma.client.findMany({
-        select: {
-          id: true,
-          status: true,
-        },
-      }),
-      this.prisma.opportunity.findMany({
-        select: {
-          stage: true,
-          status: true,
-          value: true,
-        },
-      }),
-      this.prisma.quote.findMany({
-        select: {
-          status: true,
-          price: true,
-        },
-      }),
-      this.prisma.ticket.findMany({
-        select: {
-          status: true,
-        },
-      }),
-      this.prisma.user.findMany({
-        select: {
-          id: true,
-          isActive: true,
-        },
-      }),
-      this.prisma.lead.findMany({
-        select: {
-          id: true,
-          status: true,
-        },
-      }),
-    ]);
+    const [clients, opportunities, quotes, tickets, users, leads] =
+      await Promise.all([
+        this.prisma.client.findMany({
+          select: {
+            id: true,
+            status: true,
+          },
+        }),
+        this.prisma.opportunity.findMany({
+          select: {
+            stage: true,
+            status: true,
+            value: true,
+          },
+        }),
+        this.prisma.quote.findMany({
+          select: {
+            status: true,
+            price: true,
+          },
+        }),
+        this.prisma.ticket.findMany({
+          select: {
+            status: true,
+          },
+        }),
+        this.prisma.user.findMany({
+          select: {
+            id: true,
+            isActive: true,
+          },
+        }),
+        this.prisma.lead.findMany({
+          select: {
+            id: true,
+            status: true,
+          },
+        }),
+      ]);
 
     const openOpportunities = opportunities.filter(
       (opportunity) => opportunity.status === OpportunityStatus.OPEN,
@@ -577,7 +585,8 @@ export class ClientsService {
 
     return {
       totalClients: clients.length,
-      activeClients: clients.filter((client) => client.status === 'ATIVO').length,
+      activeClients: clients.filter((client) => client.status === 'ATIVO')
+        .length,
       totalLeads: leads.length,
       newLeads: leads.filter((lead) => lead.status === 'new').length,
       openOpportunities: openOpportunities.length,
@@ -586,7 +595,8 @@ export class ClientsService {
       openQuotes: quotes.filter((quote) =>
         ['RECEIVED', 'IN_ANALYSIS'].includes(quote.status),
       ).length,
-      answeredQuotes: quotes.filter((quote) => quote.status === 'ANSWERED').length,
+      answeredQuotes: quotes.filter((quote) => quote.status === 'ANSWERED')
+        .length,
       totalTickets: tickets.length,
       openTickets: tickets.filter(
         (ticket) => !['FECHADO', 'CANCELADO', 'CLOSED'].includes(ticket.status),
@@ -598,7 +608,11 @@ export class ClientsService {
       conversionRate:
         opportunities.length === 0
           ? 0
-          : Number(((wonOpportunities.length / opportunities.length) * 100).toFixed(1)),
+          : Number(
+              ((wonOpportunities.length / opportunities.length) * 100).toFixed(
+                1,
+              ),
+            ),
       openValue: openOpportunities.reduce(
         (total, opportunity) => total + this.toNumber(opportunity.value),
         0,
@@ -615,7 +629,9 @@ export class ClientsService {
         'GANHO',
         'PERDIDO',
       ].map((stage) => {
-        const stageItems = opportunities.filter((opportunity) => opportunity.stage === stage);
+        const stageItems = opportunities.filter(
+          (opportunity) => opportunity.stage === stage,
+        );
 
         return {
           stage,
@@ -629,7 +645,11 @@ export class ClientsService {
     };
   }
 
-  async update(user: { sub: string; role: string }, id: string, dto: UpdateClientDto) {
+  async update(
+    user: { sub: string; role: string },
+    id: string,
+    dto: UpdateClientDto,
+  ) {
     this.ensureInternalUser(user);
 
     const existingClient = await this.getClientOrFail(id);
@@ -662,17 +682,28 @@ export class ClientsService {
 
     const changedFields = [
       name !== undefined && name !== existingClient.user.name ? 'nome' : null,
-      email !== undefined && email !== existingClient.user.email ? 'e-mail' : null,
+      email !== undefined && email !== existingClient.user.email
+        ? 'e-mail'
+        : null,
       dto.document !== undefined && dto.document !== existingClient.document
         ? 'documento'
         : null,
-      dto.phone !== undefined && dto.phone !== existingClient.phone ? 'telefone' : null,
-      dto.companyName !== undefined && dto.companyName !== existingClient.companyName
+      dto.phone !== undefined && dto.phone !== existingClient.phone
+        ? 'telefone'
+        : null,
+      dto.companyName !== undefined &&
+      dto.companyName !== existingClient.companyName
         ? 'empresa'
         : null,
-      dto.segment !== undefined && dto.segment !== existingClient.segment ? 'segmento' : null,
-      dto.notes !== undefined && dto.notes !== existingClient.notes ? 'observacoes' : null,
-      dto.status !== undefined && dto.status !== existingClient.status ? 'status' : null,
+      dto.segment !== undefined && dto.segment !== existingClient.segment
+        ? 'segmento'
+        : null,
+      dto.notes !== undefined && dto.notes !== existingClient.notes
+        ? 'observacoes'
+        : null,
+      dto.status !== undefined && dto.status !== existingClient.status
+        ? 'status'
+        : null,
       dto.internalOwnerId !== undefined &&
       dto.internalOwnerId !== existingClient.internalOwnerId
         ? 'responsável interno'

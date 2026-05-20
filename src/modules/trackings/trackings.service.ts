@@ -40,17 +40,13 @@ export class TrackingsService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post(
-          'https://ssw.inf.br/api/trackingdest',
-          payload,
-          {
-            timeout: 15000,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            responseType: 'text',
+        this.httpService.post('https://ssw.inf.br/api/trackingdest', payload, {
+          timeout: 15000,
+          headers: {
+            'Content-Type': 'application/json',
           },
-        ),
+          responseType: 'text',
+        }),
       );
 
       const responseText =

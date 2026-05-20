@@ -22,7 +22,9 @@ export class CreateQuoteDto {
   @IsString()
   serviceType!: string;
 
-  @ApiPropertyOptional({ description: 'Modalidade da solicitação, como avulsa ou contrato.' })
+  @ApiPropertyOptional({
+    description: 'Modalidade da solicitação, como avulsa ou contrato.',
+  })
   @IsOptional()
   @IsString()
   requestType?: string;
@@ -37,7 +39,9 @@ export class CreateQuoteDto {
   @IsString()
   deliveryAddress?: string;
 
-  @ApiPropertyOptional({ description: 'Descrição da carga, mercadoria ou serviço.' })
+  @ApiPropertyOptional({
+    description: 'Descrição da carga, mercadoria ou serviço.',
+  })
   @IsOptional()
   @IsString()
   cargoDescription?: string;
@@ -57,13 +61,17 @@ export class CreateQuoteDto {
   @IsEmail()
   contactEmail?: string;
 
-  @ApiPropertyOptional({ description: 'Peso estimado da carga em quilogramas.' })
+  @ApiPropertyOptional({
+    description: 'Peso estimado da carga em quilogramas.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   weight?: number;
 
-  @ApiPropertyOptional({ description: 'Volume estimado da carga em metros cubicos.' })
+  @ApiPropertyOptional({
+    description: 'Volume estimado da carga em metros cubicos.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -81,12 +89,16 @@ export class CreateQuoteDto {
   @IsNumber()
   merchandiseValue!: number;
 
-  @ApiPropertyOptional({ description: 'Prazo desejado para atendimento ou entrega.' })
+  @ApiPropertyOptional({
+    description: 'Prazo desejado para atendimento ou entrega.',
+  })
   @IsOptional()
   @IsString()
   desiredDeadline?: string;
 
-  @ApiPropertyOptional({ description: 'Observações adicionais da solicitação.' })
+  @ApiPropertyOptional({
+    description: 'Observações adicionais da solicitação.',
+  })
   @IsOptional()
   @IsString()
   notes?: string;

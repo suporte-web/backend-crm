@@ -31,10 +31,7 @@ export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post()
-  create(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreateTicketDto,
-  ) {
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateTicketDto) {
     return this.ticketsService.create(user, dto);
   }
 
@@ -82,10 +79,7 @@ export class TicketsController {
   }
 
   @Post(':id/start')
-  start(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ) {
+  start(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.ticketsService.start(user, id);
   }
 

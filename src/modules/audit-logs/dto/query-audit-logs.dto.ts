@@ -1,5 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AuditLogAction, AuditLogCategory, AuditLogLevel } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogCategory,
+  AuditLogLevel,
+} from '@prisma/client';
 import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
 
 export class QueryAuditLogsDto {

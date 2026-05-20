@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  
 }
 
 datasource db {
@@ -8,37 +7,39 @@ datasource db {
 }
 
 model User {
-  id                        String              @id @default(uuid())
-  name                      String
-  email                     String              @unique
-  passwordHash              String
-  mustChangePassword        Boolean             @default(true)
-  role                      UserRole            @default(CLIENTE)
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-  isActive                  Boolean             @default(true)
-  auditLogs                 AuditLog[]
-  clientProfile             Client?
-  createdLeads              Lead[]              @relation("LeadCreatedBy")
-  updatedLeads              Lead[]              @relation("LeadUpdatedBy")
-  leadImportJobs            LeadImportJob[]
-  createdLeadTimelineEvents LeadTimelineEvent[] @relation("LeadTimelineEventAuthor")
-  logsEmail                 LogEmail[]
-  notifications             Notification[]
-  authoredPosts             PortalContent[]
-  propostasCriadas          Proposta[]          @relation("PropostaCriadaPor")
-  propostasEnviadas         Proposta[]          @relation("PropostaEnviadaPor")
+  id                              String                  @id @default(uuid())
+  name                            String
+  email                           String                  @unique
+  passwordHash                    String
+  mustChangePassword              Boolean                 @default(true)
+  role                            UserRole                @default(CLIENTE)
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  isActive                        Boolean                 @default(true)
+  auditLogs                       AuditLog[]
+  clientProfile                   Client?
+  createdLeads                    Lead[]                  @relation("LeadCreatedBy")
+  updatedLeads                    Lead[]                  @relation("LeadUpdatedBy")
+  leadImportJobs                  LeadImportJob[]
+  createdLeadTimelineEvents       LeadTimelineEvent[]     @relation("LeadTimelineEventAuthor")
+  logsEmail                       LogEmail[]
+  notifications                   Notification[]
+  authoredPosts                   PortalContent[]
+  helpCenterArticlesCreated       HelpCenterArticle[]     @relation("HelpCenterArticleCreatedBy")
+  helpCenterArticlesUpdated       HelpCenterArticle[]     @relation("HelpCenterArticleUpdatedBy")
+  propostasCriadas                Proposta[]              @relation("PropostaCriadaPor")
+  propostasEnviadas               Proposta[]              @relation("PropostaEnviadaPor")
   requestedClientDeletionRequests ClientDeletionRequest[] @relation("ClientDeletionRequestedBy")
   approvedClientDeletionRequests  ClientDeletionRequest[] @relation("ClientDeletionApprovedBy")
-  supplierInvites           SupplierInvite[]    @relation("SupplierInviteAuthor")
-  assignedTickets           Ticket[]            @relation("TicketAssignedTo")
-  requestedTickets          Ticket[]            @relation("TicketRequester")
-  ticketHistoryEvents       TicketHistory[]     @relation("TicketHistoryActor")
-  ticketMessages            TicketMessage[]     @relation("TicketMessageAuthor")
-  createdTimelineEvents     TimelineEvent[]     @relation("TimelineEventAuthor")
-  chatParticipants          ChatParticipant[]
-  chatMessages              ChatMessage[]       @relation("ChatMessageAuthor")
-  privateChatMessages       ChatMessageRecipient[]
+  supplierInvites                 SupplierInvite[]        @relation("SupplierInviteAuthor")
+  assignedTickets                 Ticket[]                @relation("TicketAssignedTo")
+  requestedTickets                Ticket[]                @relation("TicketRequester")
+  ticketHistoryEvents             TicketHistory[]         @relation("TicketHistoryActor")
+  ticketMessages                  TicketMessage[]         @relation("TicketMessageAuthor")
+  createdTimelineEvents           TimelineEvent[]         @relation("TimelineEventAuthor")
+  chatParticipants                ChatParticipant[]
+  chatMessages                    ChatMessage[]           @relation("ChatMessageAuthor")
+  privateChatMessages             ChatMessageRecipient[]
 }
 
 model RoleScreenPermission {
@@ -55,26 +56,26 @@ model RoleScreenPermission {
 }
 
 model Client {
-  id              String          @id @default(uuid())
-  userId          String          @unique
-  document        String?
-  phone           String?
-  companyName     String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  internalOwnerId String?
-  notes           String?
-  segment         String?
-  status          String?
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  opportunities   Opportunity[]
-  propostas       Proposta[]
-  quotes          Quote[]
-  tickets         Ticket[]
-  timelineEvents  TimelineEvent[]
-  trackings       Tracking[]
+  id               String                  @id @default(uuid())
+  userId           String                  @unique
+  document         String?
+  phone            String?
+  companyName      String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  internalOwnerId  String?
+  notes            String?
+  segment          String?
+  status           String?
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunities    Opportunity[]
+  propostas        Proposta[]
+  quotes           Quote[]
+  tickets          Ticket[]
+  timelineEvents   TimelineEvent[]
+  trackings        Tracking[]
   deletionRequests ClientDeletionRequest[]
-  chats           Chat[]
+  chats            Chat[]
 }
 
 model Lead {
@@ -113,23 +114,23 @@ model Lead {
 }
 
 model Prospect {
-  id                 String                     @id @default(uuid())
-  nomeRazaoSocial    String
-  nomeContato        String?
-  email              String?
-  telefone           String?
-  document           String?
-  cidade             String?
-  estado             String?
-  origem             EntradaOrigem             @default(SITE)
-  statusCadastral    ProspectStatusCadastral   @default(PROSPECT)
-  portalAccessStatus ProspectPortalAccessStatus @default(SEM_ACESSO)
+  id                  String                     @id @default(uuid())
+  nomeRazaoSocial     String
+  nomeContato         String?
+  email               String?
+  telefone            String?
+  document            String?
+  cidade              String?
+  estado              String?
+  origem              EntradaOrigem              @default(SITE)
+  statusCadastral     ProspectStatusCadastral    @default(PROSPECT)
+  portalAccessStatus  ProspectPortalAccessStatus @default(SEM_ACESSO)
   createdFromTicketId String?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  createdFromTicket  Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
-  tickets            Ticket[]                   @relation("TicketProspect")
-  quotes             Quote[]
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  createdFromTicket   Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
+  tickets             Ticket[]                   @relation("TicketProspect")
+  quotes              Quote[]
 
   @@index([email])
   @@index([telefone])
@@ -280,46 +281,46 @@ model QuoteHistory {
 }
 
 model Ticket {
-  id                 String          @id @default(uuid())
-  protocolo          String?         @unique
-  clientId           String?
-  prospectId         String?
-  subject            String
-  description        String
-  status             TicketStatus    @default(ABERTO)
-  origem             EntradaOrigem?
-  prioridade         TicketPriority   @default(NORMAL)
-  nomeSolicitante    String?
-  emailSolicitante   String?
+  id                  String          @id @default(uuid())
+  protocolo           String?         @unique
+  clientId            String?
+  prospectId          String?
+  subject             String
+  description         String
+  status              TicketStatus    @default(ABERTO)
+  origem              EntradaOrigem?
+  prioridade          TicketPriority  @default(NORMAL)
+  nomeSolicitante     String?
+  emailSolicitante    String?
   telefoneSolicitante String?
-  mensagem           String?
-  formPayload        Json?
-  closedAt           DateTime?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  quoteId            String?
-  leadId             String?
-  opportunityId      String?
-  assignedToId       String?
-  requesterId        String?
-  type               TicketType      @default(SUPORTE)
-  requiresActionRole UserRole?
-  internalOnly       Boolean         @default(false)
-  lastInteractionAt  DateTime        @default(now())
-  logsEmail          LogEmail[]
-  notifications      Notification[]
-  propostas          Proposta[]
-  assignedTo         User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
-  client             Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  prospect           Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
-  lead               Lead?           @relation(fields: [leadId], references: [id])
-  opportunity        Opportunity?    @relation(fields: [opportunityId], references: [id])
-  quote              Quote?          @relation(fields: [quoteId], references: [id])
-  requester          User?           @relation("TicketRequester", fields: [requesterId], references: [id])
-  createdProspects   Prospect[]      @relation("ProspectCreatedFromTicket")
-  history            TicketHistory[]
-  messages           TicketMessage[]
-  chats              Chat[]
+  mensagem            String?
+  formPayload         Json?
+  closedAt            DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  quoteId             String?
+  leadId              String?
+  opportunityId       String?
+  assignedToId        String?
+  requesterId         String?
+  type                TicketType      @default(SUPORTE)
+  requiresActionRole  UserRole?
+  internalOnly        Boolean         @default(false)
+  lastInteractionAt   DateTime        @default(now())
+  logsEmail           LogEmail[]
+  notifications       Notification[]
+  propostas           Proposta[]
+  assignedTo          User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  client              Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect            Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
+  lead                Lead?           @relation(fields: [leadId], references: [id])
+  opportunity         Opportunity?    @relation(fields: [opportunityId], references: [id])
+  quote               Quote?          @relation(fields: [quoteId], references: [id])
+  requester           User?           @relation("TicketRequester", fields: [requesterId], references: [id])
+  createdProspects    Prospect[]      @relation("ProspectCreatedFromTicket")
+  history             TicketHistory[]
+  messages            TicketMessage[]
+  chats               Chat[]
 
   @@index([clientId])
   @@index([prospectId])
@@ -504,16 +505,16 @@ model Chat {
 }
 
 model ChatParticipant {
-  id        String   @id @default(uuid())
-  chatId    String
-  userId    String
-  canRead   Boolean  @default(true)
-  canWrite  Boolean  @default(true)
+  id         String    @id @default(uuid())
+  chatId     String
+  userId     String
+  canRead    Boolean   @default(true)
+  canWrite   Boolean   @default(true)
   lastReadAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, userId])
   @@index([userId, canRead])
@@ -525,7 +526,7 @@ model ChatMessage {
   chatId     String
   authorId   String
   content    String
-  visibility ChatMessageVisibility @default(PUBLICA_CLIENTE)
+  visibility ChatMessageVisibility  @default(PUBLICA_CLIENTE)
   editedAt   DateTime?
   deletedAt  DateTime?
   createdAt  DateTime               @default(now())
@@ -599,6 +600,25 @@ model PortalContent {
 
   @@index([type, isPublished, publishedAt])
   @@index([authorId, createdAt])
+}
+
+model HelpCenterArticle {
+  id          String   @id @default(uuid())
+  title       String
+  questions   String[]
+  answer      String
+  category    String
+  tags        String[]
+  active      Boolean  @default(true)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User?    @relation("HelpCenterArticleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?    @relation("HelpCenterArticleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([active, category])
+  @@index([createdAt])
 }
 
 model AuditLog {
