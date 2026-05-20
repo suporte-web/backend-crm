@@ -924,6 +924,18 @@ export class LeadsService {
         },
       });
 
+      if (clientUser.clientProfile?.id) {
+        await tx.ticket.updateMany({
+          where: {
+            leadId: lead.id,
+            clientId: null,
+          },
+          data: {
+            clientId: clientUser.clientProfile.id,
+          },
+        });
+      }
+
       return {
         lead: updatedLead,
         user: clientUser,

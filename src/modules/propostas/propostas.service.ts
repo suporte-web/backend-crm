@@ -313,6 +313,76 @@ export class PropostasService {
     return ticket;
   }
 
+  private getConvertedClientIdFromLeadMetadata(
+    metadata: Prisma.JsonValue | null,
+  ) {
+    if (!metadata || Array.isArray(metadata) || typeof metadata !== 'object') {
+      return null;
+    }
+
+    const clientId = (metadata as Prisma.JsonObject).clientId;
+
+    return typeof clientId === 'string' && clientId.trim()
+      ? clientId.trim()
+      : null;
+  }
+
+  private async attachConvertedLeadClientToTicket(
+    ticketId: string,
+    user: AuthUser,
+    ticket: TicketWithAccessData,
+  ) {
+    if (ticket.clientId && ticket.client?.user?.email) {
+      return ticket;
+    }
+
+    if (!ticket.leadId) {
+      return ticket;
+    }
+
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: ticket.leadId },
+      select: { metadata: true },
+    });
+    const clientId = this.getConvertedClientIdFromLeadMetadata(
+      lead?.metadata ?? null,
+    );
+
+    if (!clientId) {
+      return ticket;
+    }
+
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!client?.user?.email) {
+      return ticket;
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.ticket.update({
+        where: { id: ticketId },
+        data: { clientId: client.id },
+      }),
+      this.prisma.proposta.updateMany({
+        where: { ticketId, clientId: null },
+        data: { clientId: client.id },
+      }),
+    ]);
+
+    return this.getTicketOrThrow(ticketId, user);
+  }
+
   private includePropostaRelations(user: AuthUser): Prisma.PropostaInclude {
     const includeInternalUsers = this.isInternalUser(user);
 
@@ -435,7 +505,18 @@ export class PropostasService {
     arquivo?: UploadedPropostaFile,
   ) {
     this.ensureInternalUser(user);
-    const ticket = await this.getTicketOrThrow(ticketId, user);
+    let ticket = await this.getTicketOrThrow(ticketId, user);
+    ticket = await this.attachConvertedLeadClientToTicket(
+      ticketId,
+      user,
+      ticket,
+    );
+
+    if (ticket.leadId && !ticket.clientId) {
+      throw new BadRequestException(
+        'Lead precisa virar cliente com acesso ao portal antes de criar proposta.',
+      );
+    }
 
     if (ticket.prospectId && !ticket.clientId) {
       throw new BadRequestException(
@@ -603,6 +684,11 @@ export class PropostasService {
   ) {
     this.ensureInternalUser(user);
     let ticket = await this.getTicketOrThrow(ticketId, user);
+    ticket = await this.attachConvertedLeadClientToTicket(
+      ticketId,
+      user,
+      ticket,
+    );
 
     const proposta = await this.prisma.proposta.findFirst({
       where: {
@@ -649,13 +735,21 @@ export class PropostasService {
       (!ticket.client?.user?.email || !ticket.client.userId) &&
       fallbackClient?.user?.email
     ) {
-      await this.prisma.ticket.update({
-        where: { id: ticketId },
-        data: {
-          clientId: fallbackClient.id,
-          internalOnly: false,
-        },
-      });
+      await this.prisma.$transaction([
+        this.prisma.ticket.update({
+          where: { id: ticketId },
+          data: {
+            clientId: fallbackClient.id,
+            internalOnly: false,
+          },
+        }),
+        this.prisma.proposta.updateMany({
+          where: { ticketId, clientId: null },
+          data: {
+            clientId: fallbackClient.id,
+          },
+        }),
+      ]);
       ticket = await this.getTicketOrThrow(ticketId, user);
     }
 
@@ -710,6 +804,7 @@ export class PropostasService {
       await tx.ticket.update({
         where: { id: ticketId },
         data: {
+          internalOnly: false,
           status: TicketStatus.AGUARDANDO_CLIENTE,
           requiresActionRole: this.getActionRole(
             TicketStatus.AGUARDANDO_CLIENTE,
