@@ -33,7 +33,7 @@ export class NotificationsService {
 
   private getClient(tx?: Prisma.TransactionClient): PrismaClientLike {
     return tx ?? this.prisma;
-  }
+  } 
 
   private buildNotificationWhere(
     user: AuthUser,

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: backend-crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crm_portal
+    ports:
+      - "5433:5432"
+    volumes:
+      - backend_crm_pgdata:/var/lib/postgresql/data
+
+volumes:
+  backend_crm_pgdata:

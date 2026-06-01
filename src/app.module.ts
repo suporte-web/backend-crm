@@ -20,7 +20,11 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PropostasModule } from './modules/propostas/propostas.module';
 import { ChatsModule } from './modules/chats/chats.module';
 import { EntradasModule } from './modules/entradas/entradas.module';
+<<<<<<< Updated upstream
 import { HelpCenterModule } from './modules/help-center/help-center.module';
+=======
+import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
+>>>>>>> Stashed changes
 
 @Module({
   imports: [
@@ -45,7 +49,11 @@ import { HelpCenterModule } from './modules/help-center/help-center.module';
     PropostasModule,
     ChatsModule,
     EntradasModule,
+<<<<<<< Updated upstream
     HelpCenterModule,
+=======
+    ScreenPermissionsModule,
+>>>>>>> Stashed changes
   ],
 })
 export class AppModule {}
