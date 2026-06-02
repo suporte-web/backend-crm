@@ -1,0 +1,23 @@
+model Opportunity {
+  id                String            @id @default(uuid())
+  clientId          String
+  title             String
+  value             Decimal?
+  stage             OpportunityStage  @default(NOVO)
+  status            OpportunityStatus @default(OPEN)
+  expectedCloseDate DateTime?
+  lostReason        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  quoteId           String?
+  preContract       Boolean           @default(false)
+  preContractNotes  String?
+  client            Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quote             Quote?            @relation(fields: [quoteId], references: [id])
+  propostas         Proposta[]
+  tickets           Ticket[]
+
+  @@index([clientId, stage])
+  @@index([quoteId])
+  @@index([status, createdAt])
+}

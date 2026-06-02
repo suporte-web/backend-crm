@@ -1,0 +1,25 @@
+model Prospect {
+  id                  String                     @id @default(uuid())
+  nomeRazaoSocial     String
+  nomeContato         String?
+  email               String?
+  telefone            String?
+  document            String?
+  cidade              String?
+  estado              String?
+  origem              EntradaOrigem              @default(SITE)
+  statusCadastral     ProspectStatusCadastral    @default(PROSPECT)
+  portalAccessStatus  ProspectPortalAccessStatus @default(SEM_ACESSO)
+  createdFromTicketId String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  createdFromTicket   Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
+  tickets             Ticket[]                   @relation("TicketProspect")
+  quotes              Quote[]
+
+  @@index([email])
+  @@index([telefone])
+  @@index([document])
+  @@index([statusCadastral, createdAt])
+  @@index([origem, createdAt])
+}

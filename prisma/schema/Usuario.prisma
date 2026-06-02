@@ -1,0 +1,35 @@
+model User {
+  id                              String                  @id @default(uuid())
+  name                            String
+  email                           String                  @unique
+  passwordHash                    String
+  mustChangePassword              Boolean                 @default(true)
+  role                            UserRole                @default(CLIENTE)
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  isActive                        Boolean                 @default(true)
+  auditLogs                       AuditLog[]
+  clientProfile                   Client?
+  createdLeads                    Lead[]                  @relation("LeadCreatedBy")
+  updatedLeads                    Lead[]                  @relation("LeadUpdatedBy")
+  leadImportJobs                  LeadImportJob[]
+  createdLeadTimelineEvents       LeadTimelineEvent[]     @relation("LeadTimelineEventAuthor")
+  logsEmail                       LogEmail[]
+  notifications                   Notification[]
+  authoredPosts                   PortalContent[]
+  helpCenterArticlesCreated       HelpCenterArticle[]     @relation("HelpCenterArticleCreatedBy")
+  helpCenterArticlesUpdated       HelpCenterArticle[]     @relation("HelpCenterArticleUpdatedBy")
+  propostasCriadas                Proposta[]              @relation("PropostaCriadaPor")
+  propostasEnviadas               Proposta[]              @relation("PropostaEnviadaPor")
+  requestedClientDeletionRequests ClientDeletionRequest[] @relation("ClientDeletionRequestedBy")
+  approvedClientDeletionRequests  ClientDeletionRequest[] @relation("ClientDeletionApprovedBy")
+  supplierInvites                 SupplierInvite[]        @relation("SupplierInviteAuthor")
+  assignedTickets                 Ticket[]                @relation("TicketAssignedTo")
+  requestedTickets                Ticket[]                @relation("TicketRequester")
+  ticketHistoryEvents             TicketHistory[]         @relation("TicketHistoryActor")
+  ticketMessages                  TicketMessage[]         @relation("TicketMessageAuthor")
+  createdTimelineEvents           TimelineEvent[]         @relation("TimelineEventAuthor")
+  chatParticipants                ChatParticipant[]
+  chatMessages                    ChatMessage[]           @relation("ChatMessageAuthor")
+  privateChatMessages             ChatMessageRecipient[]
+}

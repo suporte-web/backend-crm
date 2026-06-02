@@ -1,0 +1,16 @@
+model Tracking {
+  id            String            @id @default(uuid())
+  clientId      String
+  code          String            @unique
+  origin        String?
+  destination   String?
+  carrier       String?
+  status        ShipmentStatus    @default(RECEIVED)
+  description   String?
+  estimatedDate DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  client        Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  history       TrackingHistory[]
+}

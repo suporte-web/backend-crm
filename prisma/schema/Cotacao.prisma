@@ -1,0 +1,36 @@
+model Quote {
+  id               String         @id @default(uuid())
+  code             String         @unique
+  clientId         String?
+  prospectId       String?
+  origin           String
+  destination      String
+  serviceType      String
+  weight           Float?
+  volume           Float?
+  quantity         Int?
+  desiredDeadline  String?
+  notes            String?
+  price            Decimal?
+  commercialNotes  String?
+  status           QuoteStatus    @default(RECEIVED)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cargoDescription String?
+  contactName      String?
+  contactPhone     String?
+  deliveryAddress  String?
+  merchandiseValue Decimal?
+  pickupAddress    String?
+  requestType      String?
+  contactEmail     String?
+  opportunities    Opportunity[]
+  propostas        Proposta[]
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect         Prospect?      @relation(fields: [prospectId], references: [id])
+  history          QuoteHistory[]
+  tickets          Ticket[]
+  chats            Chat[]
+
+  @@index([prospectId])
+}

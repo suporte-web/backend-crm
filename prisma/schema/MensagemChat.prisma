@@ -1,0 +1,19 @@
+model ChatMessage {
+  id         String                 @id @default(uuid())
+  chatId     String
+  authorId   String
+  content    String
+  visibility ChatMessageVisibility  @default(PUBLICA_CLIENTE)
+  editedAt   DateTime?
+  deletedAt  DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  author     User                   @relation("ChatMessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  chat       Chat                   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  recipients ChatMessageRecipient[]
+
+  @@index([chatId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([visibility])
+  @@index([deletedAt])
+}

@@ -1,0 +1,10 @@
+model ChatMessageRecipient {
+  id        String      @id @default(uuid())
+  messageId String
+  userId    String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}

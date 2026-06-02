@@ -1,0 +1,56 @@
+model Ticket {
+  id                  String          @id @default(uuid())
+  protocolo           String?         @unique
+  clientId            String?
+  prospectId          String?
+  subject             String
+  description         String
+  status              TicketStatus    @default(ABERTO)
+  origem              EntradaOrigem?
+  prioridade          TicketPriority  @default(NORMAL)
+  nomeSolicitante     String?
+  emailSolicitante    String?
+  telefoneSolicitante String?
+  mensagem            String?
+  formPayload         Json?
+  closedAt            DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  quoteId             String?
+  leadId              String?
+  opportunityId       String?
+  assignedToId        String?
+  requesterId         String?
+  type                TicketType      @default(SUPORTE)
+  requiresActionRole  UserRole?
+  internalOnly        Boolean         @default(false)
+  lastInteractionAt   DateTime        @default(now())
+  logsEmail           LogEmail[]
+  notifications       Notification[]
+  propostas           Proposta[]
+  assignedTo          User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  client              Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect            Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
+  lead                Lead?           @relation(fields: [leadId], references: [id])
+  opportunity         Opportunity?    @relation(fields: [opportunityId], references: [id])
+  quote               Quote?          @relation(fields: [quoteId], references: [id])
+  requester           User?           @relation("TicketRequester", fields: [requesterId], references: [id])
+  createdProspects    Prospect[]      @relation("ProspectCreatedFromTicket")
+  history             TicketHistory[]
+  messages            TicketMessage[]
+  chats               Chat[]
+
+  @@index([clientId])
+  @@index([prospectId])
+  @@index([quoteId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([assignedToId, status])
+  @@index([type, status])
+  @@index([requiresActionRole, status])
+  @@index([internalOnly, status])
+  @@index([status, createdAt])
+  @@index([lastInteractionAt])
+  @@index([origem, createdAt])
+  @@index([protocolo])
+}

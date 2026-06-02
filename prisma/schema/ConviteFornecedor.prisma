@@ -1,0 +1,18 @@
+model SupplierInvite {
+  id          String               @id @default(uuid())
+  companyName String
+  contactName String?
+  email       String
+  phone       String?
+  token       String               @unique
+  status      SupplierInviteStatus @default(PENDING)
+  notes       String?
+  invitedById String?
+  acceptedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  invitedBy   User?                @relation("SupplierInviteAuthor", fields: [invitedById], references: [id])
+
+  @@index([email, createdAt])
+  @@index([status, createdAt])
+}

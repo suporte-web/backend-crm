@@ -1,0 +1,16 @@
+model ChatParticipant {
+  id         String    @id @default(uuid())
+  chatId     String
+  userId     String
+  canRead    Boolean   @default(true)
+  canWrite   Boolean   @default(true)
+  lastReadAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId, canRead])
+  @@index([chatId, canWrite])
+}

@@ -1,0 +1,54 @@
+model Proposta {
+  id                            String         @id @default(uuid())
+  code                          String         @unique
+  ticketId                      String
+  quoteId                       String?
+  opportunityId                 String?
+  clientId                      String?
+  criadaPorId                   String?
+  enviadaPorId                  String?
+  status                        StatusProposta @default(RASCUNHO)
+  titulo                        String
+  descricao                     String?
+  descricaoServico              String?
+  origem                        String?
+  destino                       String?
+  valor                         Decimal?
+  condicoesPagamento            String?
+  condicoesComerciais           String?
+  observacoes                   String?
+  arquivoNome                   String?
+  arquivoUrl                    String?
+  arquivoMimeType               String?
+  arquivoTamanho                Int?
+  validadeDias                  String?
+  validaAte                     DateTime?
+  versao                        Int            @default(1)
+  enviadaEm                     DateTime?
+  aprovadaPeloClienteEm         DateTime?
+  recusadaPeloClienteEm         DateTime?
+  motivoRecusaCliente           String?
+  ajusteSolicitadoPeloClienteEm DateTime?
+  enviadaParaGestaoEm           DateTime?
+  aprovadaPelaGestaoEm          DateTime?
+  recusadaPelaGestaoEm          DateTime?
+  ajusteSolicitadoPelaGestaoEm  DateTime?
+  createdAt                     DateTime       @default(now())
+  updatedAt                     DateTime       @updatedAt
+  logsEmail                     LogEmail[]
+  client                        Client?        @relation(fields: [clientId], references: [id])
+  criadaPor                     User?          @relation("PropostaCriadaPor", fields: [criadaPorId], references: [id])
+  enviadaPor                    User?          @relation("PropostaEnviadaPor", fields: [enviadaPorId], references: [id])
+  opportunity                   Opportunity?   @relation(fields: [opportunityId], references: [id])
+  quote                         Quote?         @relation(fields: [quoteId], references: [id])
+  ticket                        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  chats                         Chat[]
+
+  @@index([ticketId])
+  @@index([quoteId])
+  @@index([opportunityId])
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([ticketId, versao])
+}

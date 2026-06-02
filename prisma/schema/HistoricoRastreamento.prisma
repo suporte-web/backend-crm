@@ -1,0 +1,9 @@
+model TrackingHistory {
+  id          String         @id @default(uuid())
+  trackingId  String
+  status      ShipmentStatus
+  location    String?
+  description String?
+  createdAt   DateTime       @default(now())
+  tracking    Tracking       @relation(fields: [trackingId], references: [id], onDelete: Cascade)
+}

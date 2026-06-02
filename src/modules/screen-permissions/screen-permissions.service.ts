@@ -2,9 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { UpdateRoleScreenPermissionsDto } from './dto/update-role-screen-permissions.dto';
 
+type ScreenPermission = UpdateRoleScreenPermissionsDto['permissions'][number];
+
+type RoleScreenPermissions = {
+  role: UserRole;
+  permissions: ScreenPermission[];
+};
+
 @Injectable()
 export class ScreenPermissionsService {
-  private permissions = [
+  private permissions: RoleScreenPermissions[] = [
     {
       role: UserRole.ADMIN,
       permissions: [],
@@ -31,7 +38,7 @@ export class ScreenPermissionsService {
       return existingRole;
     }
 
-    const newRolePermission = {
+    const newRolePermission: RoleScreenPermissions = {
       role,
       permissions: payload.permissions,
     };

@@ -1,0 +1,16 @@
+model LeadTimelineEvent {
+  id          String                @id @default(uuid())
+  leadId      String
+  type        LeadTimelineEventType
+  title       String
+  description String
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  createdBy   User?                 @relation("LeadTimelineEventAuthor", fields: [createdById], references: [id])
+  lead        Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([type, createdAt])
+}

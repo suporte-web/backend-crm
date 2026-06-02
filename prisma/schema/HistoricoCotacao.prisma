@@ -1,0 +1,8 @@
+model QuoteHistory {
+  id        String      @id @default(uuid())
+  quoteId   String
+  status    QuoteStatus
+  notes     String?
+  createdAt DateTime    @default(now())
+  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}

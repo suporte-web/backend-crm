@@ -1,0 +1,28 @@
+model LogEmail {
+  id                 String         @id @default(uuid())
+  ticketId           String?
+  propostaId         String?
+  notificationId     String?
+  userId             String?
+  emailDestino       String
+  assunto            String
+  resumo             String?
+  template           String?
+  status             StatusLogEmail @default(PENDENTE)
+  provedor           String?
+  idMensagemProvedor String?
+  mensagemErro       String?
+  enviadoEm          DateTime?
+  createdAt          DateTime       @default(now())
+  notification       Notification?  @relation(fields: [notificationId], references: [id])
+  proposta           Proposta?      @relation(fields: [propostaId], references: [id])
+  ticket             Ticket?        @relation(fields: [ticketId], references: [id])
+  user               User?          @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([propostaId])
+  @@index([notificationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}

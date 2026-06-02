@@ -1,0 +1,15 @@
+model LeadImportRowResult {
+  id        String              @id @default(uuid())
+  jobId     String
+  rowNumber Int
+  status    LeadImportRowStatus
+  reason    String?
+  rawData   Json?
+  leadId    String?
+  createdAt DateTime            @default(now())
+  job       LeadImportJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lead      Lead?               @relation(fields: [leadId], references: [id])
+
+  @@index([jobId, rowNumber])
+  @@index([leadId])
+}

@@ -1,0 +1,20 @@
+model LeadImportJob {
+  id             String                @id @default(uuid())
+  fileName       String
+  sourceFileType String
+  totalRows      Int                   @default(0)
+  successCount   Int                   @default(0)
+  ignoredCount   Int                   @default(0)
+  failureCount   Int                   @default(0)
+  status         LeadImportJobStatus   @default(PROCESSING)
+  summary        Json?
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  completedAt    DateTime?
+  createdBy      User?                 @relation(fields: [createdById], references: [id])
+  rowResults     LeadImportRowResult[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}

@@ -1,0 +1,22 @@
+model ClientDeletionRequest {
+  id                  String                      @id @default(uuid())
+  clientId            String?
+  requestedById       String
+  approvedById        String?
+  status              ClientDeletionRequestStatus @default(PENDENTE)
+  reason              String?
+  managementResponse  String?
+  clientNameSnapshot  String?
+  clientEmailSnapshot String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  decidedAt           DateTime?
+  client              Client?                     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  requestedBy         User                        @relation("ClientDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy          User?                       @relation("ClientDeletionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([clientId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+  @@index([approvedById, createdAt])
+}

@@ -1,0 +1,12 @@
+model RoleScreenPermission {
+  id          String   @id @default(uuid())
+  role        UserRole
+  screenKey   String
+  screenLabel String?
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([role, screenKey])
+  @@index([role, isEnabled])
+}

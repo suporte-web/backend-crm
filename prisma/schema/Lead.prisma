@@ -1,0 +1,34 @@
+model Lead {
+  id                String                @id @default(uuid())
+  name              String
+  email             String?
+  phone             String?
+  company           String?
+  source            String                @default("manual")
+  status            String                @default("new")
+  notes             String?
+  normalizedEmail   String?
+  normalizedPhone   String?
+  channel           String?
+  sourcePhone       String?
+  externalMessageId String?
+  externalContactId String?
+  metadata          Json?
+  rawPayload        Json?
+  lastInteractionAt DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  createdBy         User?                 @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  updatedBy         User?                 @relation("LeadUpdatedBy", fields: [updatedById], references: [id])
+  importRows        LeadImportRowResult[]
+  timeline          LeadTimelineEvent[]
+  tickets           Ticket[]
+  chats             Chat[]
+
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
+  @@index([source, createdAt])
+  @@index([status, createdAt])
+}

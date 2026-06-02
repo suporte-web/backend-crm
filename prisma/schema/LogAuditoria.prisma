@@ -1,0 +1,23 @@
+model AuditLog {
+  id         String           @id @default(uuid())
+  category   AuditLogCategory
+  action     AuditLogAction
+  level      AuditLogLevel    @default(INFO)
+  message    String
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  route      String?
+  method     String?
+  targetType String?
+  targetId   String?
+  success    Boolean          @default(true)
+  userId     String?
+  createdAt  DateTime         @default(now())
+  user       User?            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+  @@index([action, createdAt])
+  @@index([success, createdAt])
+}

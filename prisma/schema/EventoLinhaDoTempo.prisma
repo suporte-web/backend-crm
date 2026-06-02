@@ -1,0 +1,16 @@
+model TimelineEvent {
+  id          String            @id @default(uuid())
+  clientId    String
+  type        TimelineEventType
+  title       String
+  description String
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy   User?             @relation("TimelineEventAuthor", fields: [createdById], references: [id])
+
+  @@index([clientId, createdAt])
+  @@index([type, createdAt])
+}

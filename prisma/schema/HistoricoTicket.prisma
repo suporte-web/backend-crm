@@ -1,0 +1,17 @@
+model TicketHistory {
+  id           String                 @id @default(uuid())
+  ticketId     String
+  eventType    TicketHistoryEventType
+  title        String
+  description  String
+  metadata     Json?
+  internalOnly Boolean                @default(false)
+  createdById  String?
+  createdAt    DateTime               @default(now())
+  createdBy    User?                  @relation("TicketHistoryActor", fields: [createdById], references: [id])
+  ticket       Ticket                 @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdById, createdAt])
+}

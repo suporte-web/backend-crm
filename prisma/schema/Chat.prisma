@@ -1,0 +1,29 @@
+model Chat {
+  id           String            @id @default(uuid())
+  entityType   ChatEntityType
+  entityId     String
+  title        String?
+  leadId       String?
+  clientId     String?
+  quoteId      String?
+  propostaId   String?
+  ticketId     String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+  client       Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead         Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  proposta     Proposta?         @relation(fields: [propostaId], references: [id], onDelete: Cascade)
+  quote        Quote?            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  ticket       Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId])
+  @@index([clientId])
+  @@index([leadId])
+  @@index([quoteId])
+  @@index([propostaId])
+  @@index([ticketId])
+  @@index([entityType, createdAt])
+}
