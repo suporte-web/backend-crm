@@ -6,6 +6,28 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { setupSwagger } from './config/swagger';
 
+function parseOrigins(value?: string): string[] {
+  return (
+    value
+      ?.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
+function buildAllowedOrigins(): string[] {
+  return Array.from(
+    new Set([
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      ...parseOrigins(process.env.FRONTEND_URL),
+      ...parseOrigins(process.env.CORS_ORIGIN),
+    ]),
+  );
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const uploadsDir = join(process.cwd(), 'uploads');
@@ -25,8 +47,20 @@ async function bootstrap() {
     mkdirSync(propostasUploadsDir, { recursive: true });
   }
 
+  const allowedOrigins = buildAllowedOrigins();
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
     credentials: true,
   });
 
@@ -44,6 +78,6 @@ async function bootstrap() {
 
   setupSwagger(app);
 
-  await app.listen(process.env.PORT ?? 3001);
+  await app.listen(process.env.PORT ?? 3001, process.env.HOST ?? '0.0.0.0');
 }
 bootstrap();

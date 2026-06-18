@@ -29,6 +29,9 @@ RUN apt-get update \
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV HOST=0.0.0.0
+ENV FRONTEND_URL=http://52.193.143.187:3000
+ENV CORS_ORIGIN=http://52.193.143.187,http://52.193.143.187:3000
 
 COPY package*.json prisma.config.ts ./
 COPY --from=deps /app/node_modules ./node_modules
@@ -39,4 +42,4 @@ RUN mkdir -p uploads/portal-content uploads/lead-imports uploads/propostas
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
