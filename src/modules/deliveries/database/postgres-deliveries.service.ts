@@ -26,7 +26,7 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
 
     if (!value) {
       throw new InternalServerErrorException(
-        `Variavel de ambiente obrigatoria nao configurada: ${key}`,
+        `Variavel de ambiente obrigatoria não configurada: ${key}`,
       );
     }
 
@@ -35,7 +35,7 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
 
   async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
-    values: Array<string> = [],
+    values: Array<string | number> = [],
   ) {
     try {
       const result = await this.pool.query<T>(text, values);

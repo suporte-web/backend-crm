@@ -33,7 +33,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
-  ) {}
+  ) { }
 
   async create(dto: CreateUserDto, actor?: AuthUser) {
     const existingUser = await this.prisma.user.findUnique({
@@ -57,23 +57,23 @@ export class UsersService {
         clientProfile:
           dto.role === UserRole.CLIENTE
             ? {
-                create: {
-                  document: dto.document,
-                  phone: dto.phone,
-                  companyName: dto.companyName,
-                  segment: dto.segment,
-                  status: dto.status ?? 'PENDENTE',
-                  internalOwnerId: dto.internalOwnerId ?? actor?.sub,
-                  timelineEvents: {
-                    create: {
-                      type: TimelineEventType.LEAD_CREATED,
-                      title: 'Lead criado',
-                      description: `Lead inicial criado para ${dto.companyName ?? dto.name}.`,
-                      createdById: actor?.sub,
-                    },
+              create: {
+                document: dto.document,
+                phone: dto.phone,
+                companyName: dto.companyName,
+                segment: dto.segment,
+                status: dto.status ?? 'PENDENTE',
+                internalOwnerId: dto.internalOwnerId ?? actor?.sub,
+                timelineEvents: {
+                  create: {
+                    type: TimelineEventType.LEAD_CREATED,
+                    title: 'Lead criado',
+                    description: `Lead inicial criado para ${dto.companyName ?? dto.name}.`,
+                    createdById: actor?.sub,
                   },
                 },
-              }
+              },
+            }
             : undefined,
       },
       select: {
@@ -199,6 +199,61 @@ export class UsersService {
     };
   }
 
+
+
+  async setPasswordAfterReset(userId: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        mustChangePassword: true,
+        createdAt: true,
+        updatedAt: true,
+        clientProfile: true,
+      },
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.USER,
+      action: AuditLogAction.USER_UPDATED,
+      message: `Senha redefinida por recuperação de acesso para ${updated.email}.`,
+      targetType: 'User',
+      targetId: updated.id,
+      userId: updated.id,
+      details: {
+        mustChangePassword: false,
+        source: 'forgot-password',
+      },
+    });
+
+    return {
+      ...updated,
+      screenPermissions: await this.findRoleScreenPermissions(updated.role),
+    };
+  }
+
   async findInternalUsers() {
     return this.prisma.user.findMany({
       where: {
@@ -244,6 +299,9 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
+
+   
+
 
     const isCurrentPasswordValid = await bcrypt.compare(
       currentPassword,
@@ -327,25 +385,25 @@ export class UsersService {
         isActive: dto.isActive,
         clientProfile: shouldManageClientProfile
           ? {
-              upsert: {
-                create: {
-                  document: dto.document,
-                  phone: dto.phone,
-                  companyName: dto.companyName,
-                  segment: dto.segment,
-                  status: dto.status,
-                  internalOwnerId: dto.internalOwnerId,
-                },
-                update: {
-                  document: dto.document,
-                  phone: dto.phone,
-                  companyName: dto.companyName,
-                  segment: dto.segment,
-                  status: dto.status,
-                  internalOwnerId: dto.internalOwnerId,
-                },
+            upsert: {
+              create: {
+                document: dto.document,
+                phone: dto.phone,
+                companyName: dto.companyName,
+                segment: dto.segment,
+                status: dto.status,
+                internalOwnerId: dto.internalOwnerId,
               },
-            }
+              update: {
+                document: dto.document,
+                phone: dto.phone,
+                companyName: dto.companyName,
+                segment: dto.segment,
+                status: dto.status,
+                internalOwnerId: dto.internalOwnerId,
+              },
+            },
+          }
           : undefined,
       },
       select: {

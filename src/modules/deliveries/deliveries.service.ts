@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { QueryDeliveriesDto } from './dto/query-deliveries.dto';
 import { PostgresDeliveriesService } from './database/postgres-deliveries.service';
-import { PrismaService } from '../../prisma/prisma.service';
 import {
+  buildDeliveryCitiesQuery,
+  buildDeliveryRegionsQuery,
   buildDeliveriesQuery,
   buildDeliveriesSummaryQuery,
 } from './sql/deliveries.sql';
@@ -26,7 +27,7 @@ type DeliveryRow = {
   cidade_dest: string;
   uf_dest: string;
   status_entrega: 'Entregue' | 'Pendente' | 'Em atraso';
-  em_atraso: 'Sim' | 'Não';
+  em_atraso: 'Sim' | 'Nao';
   sla_entrega: 'DENTRO DO SLA' | 'FORA DO SLA' | '-';
   classificacao_rota: string;
 };
@@ -41,36 +42,27 @@ type DeliverySummaryRow = {
   porcentagemEntrega: number | string;
 };
 
+type CityRow = {
+  cidade_dest: string;
+  uf_dest: string;
+};
+
+type RegionRow = {
+  uf_dest: string;
+  classificacao_rota: string;
+};
+
 @Injectable()
 export class DeliveriesService {
   constructor(
     private readonly postgresDeliveriesService: PostgresDeliveriesService,
-    private readonly prisma: PrismaService,
   ) {}
 
-  private normalizeDocument(value?: string | null) {
-    return value?.replace(/\D/g, '') || '';
-  }
+  async findAll(filters: QueryDeliveriesDto) {
+    const query = buildDeliveriesQuery(filters);
 
-  private async getClientDocumentFilter(user: { sub: string; role: string }) {
-    if (user.role !== 'CLIENTE') {
-      return undefined;
-    }
-
-    const client = await this.prisma.client.findUnique({
-      where: { userId: user.sub },
-      select: { document: true },
-    });
-
-    return this.normalizeDocument(client?.document) || '__NO_CLIENT_DOCUMENT__';
-  }
-
-  async findAll(
-    filters: QueryDeliveriesDto,
-    user: { sub: string; role: string },
-  ) {
-    const clientDocument = await this.getClientDocumentFilter(user);
-    const query = buildDeliveriesQuery(filters, clientDocument);
+    // console.log('SQL ENTREGAS:', query.text);
+    // console.log('VALUES ENTREGAS:', query.values);
 
     return this.postgresDeliveriesService.query<DeliveryRow>(
       query.text,
@@ -78,12 +70,12 @@ export class DeliveriesService {
     );
   }
 
-  async getSummary(
-    filters: QueryDeliveriesDto,
-    user: { sub: string; role: string },
-  ) {
-    const clientDocument = await this.getClientDocumentFilter(user);
-    const query = buildDeliveriesSummaryQuery(filters, clientDocument);
+  async getSummary(filters: QueryDeliveriesDto) {
+    const query = buildDeliveriesSummaryQuery(filters);
+
+    // console.log('SQL RESUMO:', query.text);
+    // console.log('VALUES RESUMO:', query.values);
+
     const [summary] =
       await this.postgresDeliveriesService.query<DeliverySummaryRow>(
         query.text,
@@ -100,5 +92,23 @@ export class DeliveriesService {
       entregueForaDoSla: Number(summary?.entregueForaDoSla || 0),
       porcentagemEntrega: Number(summary?.porcentagemEntrega || 0),
     };
+  }
+
+  async findCities(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryCitiesQuery(filters);
+
+    return this.postgresDeliveriesService.query<CityRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  async findRegions(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryRegionsQuery(filters);
+
+    return this.postgresDeliveriesService.query<RegionRow>(
+      query.text,
+      query.values,
+    );
   }
 }
