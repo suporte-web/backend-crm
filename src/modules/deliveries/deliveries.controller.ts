@@ -30,4 +30,16 @@ export class DeliveriesController {
   findRegions(@Query() filters: QueryDeliveriesDto) {
     return this.deliveriesService.findRegions(filters);
   }
+
+  @Get('find-payers')
+  findPayers(@Query() filters: QueryDeliveriesDto) {
+    return this.deliveriesService.findPayers(filters);
+  }
+
+  @Get('find-occurrences')
+  findOccurrences(@Query() filters: QueryDeliveriesDto) {
+    return this.deliveriesService.findOccurrences(filters);
+  }
+
+  
 }

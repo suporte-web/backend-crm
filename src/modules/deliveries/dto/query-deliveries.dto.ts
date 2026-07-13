@@ -102,6 +102,22 @@ export class QueryDeliveriesDto {
   nroCtrc?: string;
 
   @ApiPropertyOptional({
+    description: 'CNPJ do pagador para busca parcial ou completa',
+    example: '02012862003770',
+  })
+  @IsOptional()
+  @IsString()
+  cnpjPagador?: string;
+
+  @ApiPropertyOptional({
+    description: 'Codigo ou descricao da ultima ocorrencia para busca parcial',
+    example: 'Mercadoria entregue',
+  })
+  @IsOptional()
+  @IsString()
+  ocorrencia?: string;
+
+  @ApiPropertyOptional({
     description: 'Status operacional da entrega',
     enum: ['Todos', 'Entregue', 'Pendente', 'Em atraso'],
   })

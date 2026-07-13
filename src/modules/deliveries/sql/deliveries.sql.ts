@@ -8,6 +8,8 @@ type SqlQuery = {
 type FilterOptions = {
   includeCity?: boolean;
   includeUf?: boolean;
+  includeCnpjPagador?: boolean;
+  includeOcorrencia?: boolean;
 };
 
 function getBaseSelect() {
@@ -151,6 +153,8 @@ function buildOptionalFilters(
   let currentIndex = startIndex;
   const includeCity = options.includeCity ?? true;
   const includeUf = options.includeUf ?? true;
+  const includeCnpjPagador = options.includeCnpjPagador ?? true;
+  const includeOcorrencia = options.includeOcorrencia ?? true;
 
   if (clientDocument !== undefined) {
     values.push(clientDocument);
@@ -208,6 +212,29 @@ function buildOptionalFilters(
   if (filters.nroCtrc?.trim()) {
     values.push(`%${filters.nroCtrc.trim()}%`);
     clauses.push(`cast(nro_ctrc as text) ilike $${currentIndex}`);
+    currentIndex += 1;
+  }
+
+  if (includeCnpjPagador && filters.cnpjPagador?.trim()) {
+    const cnpjDigits = filters.cnpjPagador.replace(/\D/g, '');
+    const cnpjSearch = cnpjDigits || filters.cnpjPagador.trim();
+
+    values.push(`%${cnpjSearch}%`);
+    clauses.push(
+      `regexp_replace(coalesce(cgc_pag::text, ''), '\\D', '', 'g') ilike $${currentIndex}`,
+    );
+    currentIndex += 1;
+  }
+
+  if (
+    includeOcorrencia &&
+    filters.ocorrencia?.trim() &&
+    filters.ocorrencia.trim() !== 'Todos'
+  ) {
+    values.push(`%${filters.ocorrencia.trim()}%`);
+    clauses.push(
+      `(cast(ult_ocor as text) ilike $${currentIndex} or ocorrencia ilike $${currentIndex})`,
+    );
     currentIndex += 1;
   }
 
@@ -383,6 +410,53 @@ export function buildDeliveryRegionsQuery(filters: QueryDeliveriesDto): SqlQuery
       ${optionalFilters.text}
         ${optionalFilters.text ? 'and' : 'where'} uf_dest is not null
       order by uf_dest, classificacao_rota;
+    `,
+    values: optionalFilters.values,
+  };
+}
+
+export function buildDeliveryPayersQuery(filters: QueryDeliveriesDto): SqlQuery {
+  const optionalFilters = buildOptionalFilters(filters, 1, undefined, {
+    includeCnpjPagador: false,
+  });
+
+  return {
+    text: `
+      ${getBaseSelect()}
+
+      select distinct
+        cgc_pag
+      from entregas_base
+      ${optionalFilters.text}
+        ${optionalFilters.text ? 'and' : 'where'} cgc_pag is not null
+        and trim(cgc_pag::text) <> ''
+      order by cgc_pag;
+    `,
+    values: optionalFilters.values,
+  };
+}
+
+export function buildDeliveryOccurrencesQuery(
+  filters: QueryDeliveriesDto,
+): SqlQuery {
+  const optionalFilters = buildOptionalFilters(filters, 1, undefined, {
+    includeOcorrencia: false,
+  });
+
+  return {
+    text: `
+      ${getBaseSelect()}
+
+      select distinct
+        ult_ocor,
+        ocorrencia
+      from entregas_base
+      ${optionalFilters.text}
+        ${optionalFilters.text ? 'and' : 'where'} (
+          ult_ocor is not null
+          or trim(ocorrencia) <> ''
+        )
+      order by ocorrencia, ult_ocor;
     `,
     values: optionalFilters.values,
   };

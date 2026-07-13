@@ -3,6 +3,8 @@ import { QueryDeliveriesDto } from './dto/query-deliveries.dto';
 import { PostgresDeliveriesService } from './database/postgres-deliveries.service';
 import {
   buildDeliveryCitiesQuery,
+  buildDeliveryOccurrencesQuery,
+  buildDeliveryPayersQuery,
   buildDeliveryRegionsQuery,
   buildDeliveriesQuery,
   buildDeliveriesSummaryQuery,
@@ -50,6 +52,15 @@ type CityRow = {
 type RegionRow = {
   uf_dest: string;
   classificacao_rota: string;
+};
+
+type PayerRow = {
+  cgc_pag: string;
+};
+
+type OccurrenceRow = {
+  ult_ocor: string | null;
+  ocorrencia: string;
 };
 
 @Injectable()
@@ -107,6 +118,24 @@ export class DeliveriesService {
     const query = buildDeliveryRegionsQuery(filters);
 
     return this.postgresDeliveriesService.query<RegionRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  async findPayers(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryPayersQuery(filters);
+
+    return this.postgresDeliveriesService.query<PayerRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  async findOccurrences(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryOccurrencesQuery(filters);
+
+    return this.postgresDeliveriesService.query<OccurrenceRow>(
       query.text,
       query.values,
     );
