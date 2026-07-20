@@ -11,9 +11,9 @@ model ClientDeletionRequest {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
   decidedAt           DateTime?
-  client              Client?                     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  approvedBy          User?                       @relation("ClientDeletionApprovedBy", fields: [approvedById], references: [id])
+  client              Client?                     @relation(fields: [clientId], references: [id])
   requestedBy         User                        @relation("ClientDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
-  approvedBy          User?                       @relation("ClientDeletionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@index([clientId, createdAt])
   @@index([status, createdAt])

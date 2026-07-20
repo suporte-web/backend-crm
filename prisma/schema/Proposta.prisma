@@ -1,6 +1,5 @@
 model Proposta {
   id                            String         @id @default(uuid())
-  code                          String         @unique
   ticketId                      String
   quoteId                       String?
   opportunityId                 String?
@@ -17,17 +16,12 @@ model Proposta {
   condicoesPagamento            String?
   condicoesComerciais           String?
   observacoes                   String?
-  arquivoNome                   String?
-  arquivoUrl                    String?
-  arquivoMimeType               String?
-  arquivoTamanho                Int?
   validadeDias                  String?
   validaAte                     DateTime?
   versao                        Int            @default(1)
   enviadaEm                     DateTime?
   aprovadaPeloClienteEm         DateTime?
   recusadaPeloClienteEm         DateTime?
-  motivoRecusaCliente           String?
   ajusteSolicitadoPeloClienteEm DateTime?
   enviadaParaGestaoEm           DateTime?
   aprovadaPelaGestaoEm          DateTime?
@@ -35,6 +29,13 @@ model Proposta {
   ajusteSolicitadoPelaGestaoEm  DateTime?
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
+  code                          String         @unique
+  arquivoNome                   String?
+  arquivoUrl                    String?
+  arquivoMimeType               String?
+  arquivoTamanho                Int?
+  motivoRecusaCliente           String?
+  chats                         Chat[]
   logsEmail                     LogEmail[]
   client                        Client?        @relation(fields: [clientId], references: [id])
   criadaPor                     User?          @relation("PropostaCriadaPor", fields: [criadaPorId], references: [id])
@@ -42,7 +43,6 @@ model Proposta {
   opportunity                   Opportunity?   @relation(fields: [opportunityId], references: [id])
   quote                         Quote?         @relation(fields: [quoteId], references: [id])
   ticket                        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  chats                         Chat[]
 
   @@index([ticketId])
   @@index([quoteId])

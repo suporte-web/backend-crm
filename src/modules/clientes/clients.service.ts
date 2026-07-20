@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -21,10 +22,22 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UsersService } from '../users/users.service';
+import {
+  CreateClientContactDto,
+  CreateClientDto,
+} from './dto/create-client.dto';
 import { CreateTimelineNoteDto } from './dto/create-timeline-note.dto';
 import { DecideClientDeletionDto } from './dto/decide-client-deletion.dto';
 import { RequestClientDeletionDto } from './dto/request-client-deletion.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+
+type UploadedClientDocumentFile = {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
 
 @Injectable()
 export class ClientsService {
@@ -32,6 +45,7 @@ export class ClientsService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
   ) {}
 
   private ensureInternalUser(user: { sub: string; role: string }) {
@@ -57,6 +71,46 @@ export class ClientsService {
   private sanitize(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private sanitizeClientContacts(contacts?: CreateClientContactDto[]) {
+    return (contacts ?? [])
+      .map((contact) => ({
+        name: contact.name?.trim() || undefined,
+        role: contact.role?.trim() || undefined,
+        email: contact.email?.trim() || undefined,
+        phone: contact.phone?.trim() || undefined,
+        notes: contact.notes?.trim() || undefined,
+        isPrimary: contact.isPrimary ?? false,
+      }))
+      .filter(
+        (contact) =>
+          contact.name ||
+          contact.role ||
+          contact.email ||
+          contact.phone ||
+          contact.notes,
+      )
+      .map((contact, index) => ({
+        ...contact,
+        isPrimary: index === 0 ? true : contact.isPrimary,
+      }));
+  }
+
+  private parseOptionalDate(value?: string | null) {
+    const sanitized = this.sanitize(value);
+
+    if (!sanitized) {
+      return undefined;
+    }
+
+    const parsed = new Date(sanitized);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Data do cadastro invalida.');
+    }
+
+    return parsed;
   }
 
   private formatQuoteStatus(status: QuoteStatus) {
@@ -107,6 +161,24 @@ export class ClientsService {
           orderBy: {
             createdAt: 'desc',
           },
+        },
+        documents: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+        contacts: {
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
       },
     });
@@ -193,6 +265,16 @@ export class ClientsService {
     return Number(value?.toString() ?? 0);
   }
 
+  private normalizeDocument(document?: string | null): string | null {
+    if (!document) {
+      return null;
+    }
+
+    const normalizedDocument = document.replace(/\D/g, '');
+
+    return normalizedDocument || null;
+  }
+
   async findMine(userId: string) {
     const client = await this.prisma.client.findUnique({
       where: { userId },
@@ -211,6 +293,97 @@ export class ClientsService {
     }
 
     return client;
+  }
+
+  async create(user: AuthUser, dto: CreateClientDto) {
+    this.ensureInternalUser(user);
+
+    const normalizedDocument = this.normalizeDocument(dto.document);
+
+    if (!normalizedDocument) {
+      throw new BadRequestException('Informe o CPF ou CNPJ do cliente.');
+    }
+
+    const existingClient = await this.prisma.client.findFirst({
+      where: {
+        document: normalizedDocument,
+      },
+      select: {
+        id: true,
+        companyName: true,
+        legalName: true,
+        tradeName: true,
+        document: true,
+      },
+    });
+
+    if (existingClient) {
+      const clientName =
+        existingClient.tradeName ??
+        existingClient.legalName ??
+        existingClient.companyName ??
+        'Cliente já cadastrado';
+
+      throw new ConflictException(
+        `O documento informado já está cadastrado para o cliente ${clientName}.`,
+      );
+    }
+
+    const displayName =
+      this.sanitize(dto.name) ??
+      this.sanitize(dto.tradeName) ??
+      this.sanitize(dto.legalName) ??
+      this.sanitize(dto.companyName) ??
+      normalizedDocument;
+
+    if (!displayName) {
+      throw new BadRequestException(
+        'Informe razão social, nome fantasia, empresa ou CNPJ.',
+      );
+    }
+
+    try {
+      return await this.usersService.create(
+        {
+          name: displayName,
+          role: UserRole.CLIENTE,
+          isActive: false,
+          document: normalizedDocument,
+          phone: this.sanitize(dto.phone) ?? undefined,
+          companyName:
+            this.sanitize(dto.companyName) ??
+            this.sanitize(dto.tradeName) ??
+            this.sanitize(dto.legalName) ??
+            displayName,
+          legalName: this.sanitize(dto.legalName) ?? undefined,
+          tradeName: this.sanitize(dto.tradeName) ?? undefined,
+          cnae: this.sanitize(dto.cnae) ?? undefined,
+          stateRegistration: this.sanitize(dto.stateRegistration) ?? undefined,
+          businessActivity: this.sanitize(dto.businessActivity) ?? undefined,
+          taxRegime: this.sanitize(dto.taxRegime) ?? undefined,
+          address: this.sanitize(dto.address) ?? undefined,
+          bankDetails: this.sanitize(dto.bankDetails) ?? undefined,
+          modality: this.sanitize(dto.modality) ?? undefined,
+          registrationDate: this.sanitize(dto.registrationDate) ?? undefined,
+          segment: this.sanitize(dto.segment) ?? undefined,
+          status: this.sanitize(dto.status) ?? 'PENDENTE',
+          internalOwnerId: this.sanitize(dto.internalOwnerId) ?? user.sub,
+          contacts: dto.contacts,
+        },
+        user,
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Já existe um cliente cadastrado com este CPF ou CNPJ.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   async findAll(
@@ -384,18 +557,31 @@ export class ClientsService {
         document: client.document,
         phone: client.phone,
         companyName: client.companyName,
+        legalName: client.legalName,
+        tradeName: client.tradeName,
+        cnae: client.cnae,
+        stateRegistration: client.stateRegistration,
+        businessActivity: client.businessActivity,
+        taxRegime: client.taxRegime,
+        address: client.address,
+        bankDetails: client.bankDetails,
+        modality: client.modality,
+        registrationDate: client.registrationDate,
         segment: client.segment,
         notes: client.notes,
         status: client.status,
         internalOwnerId: client.internalOwnerId,
         createdAt: client.createdAt,
         updatedAt: client.updatedAt,
-        user: {
-          id: client.user.id,
-          name: client.user.name,
-          email: client.user.email,
-          role: client.user.role,
-        },
+        contacts: client.contacts,
+        user: client.user
+          ? {
+              id: client.user.id,
+              name: client.user.name,
+              email: client.user.email,
+              role: client.user.role,
+            }
+          : null,
       },
       metrics: {
         totalQuotes,
@@ -439,18 +625,32 @@ export class ClientsService {
         document: client.document,
         phone: client.phone,
         companyName: client.companyName,
+        legalName: client.legalName,
+        tradeName: client.tradeName,
+        cnae: client.cnae,
+        stateRegistration: client.stateRegistration,
+        businessActivity: client.businessActivity,
+        taxRegime: client.taxRegime,
+        address: client.address,
+        bankDetails: client.bankDetails,
+        modality: client.modality,
+        registrationDate: client.registrationDate,
         segment: client.segment,
         notes: client.notes,
         status: client.status,
         internalOwnerId: client.internalOwnerId,
         createdAt: client.createdAt,
         updatedAt: client.updatedAt,
-        user: {
-          id: client.user.id,
-          name: client.user.name,
-          email: client.user.email,
-          role: client.user.role,
-        },
+        contacts: client.contacts,
+        user: client.user
+          ? {
+              id: client.user.id,
+              name: client.user.name,
+              email: client.user.email,
+              role: client.user.role,
+            }
+          : null,
+        documents: client.documents,
       },
       opportunities: client.opportunities,
       timeline: this.buildCombinedTimeline(client),
@@ -480,6 +680,51 @@ export class ClientsService {
     this.ensureInternalUser(user);
     const client = await this.getClientOrFail(id);
     return this.buildCombinedTimeline(client);
+  }
+
+  async createDocument(
+    user: AuthUser,
+    id: string,
+    file: UploadedClientDocumentFile,
+    description?: string,
+  ) {
+    this.ensureInternalUser(user);
+    await this.getClientOrFail(id);
+
+    if (!file?.filename) {
+      throw new BadRequestException(
+        'O arquivo não foi salvo corretamente no servidor.',
+      );
+    }
+
+    const document = await this.prisma.clientDocument.create({
+      data: {
+        clientId: id,
+        fileName: file.filename,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: `/uploads/client-documents/${file.filename}`,
+        description: this.sanitize(description),
+        uploadedById: user.sub,
+      },
+    });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        clientId: id,
+        type: TimelineEventType.NOTE_ADDED,
+        title: 'Documento anexado',
+        description: `${file.originalname} foi anexado ao cadastro do cliente.`,
+        createdById: user.sub,
+        metadata: {
+          documentId: document.id,
+          fileName: document.originalName,
+        },
+      },
+    });
+
+    return document;
   }
 
   async createTimelineNote(
@@ -668,8 +913,9 @@ export class ClientsService {
 
     const name = sanitizedName ?? undefined;
     const email = sanitizedEmail ?? undefined;
+    const contacts = this.sanitizeClientContacts(dto.contacts);
 
-    if (email && email !== existingClient.user.email) {
+    if (email && email !== existingClient.user?.email) {
       const emailInUse = await this.prisma.user.findUnique({
         where: { email },
         select: { id: true },
@@ -681,8 +927,8 @@ export class ClientsService {
     }
 
     const changedFields = [
-      name !== undefined && name !== existingClient.user.name ? 'nome' : null,
-      email !== undefined && email !== existingClient.user.email
+      name !== undefined && name !== existingClient.user?.name ? 'nome' : null,
+      email !== undefined && email !== existingClient.user?.email
         ? 'e-mail'
         : null,
       dto.document !== undefined && dto.document !== existingClient.document
@@ -695,6 +941,37 @@ export class ClientsService {
       dto.companyName !== existingClient.companyName
         ? 'empresa'
         : null,
+      dto.legalName !== undefined && dto.legalName !== existingClient.legalName
+        ? 'razão social'
+        : null,
+      dto.tradeName !== undefined && dto.tradeName !== existingClient.tradeName
+        ? 'nome fantasia'
+        : null,
+      dto.cnae !== undefined && dto.cnae !== existingClient.cnae
+        ? 'CNAE'
+        : null,
+      dto.stateRegistration !== undefined &&
+      dto.stateRegistration !== existingClient.stateRegistration
+        ? 'inscrição estadual'
+        : null,
+      dto.businessActivity !== undefined &&
+      dto.businessActivity !== existingClient.businessActivity
+        ? 'atividade comercial'
+        : null,
+      dto.taxRegime !== undefined && dto.taxRegime !== existingClient.taxRegime
+        ? 'regime tributário'
+        : null,
+      dto.address !== undefined && dto.address !== existingClient.address
+        ? 'endereço'
+        : null,
+      dto.bankDetails !== undefined &&
+      dto.bankDetails !== existingClient.bankDetails
+        ? 'dados bancários'
+        : null,
+      dto.modality !== undefined && dto.modality !== existingClient.modality
+        ? 'modalidade'
+        : null,
+      dto.registrationDate !== undefined ? 'data do cadastro' : null,
       dto.segment !== undefined && dto.segment !== existingClient.segment
         ? 'segmento'
         : null,
@@ -708,12 +985,15 @@ export class ClientsService {
       dto.internalOwnerId !== existingClient.internalOwnerId
         ? 'responsável interno'
         : null,
+      dto.contacts !== undefined ? 'contatos' : null,
     ].filter(Boolean);
 
     const updatedClient = await this.prisma.$transaction(async (tx) => {
-      if (name !== undefined || email !== undefined) {
+      if (existingClient.userId) {
         await tx.user.update({
-          where: { id: existingClient.userId },
+          where: {
+            id: existingClient.userId,
+          },
           data: {
             name,
             email,
@@ -727,15 +1007,36 @@ export class ClientsService {
           document: dto.document,
           phone: dto.phone,
           companyName: dto.companyName,
+          legalName: dto.legalName,
+          tradeName: dto.tradeName,
+          cnae: dto.cnae,
+          stateRegistration: dto.stateRegistration,
+          businessActivity: dto.businessActivity,
+          taxRegime: dto.taxRegime,
+          address: dto.address,
+          bankDetails: dto.bankDetails,
+          modality: dto.modality,
+          registrationDate: this.parseOptionalDate(dto.registrationDate),
           segment: dto.segment,
           notes: dto.notes,
           status: dto.status,
           internalOwnerId: dto.internalOwnerId,
+          contacts:
+            dto.contacts !== undefined
+              ? {
+                  deleteMany: {},
+                  create: contacts,
+                }
+              : undefined,
         },
         include: {
           user: true,
           quotes: true,
           opportunities: true,
+          documents: true,
+          contacts: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          },
         },
       });
 
@@ -744,7 +1045,7 @@ export class ClientsService {
           data: {
             clientId: id,
             type: TimelineEventType.LEAD_UPDATED,
-            title: 'Lead atualizado',
+            title: 'Cliente atualizado',
             description: `Campos atualizados: ${changedFields.join(', ')}.`,
             createdById: user.sub,
             metadata: {
@@ -760,7 +1061,11 @@ export class ClientsService {
     await this.auditLogsService.create({
       category: AuditLogCategory.CLIENT,
       action: AuditLogAction.CLIENT_UPDATED,
-      message: `Cliente atualizado: ${existingClient.companyName ?? existingClient.user.name}.`,
+      message: `Cliente atualizado: ${
+        existingClient.companyName ??
+        existingClient.user?.name ??
+        'Cliente sem nome'
+      }.`,
       targetType: 'Client',
       targetId: id,
       userId: user.sub,
@@ -775,7 +1080,9 @@ export class ClientsService {
         {
           title: 'Cliente atualizado',
           message: `Cadastro de ${
-            updatedClient.companyName ?? updatedClient.user.name
+            updatedClient.companyName ??
+            updatedClient.user?.name ??
+            'Cliente sem nome'
           } atualizado: ${changedFields.join(', ')}.`,
           link: `/clients/${updatedClient.id}`,
           actorId: user.sub,
@@ -802,7 +1109,7 @@ export class ClientsService {
           status as ClientDeletionRequestStatus,
         )
       ) {
-        throw new BadRequestException('Status de solicitação invalido.');
+        throw new BadRequestException('Status de solicitação inválido.');
       }
 
       where.status = status as ClientDeletionRequestStatus;
@@ -863,6 +1170,12 @@ export class ClientsService {
     if (pendingRequest) {
       throw new BadRequestException(
         'Já existe uma solicitação de exclusão pendente para este cliente.',
+      );
+    }
+
+    if (!client.user) {
+      throw new BadRequestException(
+        'Este cliente não possui um usuário de acesso vinculado.',
       );
     }
 
@@ -934,7 +1247,7 @@ export class ClientsService {
         title: 'Solicitação de exclusão de cliente',
         message: `${
           client.companyName ?? client.user.name
-        } foi enviado para aprovacao de exclusao.`,
+        } foi enviado para aprovação de exclusao.`,
         link: '/clients',
         actorId: user.sub,
         metadata: {
@@ -1087,7 +1400,12 @@ export class ClientsService {
           approvedById: user.sub,
           managementResponse,
           decidedAt: now,
+          clientId: null,
         },
+      });
+
+      await tx.client.delete({
+        where: { id: targetClientId },
       });
 
       await tx.user.delete({
@@ -1098,7 +1416,7 @@ export class ClientsService {
     await this.auditLogsService.create({
       category: AuditLogCategory.CLIENT,
       action: AuditLogAction.CUSTOM,
-      message: `Exclusao aprovada para ${targetName}.`,
+      message: `Exclusão aprovada para ${targetName}.`,
       targetType: 'ClientDeletionRequest',
       targetId: requestId,
       userId: user.sub,
@@ -1112,7 +1430,7 @@ export class ClientsService {
     await this.auditLogsService.create({
       category: AuditLogCategory.USER,
       action: AuditLogAction.USER_DELETED,
-      message: `Usuario removido apos aprovacao da Gestao: ${targetEmail}.`,
+      message: `Usuário removido apos aprovação da Gestão: ${targetEmail}.`,
       targetType: 'User',
       targetId: targetUserId,
       userId: user.sub,
@@ -1123,8 +1441,8 @@ export class ClientsService {
     });
 
     await this.notificationsService.notifyUsers([request.requestedBy.id], {
-      title: 'Cliente excluido',
-      message: `${targetName} foi excluido apos aprovacao da Gestao.`,
+      title: 'Cliente excluído',
+      message: `${targetName} foi excluído apos aprovação da Gestão.`,
       link: '/clients',
       actorId: user.sub,
       metadata: {
@@ -1135,7 +1453,7 @@ export class ClientsService {
     });
 
     return {
-      message: 'Cliente excluido com aprovação da Gestão.',
+      message: 'Cliente excluído com aprovação da Gestão.',
       request: {
         id: requestId,
         status: ClientDeletionRequestStatus.APROVADA,

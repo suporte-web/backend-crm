@@ -171,7 +171,9 @@ export class OpportunitiesService {
           clientId: dto.clientId,
           type: TimelineEventType.OPPORTUNITY_CREATED,
           title: 'Oportunidade criada',
-          description: `A oportunidade "${dto.title}" foi registrada para ${client.companyName ?? client.user.name}.`,
+          description: `A oportunidade "${dto.title}" foi registrada para ${
+            client.companyName ?? client.user?.name ?? 'Cliente sem nome'
+          }.`,
           createdById: user.sub,
           metadata: {
             opportunityId: opportunity.id,

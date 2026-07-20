@@ -1,19 +1,9 @@
 model Ticket {
   id                  String          @id @default(uuid())
-  protocolo           String?         @unique
   clientId            String?
-  prospectId          String?
   subject             String
   description         String
   status              TicketStatus    @default(ABERTO)
-  origem              EntradaOrigem?
-  prioridade          TicketPriority  @default(NORMAL)
-  nomeSolicitante     String?
-  emailSolicitante    String?
-  telefoneSolicitante String?
-  mensagem            String?
-  formPayload         Json?
-  closedAt            DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   quoteId             String?
@@ -23,22 +13,32 @@ model Ticket {
   requesterId         String?
   type                TicketType      @default(SUPORTE)
   requiresActionRole  UserRole?
-  internalOnly        Boolean         @default(false)
   lastInteractionAt   DateTime        @default(now())
+  internalOnly        Boolean         @default(false)
+  protocolo           String?         @unique
+  prospectId          String?
+  origem              EntradaOrigem?
+  prioridade          TicketPriority  @default(NORMAL)
+  nomeSolicitante     String?
+  emailSolicitante    String?
+  telefoneSolicitante String?
+  mensagem            String?
+  formPayload         Json?
+  closedAt            DateTime?
+  chats               Chat[]
   logsEmail           LogEmail[]
   notifications       Notification[]
   propostas           Proposta[]
+  createdProspects    Prospect[]      @relation("ProspectCreatedFromTicket")
   assignedTo          User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
   client              Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  prospect            Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
   lead                Lead?           @relation(fields: [leadId], references: [id])
   opportunity         Opportunity?    @relation(fields: [opportunityId], references: [id])
+  prospect            Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
   quote               Quote?          @relation(fields: [quoteId], references: [id])
   requester           User?           @relation("TicketRequester", fields: [requesterId], references: [id])
-  createdProspects    Prospect[]      @relation("ProspectCreatedFromTicket")
   history             TicketHistory[]
   messages            TicketMessage[]
-  chats               Chat[]
 
   @@index([clientId])
   @@index([prospectId])

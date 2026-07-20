@@ -1,28 +1,43 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
-  IsEnum,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
-import { UserRole } from '@prisma/client';
+import { Type } from 'class-transformer';
 
-export class UpdateUserDto {
+export class CreateClientContactDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
 
   @IsOptional()
   @IsEmail()
   email?: string;
 
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 
   @IsOptional()
   @IsBoolean()
-  isActive?: boolean;
+  isPrimary?: boolean;
+}
+
+export class CreateClientDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
 
   @IsOptional()
   @IsString()
@@ -82,9 +97,19 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()
   @IsString()
   internalOwnerId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateClientContactDto)
+  contacts?: CreateClientContactDto[];
 }

@@ -1,8 +1,6 @@
 model Quote {
   id               String         @id @default(uuid())
-  code             String         @unique
   clientId         String?
-  prospectId       String?
   origin           String
   destination      String
   serviceType      String
@@ -24,13 +22,15 @@ model Quote {
   pickupAddress    String?
   requestType      String?
   contactEmail     String?
+  code             String         @unique
+  prospectId       String?
+  chats            Chat[]
   opportunities    Opportunity[]
   propostas        Proposta[]
   client           Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   prospect         Prospect?      @relation(fields: [prospectId], references: [id])
   history          QuoteHistory[]
   tickets          Ticket[]
-  chats            Chat[]
 
   @@index([prospectId])
 }

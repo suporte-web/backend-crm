@@ -20,12 +20,12 @@ model Lead {
   updatedById       String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  chats             Chat[]
   createdBy         User?                 @relation("LeadCreatedBy", fields: [createdById], references: [id])
   updatedBy         User?                 @relation("LeadUpdatedBy", fields: [updatedById], references: [id])
   importRows        LeadImportRowResult[]
   timeline          LeadTimelineEvent[]
   tickets           Ticket[]
-  chats             Chat[]
 
   @@index([normalizedEmail])
   @@index([normalizedPhone])

@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { ClientsModule } from './modules/clients/clients.module';
+import { ClientsModule } from './modules/clientes/clients.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { TrackingsModule } from './modules/trackings/trackings.module';
 import { TicketsModule } from './modules/tickets/tickets.module';

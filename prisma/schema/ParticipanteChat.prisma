@@ -4,9 +4,9 @@ model ChatParticipant {
   userId     String
   canRead    Boolean   @default(true)
   canWrite   Boolean   @default(true)
-  lastReadAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  lastReadAt DateTime?
   chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 

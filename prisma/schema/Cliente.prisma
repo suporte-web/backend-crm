@@ -1,22 +1,74 @@
 model Client {
-  id               String                  @id @default(uuid())
-  userId           String                  @unique
-  document         String?
-  phone            String?
-  companyName      String?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  internalOwnerId  String?
-  notes            String?
-  segment          String?
-  status           String?
-  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid())
+  document          String?   @unique
+  phone             String?
+  companyName       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  internalOwnerId   String?
+  notes             String?
+  segment           String?
+  status            String?
+  legalName         String?
+  tradeName         String?
+  cnae              String?
+  stateRegistration String?
+  businessActivity  String?
+  taxRegime         String?
+  address           String?
+  bankDetails       String?
+  modality          String?
+  registrationDate  DateTime?
+  userId            String?   @unique
+
+  chats            Chat[]
+  user             User?                   @relation("ClientLoginUser", fields: [userId], references: [id])
+  contacts         ClientContact[]
+  deletionRequests ClientDeletionRequest[]
+  documents        ClientDocument[]
   opportunities    Opportunity[]
   propostas        Proposta[]
   quotes           Quote[]
   tickets          Ticket[]
   timelineEvents   TimelineEvent[]
   trackings        Tracking[]
-  deletionRequests ClientDeletionRequest[]
-  chats            Chat[]
+
+  @@index([internalOwnerId])
+}
+
+model ClientDocument {
+  id           String   @id @default(uuid())
+  clientId     String
+  fileName     String
+  originalName String
+  mimeType     String?
+  size         Int?
+  url          String
+  description  String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  category     String?
+  updatedAt    DateTime @default(now())
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([uploadedById])
+  @@index([clientId, createdAt])
+}
+
+model ClientContact {
+  id        String   @id @default(uuid())
+  clientId  String
+  name      String?
+  role      String?
+  email     String?
+  phone     String?
+  notes     String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
 }

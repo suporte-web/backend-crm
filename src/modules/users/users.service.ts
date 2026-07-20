@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -35,40 +36,114 @@ export class UsersService {
     private readonly auditLogsService: AuditLogsService,
   ) { }
 
+  private parseOptionalDate(value?: string) {
+    if (!value) {
+      return undefined;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  private sanitizeClientContacts(dto: CreateUserDto) {
+    return (dto.contacts ?? [])
+      .map((contact) => ({
+        name: contact.name?.trim() || undefined,
+        role: contact.role?.trim() || undefined,
+        email: contact.email?.trim() || undefined,
+        phone: contact.phone?.trim() || undefined,
+        notes: contact.notes?.trim() || undefined,
+        isPrimary: contact.isPrimary ?? false,
+      }))
+      .filter(
+        (contact) =>
+          contact.name ||
+          contact.role ||
+          contact.email ||
+          contact.phone ||
+          contact.notes,
+      )
+      .map((contact, index) => ({
+        ...contact,
+        isPrimary: index === 0 ? true : contact.isPrimary,
+      }));
+  }
+
+  private createTechnicalClientEmail() {
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+    return `cliente-${suffix}@sem-acesso.pizzattolog.com`;
+  }
+
+  private createTechnicalClientPassword() {
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
+    return `Cliente@${suffix}1`;
+  }
+
   async create(dto: CreateUserDto, actor?: AuthUser) {
+    const isClient = dto.role === UserRole.CLIENTE;
+    const email = dto.email?.trim() || (isClient ? this.createTechnicalClientEmail() : undefined);
+    const password = dto.password || (isClient ? this.createTechnicalClientPassword() : undefined);
+
+    if (!email) {
+      throw new BadRequestException('Informe o e-mail do usuÃ¡rio.');
+    }
+
+    if (!password) {
+      throw new BadRequestException('Informe a senha do usuÃ¡rio.');
+    }
+
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (existingUser) {
       throw new BadRequestException('E-mail já está em uso.');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const contacts = this.sanitizeClientContacts(dto);
 
     const user = await this.prisma.user.create({
       data: {
         name: dto.name,
-        email: dto.email,
+        email,
         passwordHash,
         mustChangePassword: true,
         role: dto.role,
-        isActive: dto.isActive ?? true,
+        isActive: dto.isActive ?? (isClient ? false : true),
         clientProfile:
-          dto.role === UserRole.CLIENTE
+          isClient
             ? {
               create: {
                 document: dto.document,
                 phone: dto.phone,
                 companyName: dto.companyName,
+                legalName: dto.legalName,
+                tradeName: dto.tradeName,
+                cnae: dto.cnae,
+                stateRegistration: dto.stateRegistration,
+                businessActivity: dto.businessActivity,
+                taxRegime: dto.taxRegime,
+                address: dto.address,
+                bankDetails: dto.bankDetails,
+                modality: dto.modality,
+                registrationDate: this.parseOptionalDate(
+                  dto.registrationDate,
+                ),
                 segment: dto.segment,
                 status: dto.status ?? 'PENDENTE',
                 internalOwnerId: dto.internalOwnerId ?? actor?.sub,
+                contacts:
+                  contacts.length > 0
+                    ? {
+                        create: contacts,
+                      }
+                    : undefined,
                 timelineEvents: {
                   create: {
                     type: TimelineEventType.LEAD_CREATED,
-                    title: 'Lead criado',
-                    description: `Lead inicial criado para ${dto.companyName ?? dto.name}.`,
+                    title: 'Cliente criado',
+                    description: `Cadastro inicial criado para ${dto.companyName ?? dto.name}.`,
                     createdById: actor?.sub,
                   },
                 },
@@ -87,14 +162,25 @@ export class UsersService {
         clientProfile: {
           select: {
             id: true,
-            document: true,
-            phone: true,
-            companyName: true,
-            segment: true,
-            status: true,
-            createdAt: true,
+              document: true,
+              phone: true,
+              companyName: true,
+              legalName: true,
+              tradeName: true,
+              cnae: true,
+              stateRegistration: true,
+              businessActivity: true,
+              taxRegime: true,
+              address: true,
+              bankDetails: true,
+              modality: true,
+              registrationDate: true,
+              segment: true,
+              status: true,
+              createdAt: true,
             updatedAt: true,
             internalOwnerId: true,
+            contacts: true,
           },
         },
       },
@@ -103,7 +189,7 @@ export class UsersService {
     await this.auditLogsService.create({
       category: AuditLogCategory.USER,
       action: AuditLogAction.USER_CREATED,
-      message: `Usuario criado: ${user.name}.`,
+      message: `Usuário criado: ${user.name}.`,
       targetType: 'User',
       targetId: user.id,
       userId: actor?.sub,
@@ -137,6 +223,16 @@ export class UsersService {
               document: true,
               phone: true,
               companyName: true,
+              legalName: true,
+              tradeName: true,
+              cnae: true,
+              stateRegistration: true,
+              businessActivity: true,
+              taxRegime: true,
+              address: true,
+              bankDetails: true,
+              modality: true,
+              registrationDate: true,
               segment: true,
               status: true,
               internalOwnerId: true,
@@ -176,12 +272,22 @@ export class UsersService {
         clientProfile: {
           select: {
             id: true,
-            document: true,
-            phone: true,
-            companyName: true,
-            segment: true,
-            status: true,
-            internalOwnerId: true,
+              document: true,
+              phone: true,
+              companyName: true,
+              legalName: true,
+              tradeName: true,
+              cnae: true,
+              stateRegistration: true,
+              businessActivity: true,
+              taxRegime: true,
+              address: true,
+              bankDetails: true,
+              modality: true,
+              registrationDate: true,
+              segment: true,
+              status: true,
+              internalOwnerId: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -390,6 +496,18 @@ export class UsersService {
                 document: dto.document,
                 phone: dto.phone,
                 companyName: dto.companyName,
+                legalName: dto.legalName,
+                tradeName: dto.tradeName,
+                cnae: dto.cnae,
+                stateRegistration: dto.stateRegistration,
+                businessActivity: dto.businessActivity,
+                taxRegime: dto.taxRegime,
+                address: dto.address,
+                bankDetails: dto.bankDetails,
+                modality: dto.modality,
+                registrationDate: this.parseOptionalDate(
+                  dto.registrationDate,
+                ),
                 segment: dto.segment,
                 status: dto.status,
                 internalOwnerId: dto.internalOwnerId,
@@ -398,6 +516,18 @@ export class UsersService {
                 document: dto.document,
                 phone: dto.phone,
                 companyName: dto.companyName,
+                legalName: dto.legalName,
+                tradeName: dto.tradeName,
+                cnae: dto.cnae,
+                stateRegistration: dto.stateRegistration,
+                businessActivity: dto.businessActivity,
+                taxRegime: dto.taxRegime,
+                address: dto.address,
+                bankDetails: dto.bankDetails,
+                modality: dto.modality,
+                registrationDate: this.parseOptionalDate(
+                  dto.registrationDate,
+                ),
                 segment: dto.segment,
                 status: dto.status,
                 internalOwnerId: dto.internalOwnerId,
@@ -421,6 +551,16 @@ export class UsersService {
             document: true,
             phone: true,
             companyName: true,
+            legalName: true,
+            tradeName: true,
+            cnae: true,
+            stateRegistration: true,
+            businessActivity: true,
+            taxRegime: true,
+            address: true,
+            bankDetails: true,
+            modality: true,
+            registrationDate: true,
             segment: true,
             status: true,
             internalOwnerId: true,
@@ -434,7 +574,7 @@ export class UsersService {
     await this.auditLogsService.create({
       category: AuditLogCategory.USER,
       action: AuditLogAction.USER_UPDATED,
-      message: `Usuario atualizado: ${updatedUser.name}.`,
+      message: `Usuário atualizado: ${updatedUser.name}.`,
       targetType: 'User',
       targetId: updatedUser.id,
       userId: actor?.sub,
@@ -548,7 +688,7 @@ export class UsersService {
     await this.auditLogsService.create({
       category: AuditLogCategory.USER,
       action: AuditLogAction.USER_DELETED,
-      message: `Usuario removido: ${existingUser.email}.`,
+      message: `Usuário removido: ${existingUser.email}.`,
       targetType: 'User',
       targetId: id,
       userId: actor?.sub,

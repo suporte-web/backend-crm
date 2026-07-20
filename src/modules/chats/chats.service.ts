@@ -464,7 +464,11 @@ export class ChatsService {
         entityType,
         entityId,
         clientId: client.id,
-        title: title ?? client.companyName ?? client.user.name,
+        title:
+          title ??
+          client.companyName ??
+          client.user?.name ??
+          'Conversa com cliente',
         defaultParticipants: this.uniqueParticipants(
           [
             { userId: user.sub },

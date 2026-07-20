@@ -11,13 +11,13 @@ model Chat {
   createdById  String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
-  participants ChatParticipant[]
-  messages     ChatMessage[]
   client       Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   lead         Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
   proposta     Proposta?         @relation(fields: [propostaId], references: [id], onDelete: Cascade)
   quote        Quote?            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   ticket       Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+  participants ChatParticipant[]
 
   @@unique([entityType, entityId])
   @@index([clientId])

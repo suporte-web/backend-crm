@@ -242,7 +242,9 @@ export class QuotesService {
           requiresActionRole: UserRole.COMERCIAL,
           lastInteractionAt: new Date(),
           subject: `Nova cotacao: ${dto.serviceType}`,
-          description: `Cliente ${client.companyName ?? client.user.name} enviou cotacao de ${dto.origin} para ${dto.destination}.`,
+          description: `Cliente ${
+            client.companyName ?? client.user?.name ?? 'Cliente sem nome'
+          } enviou cotacao de ${dto.origin} para ${dto.destination}.`,
           messages: {
             create: {
               senderType: MessageSenderType.CLIENTE,
@@ -286,7 +288,9 @@ export class QuotesService {
             'Nova cotação recebida. Acesse o ticket para iniciar o atendimento.',
           actorId: user?.sub ?? client.userId,
           emailSubject: 'Nova cotação recebida no CRM',
-          emailSummary: `${client.companyName ?? client.user.name} - ${dto.serviceType}`,
+          emailSummary: `${
+            client.companyName ?? client.user?.name ?? 'Cliente sem nome'
+          } - ${dto.serviceType}`,
         },
         tx,
       );
@@ -297,7 +301,9 @@ export class QuotesService {
     await this.auditLogsService.create({
       category: AuditLogCategory.QUOTE,
       action: AuditLogAction.QUOTE_CREATED,
-      message: `Cotação criada para ${client.companyName ?? client.user.name}.`,
+      message: `Cotação criada para ${
+        client.companyName ?? client.user?.name ?? 'Cliente sem nome'
+      }.`,
       targetType: 'Quote',
       targetId: quote.id,
       userId: user?.sub ?? client.userId,

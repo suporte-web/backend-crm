@@ -34,6 +34,7 @@ async function bootstrap() {
   const portalContentUploadsDir = join(uploadsDir, 'portal-content');
   const leadImportsDir = join(uploadsDir, 'lead-imports');
   const propostasUploadsDir = join(uploadsDir, 'propostas');
+  const clientDocumentsUploadsDir = join(uploadsDir, 'client-documents');
 
   if (!existsSync(portalContentUploadsDir)) {
     mkdirSync(portalContentUploadsDir, { recursive: true });
@@ -45,6 +46,10 @@ async function bootstrap() {
 
   if (!existsSync(propostasUploadsDir)) {
     mkdirSync(propostasUploadsDir, { recursive: true });
+  }
+
+  if (!existsSync(clientDocumentsUploadsDir)) {
+    mkdirSync(clientDocumentsUploadsDir, { recursive: true });
   }
 
   const allowedOrigins = buildAllowedOrigins();

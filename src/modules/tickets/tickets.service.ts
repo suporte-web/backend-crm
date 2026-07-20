@@ -42,12 +42,15 @@ type TicketFilters = {
 
 type TicketNotificationTarget = {
   id: string;
-  subject: string;
+
   assignedToId?: string | null;
+
   internalOnly?: boolean | null;
+
   client?: {
-    userId: string;
+    userId: string | null;
     companyName?: string | null;
+
     user?: {
       name: string;
       email: string;
@@ -420,9 +423,14 @@ export class TicketsService {
   }
 
   private assertTicketAccess(
-    user: { sub: string; role: string },
+    user: {
+      sub: string;
+      role: string;
+    },
     ticket: {
-      client?: { userId: string } | null;
+      client?: {
+        userId: string | null;
+      } | null;
       internalOnly?: boolean | null;
     },
   ) {

@@ -10,8 +10,8 @@ model HelpCenterArticle {
   updatedById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdBy   User?    @relation("HelpCenterArticleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy   User?    @relation("HelpCenterArticleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdBy   User?    @relation("HelpCenterArticleCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User?    @relation("HelpCenterArticleUpdatedBy", fields: [updatedById], references: [id])
 
   @@index([active, category])
   @@index([createdAt])
