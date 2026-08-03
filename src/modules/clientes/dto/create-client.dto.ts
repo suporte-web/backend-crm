@@ -15,7 +15,15 @@ export class CreateClientContactDto {
 
   @IsOptional()
   @IsString()
+  nomeContato?: string;
+
+  @IsOptional()
+  @IsString()
   role?: string;
+
+  @IsOptional()
+  @IsString()
+  cargo?: string;
 
   @IsOptional()
   @IsEmail()
@@ -24,6 +32,18 @@ export class CreateClientContactDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  telefone?: string;
+
+  @IsOptional()
+  @IsString()
+  whatsapp?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedin?: string;
 
   @IsOptional()
   @IsString()
@@ -81,6 +101,10 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
   bankDetails?: string;
 
   @IsOptional()
@@ -90,6 +114,38 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   registrationDate?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentTerm?: string;
+
+  @IsOptional()
+  @IsString()
+  contractValidity?: string;
+
+  @IsOptional()
+  @IsString()
+  priceAdjustment?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceContactName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  invoiceContactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceContactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  commercialTermsNotes?: string;
 
   @IsOptional()
   @IsString()

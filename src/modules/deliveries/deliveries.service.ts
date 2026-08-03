@@ -123,13 +123,25 @@ export class DeliveriesService {
     );
   }
 
+  // log cnpj pagador
   async findPayers(filters: QueryDeliveriesDto) {
     const query = buildDeliveryPayersQuery(filters);
 
-    return this.postgresDeliveriesService.query<PayerRow>(
+    // console.log('==============================');
+    // console.log('FILTROS DOS PAGADORES:', filters);
+    // console.log('VALORES DOS PAGADORES:', query.values);
+    // console.log('SQL DOS PAGADORES:', query.text);
+
+    const result = await this.postgresDeliveriesService.query<PayerRow>(
       query.text,
       query.values,
     );
+
+    // console.log('TOTAL DE PAGADORES:', result.length);
+    // console.log('PAGADORES RETORNADOS:', result);
+    // console.log('==============================');
+
+    return result;
   }
 
   async findOccurrences(filters: QueryDeliveriesDto) {

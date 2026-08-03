@@ -10,6 +10,7 @@ type FilterOptions = {
   includeUf?: boolean;
   includeCnpjPagador?: boolean;
   includeOcorrencia?: boolean;
+  includeDefaultDateRange?: boolean;
 };
 
 function getBaseSelect() {
@@ -155,6 +156,7 @@ function buildOptionalFilters(
   const includeUf = options.includeUf ?? true;
   const includeCnpjPagador = options.includeCnpjPagador ?? true;
   const includeOcorrencia = options.includeOcorrencia ?? true;
+  const includeDefaultDateRange = options.includeDefaultDateRange ?? true;
 
   if (clientDocument !== undefined) {
     values.push(clientDocument);
@@ -168,7 +170,7 @@ function buildOptionalFilters(
   let dataFim = firstFilled(filters.dataFim, filters.dataFinal);
   const dataRef = firstFilled(filters.dataRef, filters.data);
 
-  if (!dataInicio && !dataFim && !dataRef) {
+  if (includeDefaultDateRange && !dataInicio && !dataFim && !dataRef) {
     const defaultRange = getDefaultDateRange();
 
     dataInicio = defaultRange.dataInicio;
@@ -373,7 +375,9 @@ export function buildDeliveriesSummaryQuery(
   };
 }
 
-export function buildDeliveryCitiesQuery(filters: QueryDeliveriesDto): SqlQuery {
+export function buildDeliveryCitiesQuery(
+  filters: QueryDeliveriesDto,
+): SqlQuery {
   const optionalFilters = buildOptionalFilters(filters, 1, undefined, {
     includeCity: false,
   });
@@ -394,7 +398,9 @@ export function buildDeliveryCitiesQuery(filters: QueryDeliveriesDto): SqlQuery 
   };
 }
 
-export function buildDeliveryRegionsQuery(filters: QueryDeliveriesDto): SqlQuery {
+export function buildDeliveryRegionsQuery(
+  filters: QueryDeliveriesDto,
+): SqlQuery {
   const optionalFilters = buildOptionalFilters(filters, 1, undefined, {
     includeUf: false,
   });
@@ -415,9 +421,12 @@ export function buildDeliveryRegionsQuery(filters: QueryDeliveriesDto): SqlQuery
   };
 }
 
-export function buildDeliveryPayersQuery(filters: QueryDeliveriesDto): SqlQuery {
+export function buildDeliveryPayersQuery(
+  filters: QueryDeliveriesDto,
+): SqlQuery {
   const optionalFilters = buildOptionalFilters(filters, 1, undefined, {
     includeCnpjPagador: false,
+    includeDefaultDateRange: false,
   });
 
   return {

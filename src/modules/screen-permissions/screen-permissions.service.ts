@@ -24,6 +24,10 @@ export class ScreenPermissionsService {
       role: UserRole.COMERCIAL,
       permissions: [],
     },
+    {
+      role: UserRole.OPERACAO,
+      permissions: [],
+    },
   ];
 
   findAll() {

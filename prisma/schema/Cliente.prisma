@@ -1,25 +1,34 @@
 model Client {
-  id                String    @id @default(uuid())
-  document          String?   @unique
-  phone             String?
-  companyName       String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  internalOwnerId   String?
-  notes             String?
-  segment           String?
-  status            String?
-  legalName         String?
-  tradeName         String?
-  cnae              String?
-  stateRegistration String?
-  businessActivity  String?
-  taxRegime         String?
-  address           String?
-  bankDetails       String?
-  modality          String?
-  registrationDate  DateTime?
-  userId            String?   @unique
+  id                   String    @id @default(uuid())
+  document             String?   @unique
+  phone                String?
+  companyName          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  internalOwnerId      String?
+  notes                String?
+  segment              String?
+  status               String?
+  legalName            String?
+  tradeName            String?
+  cnae                 String?
+  stateRegistration    String?
+  businessActivity     String?
+  taxRegime            String?
+  address              String?
+  city                 String?
+  bankDetails          String?
+  modality             String?
+  registrationDate     DateTime?
+  paymentMethod        String?
+  paymentTerm          String?
+  contractValidity     String?
+  priceAdjustment      String?
+  invoiceContactName   String?
+  invoiceContactEmail  String?
+  invoiceContactPhone  String?
+  commercialTermsNotes String?
+  userId               String?   @unique
 
   chats            Chat[]
   user             User?                   @relation("ClientLoginUser", fields: [userId], references: [id])

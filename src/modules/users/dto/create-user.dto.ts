@@ -99,6 +99,10 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
   bankDetails?: string;
 
   @IsOptional()
@@ -108,6 +112,38 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   registrationDate?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentTerm?: string;
+
+  @IsOptional()
+  @IsString()
+  contractValidity?: string;
+
+  @IsOptional()
+  @IsString()
+  priceAdjustment?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceContactName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  invoiceContactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceContactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  commercialTermsNotes?: string;
 
   @IsOptional()
   @IsString()

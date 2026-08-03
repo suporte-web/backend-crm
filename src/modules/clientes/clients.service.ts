@@ -18,6 +18,9 @@ import {
   TimelineEventType,
   UserRole,
 } from '@prisma/client';
+import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
@@ -31,6 +34,7 @@ import { CreateTimelineNoteDto } from './dto/create-timeline-note.dto';
 import { DecideClientDeletionDto } from './dto/decide-client-deletion.dto';
 import { RequestClientDeletionDto } from './dto/request-client-deletion.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { DeleteClientDocumentDto } from './dto/delete-client-document.dto';
 
 type UploadedClientDocumentFile = {
   filename: string;
@@ -95,6 +99,39 @@ export class ClientsService {
         ...contact,
         isPrimary: index === 0 ? true : contact.isPrimary,
       }));
+  }
+
+  private buildContactNotes(contact: CreateClientContactDto) {
+    const notes = this.sanitize(contact.notes);
+    const whatsapp = this.sanitize(contact.whatsapp);
+    const linkedin = this.sanitize(contact.linkedin);
+    const extraNotes = [
+      whatsapp ? `WhatsApp: ${whatsapp}` : null,
+      linkedin ? `LinkedIn: ${linkedin}` : null,
+    ].filter(Boolean);
+
+    return [notes, ...extraNotes].filter(Boolean).join('\n') || null;
+  }
+
+  private sanitizeClientContact(contact: CreateClientContactDto) {
+    const name = this.sanitize(contact.name ?? contact.nomeContato);
+    const role = this.sanitize(contact.role ?? contact.cargo);
+    const email = this.sanitize(contact.email);
+    const phone = this.sanitize(contact.phone ?? contact.telefone);
+    const notes = this.buildContactNotes(contact);
+
+    if (!name && !role && !email && !phone && !notes) {
+      throw new BadRequestException('Informe os dados do contato.');
+    }
+
+    return {
+      name,
+      role,
+      email,
+      phone,
+      notes,
+      isPrimary: contact.isPrimary ?? false,
+    };
   }
 
   private parseOptionalDate(value?: string | null) {
@@ -362,9 +399,22 @@ export class ClientsService {
           businessActivity: this.sanitize(dto.businessActivity) ?? undefined,
           taxRegime: this.sanitize(dto.taxRegime) ?? undefined,
           address: this.sanitize(dto.address) ?? undefined,
+          city: this.sanitize(dto.city) ?? undefined,
           bankDetails: this.sanitize(dto.bankDetails) ?? undefined,
           modality: this.sanitize(dto.modality) ?? undefined,
           registrationDate: this.sanitize(dto.registrationDate) ?? undefined,
+          paymentMethod: this.sanitize(dto.paymentMethod) ?? undefined,
+          paymentTerm: this.sanitize(dto.paymentTerm) ?? undefined,
+          contractValidity: this.sanitize(dto.contractValidity) ?? undefined,
+          priceAdjustment: this.sanitize(dto.priceAdjustment) ?? undefined,
+          invoiceContactName:
+            this.sanitize(dto.invoiceContactName) ?? undefined,
+          invoiceContactEmail:
+            this.sanitize(dto.invoiceContactEmail) ?? undefined,
+          invoiceContactPhone:
+            this.sanitize(dto.invoiceContactPhone) ?? undefined,
+          commercialTermsNotes:
+            this.sanitize(dto.commercialTermsNotes) ?? undefined,
           segment: this.sanitize(dto.segment) ?? undefined,
           status: this.sanitize(dto.status) ?? 'PENDENTE',
           internalOwnerId: this.sanitize(dto.internalOwnerId) ?? user.sub,
@@ -564,9 +614,18 @@ export class ClientsService {
         businessActivity: client.businessActivity,
         taxRegime: client.taxRegime,
         address: client.address,
+        city: client.city,
         bankDetails: client.bankDetails,
         modality: client.modality,
         registrationDate: client.registrationDate,
+        paymentMethod: client.paymentMethod,
+        paymentTerm: client.paymentTerm,
+        contractValidity: client.contractValidity,
+        priceAdjustment: client.priceAdjustment,
+        invoiceContactName: client.invoiceContactName,
+        invoiceContactEmail: client.invoiceContactEmail,
+        invoiceContactPhone: client.invoiceContactPhone,
+        commercialTermsNotes: client.commercialTermsNotes,
         segment: client.segment,
         notes: client.notes,
         status: client.status,
@@ -632,9 +691,18 @@ export class ClientsService {
         businessActivity: client.businessActivity,
         taxRegime: client.taxRegime,
         address: client.address,
+        city: client.city,
         bankDetails: client.bankDetails,
         modality: client.modality,
         registrationDate: client.registrationDate,
+        paymentMethod: client.paymentMethod,
+        paymentTerm: client.paymentTerm,
+        contractValidity: client.contractValidity,
+        priceAdjustment: client.priceAdjustment,
+        invoiceContactName: client.invoiceContactName,
+        invoiceContactEmail: client.invoiceContactEmail,
+        invoiceContactPhone: client.invoiceContactPhone,
+        commercialTermsNotes: client.commercialTermsNotes,
         segment: client.segment,
         notes: client.notes,
         status: client.status,
@@ -682,14 +750,199 @@ export class ClientsService {
     return this.buildCombinedTimeline(client);
   }
 
+  async createContact(
+    user: AuthUser,
+    clientId: string,
+    dto: CreateClientContactDto,
+  ) {
+    this.ensureInternalUser(user);
+    const client = await this.getClientOrFail(clientId);
+    const contactData = this.sanitizeClientContact(dto);
+    const hasContacts = client.contacts.length > 0;
+
+    const contact = await this.prisma.clientContact.create({
+      data: {
+        clientId,
+        ...contactData,
+        isPrimary: !hasContacts || contactData.isPrimary,
+      },
+    });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        clientId,
+        type: TimelineEventType.NOTE_ADDED,
+        title: 'Contato cadastrado',
+        description: `${contact.name ?? 'Contato'} foi adicionado ao cadastro do cliente.`,
+        createdById: user.sub,
+        metadata: {
+          contactId: contact.id,
+        },
+      },
+    });
+
+    return { contact };
+  }
+
+  async updateContact(
+    user: AuthUser,
+    clientId: string,
+    contactId: string,
+    dto: CreateClientContactDto,
+  ) {
+    this.ensureInternalUser(user);
+    await this.getClientOrFail(clientId);
+
+    const existingContact = await this.prisma.clientContact.findFirst({
+      where: {
+        id: contactId,
+        clientId,
+      },
+    });
+
+    if (!existingContact) {
+      throw new NotFoundException('Contato nao encontrado.');
+    }
+
+    const contactData = this.sanitizeClientContact(dto);
+    const contact = await this.prisma.clientContact.update({
+      where: {
+        id: contactId,
+      },
+      data: contactData,
+    });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        clientId,
+        type: TimelineEventType.LEAD_UPDATED,
+        title: 'Contato atualizado',
+        description: `${contact.name ?? 'Contato'} foi atualizado no cadastro do cliente.`,
+        createdById: user.sub,
+        metadata: {
+          contactId: contact.id,
+        },
+      },
+    });
+
+    return { contact };
+  }
+
+  async deleteContact(user: AuthUser, clientId: string, contactId: string) {
+    this.ensureInternalUser(user);
+    await this.getClientOrFail(clientId);
+
+    const contact = await this.prisma.clientContact.findFirst({
+      where: {
+        id: contactId,
+        clientId,
+      },
+    });
+
+    if (!contact) {
+      throw new NotFoundException('Contato nao encontrado.');
+    }
+
+    await this.prisma.clientContact.delete({
+      where: {
+        id: contact.id,
+      },
+    });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        clientId,
+        type: TimelineEventType.NOTE_ADDED,
+        title: 'Contato removido',
+        description: `${contact.name ?? 'Contato'} foi removido do cadastro do cliente.`,
+        createdById: user.sub,
+        metadata: {
+          contactId: contact.id,
+        },
+      },
+    });
+
+    return { message: 'Contato removido com sucesso.' };
+  }
+
   async createDocument(
     user: AuthUser,
     id: string,
     file: UploadedClientDocumentFile,
     description?: string,
+    category?: string,
+  ) {
+    const document = await this.createDocuments(
+      user,
+      id,
+      [file],
+      description,
+      category,
+    );
+    return Array.isArray(document) ? document[0] : document;
+  }
+
+  async createDocuments(
+    user: AuthUser,
+    id: string,
+    files: UploadedClientDocumentFile[],
+    description?: string,
+    category?: string,
   ) {
     this.ensureInternalUser(user);
     await this.getClientOrFail(id);
+
+    if (files.length !== 1) {
+      if (!files.length) {
+        throw new BadRequestException('Arquivo não enviado.');
+      }
+
+      if (files.some((currentFile) => !currentFile?.filename)) {
+        throw new BadRequestException(
+          'Um dos arquivos não foi salvo corretamente no servidor.',
+        );
+      }
+
+      const sanitizedDescription = this.sanitize(description);
+      const sanitizedCategory = this.sanitize(category);
+      const documents = [];
+
+      for (const currentFile of files) {
+        const document = await this.prisma.clientDocument.create({
+          data: {
+            clientId: id,
+            fileName: currentFile.filename,
+            originalName: currentFile.originalname,
+            mimeType: currentFile.mimetype,
+            size: currentFile.size,
+            url: `/uploads/client-documents/${currentFile.filename}`,
+            description: sanitizedDescription,
+            category: sanitizedCategory,
+            uploadedById: user.sub,
+          },
+        });
+
+        await this.prisma.timelineEvent.create({
+          data: {
+            clientId: id,
+            type: TimelineEventType.NOTE_ADDED,
+            title: 'Documento anexado',
+            description: `${currentFile.originalname} foi anexado ao cadastro do cliente.`,
+            createdById: user.sub,
+            metadata: {
+              documentId: document.id,
+              fileName: document.originalName,
+            },
+          },
+        });
+
+        documents.push(document);
+      }
+
+      return documents;
+    }
+
+    const file = files[0];
 
     if (!file?.filename) {
       throw new BadRequestException(
@@ -706,6 +959,7 @@ export class ClientsService {
         size: file.size,
         url: `/uploads/client-documents/${file.filename}`,
         description: this.sanitize(description),
+        category: this.sanitize(category),
         uploadedById: user.sub,
       },
     });
@@ -725,6 +979,148 @@ export class ClientsService {
     });
 
     return document;
+  }
+
+  async getDocumentDownload(user: AuthUser, id: string, documentId: string) {
+    this.ensureInternalUser(user);
+    await this.getClientOrFail(id);
+
+    const document = await this.prisma.clientDocument.findFirst({
+      where: {
+        id: documentId,
+        clientId: id,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+
+    const filePath = join(
+      process.cwd(),
+      'uploads',
+      'client-documents',
+      document.fileName,
+    );
+
+    if (!existsSync(filePath)) {
+      throw new NotFoundException('Arquivo não encontrado no servidor.');
+    }
+
+    return {
+      filePath,
+      originalName: document.originalName || document.fileName,
+      mimeType: document.mimeType || 'application/octet-stream',
+    };
+  }
+
+  async deleteDocument(
+    user: AuthUser,
+    clientId: string,
+    documentId: string,
+    dto: DeleteClientDocumentDto,
+  ) {
+    this.ensureInternalUser(user);
+
+    // Confirma que o cliente existe.
+    await this.getClientOrFail(clientId);
+
+    const justification = this.sanitize(dto.justification);
+
+    if (!justification) {
+      throw new BadRequestException(
+        'A justificativa da exclusão é obrigatória.',
+      );
+    }
+
+    // Busca o documento e garante que ele pertence ao cliente informado.
+    const document = await this.prisma.clientDocument.findFirst({
+      where: {
+        id: documentId,
+        clientId,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Documento não encontrado.');
+    }
+
+    const filePath = join(
+      process.cwd(),
+      'uploads',
+      'client-documents',
+      document.fileName,
+    );
+
+    /*
+     * Primeiro registramos a exclusão no banco e no histórico.
+     * As duas operações ficam dentro da mesma transação.
+     */
+    await this.prisma.$transaction(async (tx) => {
+      await tx.clientDocument.delete({
+        where: {
+          id: document.id,
+        },
+      });
+
+      await tx.timelineEvent.create({
+        data: {
+          clientId,
+          type: TimelineEventType.NOTE_ADDED,
+          title: 'Documento excluído',
+          description:
+            `O documento "${document.originalName}" foi excluído. ` +
+            `Justificativa: ${justification}`,
+          createdById: user.sub,
+          metadata: {
+            documentId: document.id,
+            fileName: document.fileName,
+            originalName: document.originalName,
+            justification,
+            deletedById: user.sub,
+            deletedAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    /*
+     * Depois de remover o registro, apaga o arquivo físico da VM.
+     * ENOENT significa que o arquivo já não existia no disco.
+     */
+    try {
+      await unlink(filePath);
+    } catch (error) {
+      const fileError = error as NodeJS.ErrnoException;
+
+      if (fileError.code !== 'ENOENT') {
+        console.error(
+          'Erro ao remover arquivo físico do documento:',
+          fileError,
+        );
+      }
+    }
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.CUSTOM,
+      message: `Documento excluído do cliente: ${document.originalName}.`,
+      targetType: 'ClientDocument',
+      targetId: document.id,
+      userId: user.sub,
+      details: {
+        clientId,
+        documentId: document.id,
+        fileName: document.fileName,
+        originalName: document.originalName,
+        justification,
+      },
+    });
+
+    return {
+      message: 'Documento excluído com sucesso.',
+      documentId: document.id,
+    };
   }
 
   async createTimelineNote(
@@ -972,6 +1368,38 @@ export class ClientsService {
         ? 'modalidade'
         : null,
       dto.registrationDate !== undefined ? 'data do cadastro' : null,
+      dto.paymentMethod !== undefined &&
+      dto.paymentMethod !== existingClient.paymentMethod
+        ? 'forma de pagamento'
+        : null,
+      dto.paymentTerm !== undefined &&
+      dto.paymentTerm !== existingClient.paymentTerm
+        ? 'prazo de pagamento'
+        : null,
+      dto.contractValidity !== undefined &&
+      dto.contractValidity !== existingClient.contractValidity
+        ? 'vigencia'
+        : null,
+      dto.priceAdjustment !== undefined &&
+      dto.priceAdjustment !== existingClient.priceAdjustment
+        ? 'reajuste'
+        : null,
+      dto.invoiceContactName !== undefined &&
+      dto.invoiceContactName !== existingClient.invoiceContactName
+        ? 'contato de faturamento'
+        : null,
+      dto.invoiceContactEmail !== undefined &&
+      dto.invoiceContactEmail !== existingClient.invoiceContactEmail
+        ? 'e-mail de faturamento'
+        : null,
+      dto.invoiceContactPhone !== undefined &&
+      dto.invoiceContactPhone !== existingClient.invoiceContactPhone
+        ? 'telefone de faturamento'
+        : null,
+      dto.commercialTermsNotes !== undefined &&
+      dto.commercialTermsNotes !== existingClient.commercialTermsNotes
+        ? 'observacoes comerciais'
+        : null,
       dto.segment !== undefined && dto.segment !== existingClient.segment
         ? 'segmento'
         : null,
@@ -1014,9 +1442,18 @@ export class ClientsService {
           businessActivity: dto.businessActivity,
           taxRegime: dto.taxRegime,
           address: dto.address,
+          city: dto.city,
           bankDetails: dto.bankDetails,
           modality: dto.modality,
           registrationDate: this.parseOptionalDate(dto.registrationDate),
+          paymentMethod: dto.paymentMethod,
+          paymentTerm: dto.paymentTerm,
+          contractValidity: dto.contractValidity,
+          priceAdjustment: dto.priceAdjustment,
+          invoiceContactName: dto.invoiceContactName,
+          invoiceContactEmail: dto.invoiceContactEmail,
+          invoiceContactPhone: dto.invoiceContactPhone,
+          commercialTermsNotes: dto.commercialTermsNotes,
           segment: dto.segment,
           notes: dto.notes,
           status: dto.status,
@@ -1173,19 +1610,21 @@ export class ClientsService {
       );
     }
 
-    if (!client.user) {
-      throw new BadRequestException(
-        'Este cliente não possui um usuário de acesso vinculado.',
-      );
-    }
+    const clientName =
+      client.companyName ??
+      client.tradeName ??
+      client.legalName ??
+      client.user?.name ??
+      client.document ??
+      'Cliente sem nome';
 
     const request = await this.prisma.clientDeletionRequest.create({
       data: {
         clientId: client.id,
         requestedById: user.sub,
         reason: this.sanitize(dto.reason),
-        clientNameSnapshot: client.companyName ?? client.user.name,
-        clientEmailSnapshot: client.user.email,
+        clientNameSnapshot: clientName,
+        clientEmailSnapshot: client.user?.email,
       },
       include: {
         client: {
@@ -1229,15 +1668,13 @@ export class ClientsService {
     await this.auditLogsService.create({
       category: AuditLogCategory.CLIENT,
       action: AuditLogAction.CUSTOM,
-      message: `Solicitacao de exclusao criada para ${
-        client.companyName ?? client.user.name
-      }.`,
+      message: `Solicitacao de exclusao criada para ${clientName}.`,
       targetType: 'ClientDeletionRequest',
       targetId: request.id,
       userId: user.sub,
       details: {
         clientId: client.id,
-        clientName: client.companyName ?? client.user.name,
+        clientName,
       },
     });
 
@@ -1245,9 +1682,7 @@ export class ClientsService {
       [UserRole.ADMIN, UserRole.GESTAO],
       {
         title: 'Solicitação de exclusão de cliente',
-        message: `${
-          client.companyName ?? client.user.name
-        } foi enviado para aprovação de exclusao.`,
+        message: `${clientName} foi enviado para aprovação de exclusao.`,
         link: '/clients',
         actorId: user.sub,
         metadata: {
@@ -1381,16 +1816,23 @@ export class ClientsService {
       };
     }
 
-    if (!request.client || !request.client.user) {
+    if (!request.client) {
       throw new BadRequestException(
         'O cliente vinculado a esta solicitação não está mais disponível.',
       );
     }
 
     const targetClientId = request.client.id;
-    const targetUserId = request.client.user.id;
-    const targetName = request.client.companyName ?? request.client.user.name;
-    const targetEmail = request.client.user.email;
+    const targetUserId = request.client.user?.id;
+    const targetName =
+      request.client.companyName ??
+      request.client.tradeName ??
+      request.client.legalName ??
+      request.client.user?.name ??
+      request.client.document ??
+      request.clientNameSnapshot ??
+      'Cliente sem nome';
+    const targetEmail = request.client.user?.email ?? null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.clientDeletionRequest.update({
@@ -1408,9 +1850,11 @@ export class ClientsService {
         where: { id: targetClientId },
       });
 
-      await tx.user.delete({
-        where: { id: targetUserId },
-      });
+      if (targetUserId) {
+        await tx.user.delete({
+          where: { id: targetUserId },
+        });
+      }
     });
 
     await this.auditLogsService.create({
@@ -1427,18 +1871,20 @@ export class ClientsService {
       },
     });
 
-    await this.auditLogsService.create({
-      category: AuditLogCategory.USER,
-      action: AuditLogAction.USER_DELETED,
-      message: `Usuário removido apos aprovação da Gestão: ${targetEmail}.`,
-      targetType: 'User',
-      targetId: targetUserId,
-      userId: user.sub,
-      details: {
-        clientId: targetClientId,
-        clientName: targetName,
-      },
-    });
+    if (targetUserId && targetEmail) {
+      await this.auditLogsService.create({
+        category: AuditLogCategory.USER,
+        action: AuditLogAction.USER_DELETED,
+        message: `Usuário removido apos aprovação da Gestão: ${targetEmail}.`,
+        targetType: 'User',
+        targetId: targetUserId,
+        userId: user.sub,
+        details: {
+          clientId: targetClientId,
+          clientName: targetName,
+        },
+      });
+    }
 
     await this.notificationsService.notifyUsers([request.requestedBy.id], {
       title: 'Cliente excluído',
@@ -1462,5 +1908,33 @@ export class ClientsService {
         decidedAt: now,
       },
     };
+  }
+
+  async updateOpportunityStatus(
+    clientId: string,
+    opportunityId: string,
+    status: 'OPEN' | 'WON' | 'LOST',
+  ) {
+    const opportunity = await this.prisma.opportunity.findFirst({
+      where: {
+        id: opportunityId,
+        clientId,
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException(
+        'Oportunidade não encontrada para este cliente.',
+      );
+    }
+
+    return this.prisma.opportunity.update({
+      where: {
+        id: opportunityId,
+      },
+      data: {
+        status,
+      },
+    });
   }
 }

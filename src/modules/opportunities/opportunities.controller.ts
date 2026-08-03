@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -75,5 +76,14 @@ export class OpportunitiesController {
     }
 
     return this.opportunitiesService.update(user, id, dto);
+  }
+
+  @Delete(':id')
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Id da oportunidade e obrigatÃ³rio.');
+    }
+
+    return this.opportunitiesService.remove(user, id);
   }
 }

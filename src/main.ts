@@ -70,6 +70,7 @@ async function bootstrap() {
   });
 
   app.use('/uploads', express.static(uploadsDir));
+  app.use('/api/uploads', express.static(uploadsDir));
 
   app.setGlobalPrefix('api');
 

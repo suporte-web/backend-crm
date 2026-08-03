@@ -2,6 +2,7 @@ export enum UserRole {
   ADMIN = 'ADMIN',
   GESTAO = 'GESTAO',
   COMERCIAL = 'COMERCIAL',
+  OPERACAO = 'OPERACAO',
   MARKETING = 'MARKETING',
   CLIENTE = 'CLIENTE',
 }

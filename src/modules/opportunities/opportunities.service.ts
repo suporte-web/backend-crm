@@ -543,4 +543,60 @@ export class OpportunitiesService {
 
     return updatedOpportunity;
   }
+
+  async remove(user: AuthUser, id: string) {
+    this.ensureInternalUser(user);
+
+    const opportunity = await this.prisma.opportunity.findUnique({
+      where: { id },
+      include: {
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException('Oportunidade nÃ£o encontrada.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.timelineEvent.create({
+        data: {
+          clientId: opportunity.clientId,
+          type: TimelineEventType.NOTE_ADDED,
+          title: 'Oportunidade excluida',
+          description: `Oportunidade excluida: ${opportunity.title}.`,
+          createdById: user.sub,
+          metadata: {
+            opportunityId: id,
+            title: opportunity.title,
+          },
+        },
+      });
+
+      await tx.opportunity.delete({
+        where: { id },
+      });
+    });
+
+    await this.auditLogsService.create({
+      category: AuditLogCategory.CLIENT,
+      action: AuditLogAction.CUSTOM,
+      message: `Oportunidade excluida: ${opportunity.title}.`,
+      targetType: 'Opportunity',
+      targetId: id,
+      userId: user.sub,
+      details: {
+        clientId: opportunity.clientId,
+        title: opportunity.title,
+        stage: opportunity.stage,
+        status: opportunity.status,
+      },
+    });
+
+    return { message: 'Oportunidade excluida com sucesso.' };
+  }
 }
