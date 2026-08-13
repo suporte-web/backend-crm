@@ -23,7 +23,7 @@ import { EntradasModule } from './modules/entradas/entradas.module';
 import { HelpCenterModule } from './modules/help-center/help-center.module';
 import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
 import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entregas-por-placas.module';
-import { TesteManifestoSswModule } from './teste-manifesto-ssw/teste-manifesto-ssw.module';
+
 
 @Module({
   imports: [
@@ -51,7 +51,7 @@ import { TesteManifestoSswModule } from './teste-manifesto-ssw/teste-manifesto-s
     HelpCenterModule,
     ScreenPermissionsModule,
     EntregasPorPlacasModule,
-    TesteManifestoSswModule,  
+      
   ],
 })
 export class AppModule {}
