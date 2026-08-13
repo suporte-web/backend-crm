@@ -6,19 +6,20 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Pool, QueryResultRow } from 'pg';
 
+type QueryValue = string | number | null;
+
 @Injectable()
-export class PostgresDeliveriesService implements OnModuleDestroy {
+export class KmmDatabaseService implements OnModuleDestroy {
   private readonly pool: Pool;
 
   constructor(private readonly configService: ConfigService) {
-    // A conexao usa apenas variaveis de ambiente,
-    // sem credenciais fixas no codigo.
+    // Conexao com o banco KMM usando apenas variaveis de ambiente.
     this.pool = new Pool({
-      host: this.getRequiredConfig('DB_HOST'),
-      port: Number(this.getRequiredConfig('DB_PORT')),
-      database: this.getRequiredConfig('DB_NAME'),
-      user: this.getRequiredConfig('DB_USER'),
-      password: this.getRequiredConfig('DB_PASSWORD'),
+      host: this.getRequiredConfig('KMM_DB_HOST'),
+      port: Number(this.getRequiredConfig('KMM_DB_PORT')),
+      database: this.getRequiredConfig('KMM_DB_NAME'),
+      user: this.getRequiredConfig('KMM_DB_USER'),
+      password: this.getRequiredConfig('KMM_DB_PASSWORD'),
     });
   }
 
@@ -27,7 +28,7 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
 
     if (!value) {
       throw new InternalServerErrorException(
-        `Variavel de ambiente obrigatoria não configurada: ${key}`,
+        `Variavel de ambiente obrigatoria nao configurada: ${key}`,
       );
     }
 
@@ -36,15 +37,17 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
 
   async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
-    values: Array<string | number> = [],
+    values: QueryValue[] = [],
   ): Promise<T[]> {
     try {
       const result = await this.pool.query<T>(text, values);
 
       return result.rows;
-    } catch {
+    } catch (error) {
+      console.error('Erro ao consultar banco KMM:', error);
+
       throw new InternalServerErrorException(
-        'Não foi possível consultar o banco de entregas.',
+        'Nao foi possivel consultar o banco KMM.',
       );
     }
   }
