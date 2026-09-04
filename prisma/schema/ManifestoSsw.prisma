@@ -1,0 +1,36 @@
+model ManifestoSsw {
+  id Int @id @default(autoincrement())
+
+  manifestoSsw      String  @unique @map("manifesto_ssw")
+  chaveManifestoSsw String? @map("chave_manifesto_ssw")
+
+  placa        String
+  placaCarreta String? @map("placa_carreta")
+
+  motoristaCpf  String? @map("motorista_cpf")
+  motoristaNome String? @map("motorista_nome")
+
+  dataEmissao     DateTime? @map("data_emissao")
+  dataPrevChegada DateTime? @map("data_prev_chegada")
+
+  recebidoEm   DateTime @default(now()) @map("recebido_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  ctrcs ManifestoSswCtrc[]
+
+  @@index([dataEmissao])
+  @@map("manifesto_ssw")
+}
+
+model ManifestoSswCtrc {
+  id Int @id @default(autoincrement())
+
+  manifestoId Int    @map("manifesto_id")
+  ctrcSsw     String @map("ctrc_ssw")
+
+  manifesto ManifestoSsw @relation(fields: [manifestoId], references: [id], onDelete: Cascade)
+
+  @@unique([manifestoId, ctrcSsw])
+  @@index([ctrcSsw])
+  @@map("manifesto_ssw_ctrc")
+}

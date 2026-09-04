@@ -35,6 +35,34 @@ export class NotificationsService {
     return tx ?? this.prisma;
   } 
 
+  private normalizeNotificationLink(link?: string | null) {
+    if (!link) {
+      return null;
+    }
+
+    if (link.startsWith('/tickets?')) {
+      return `/chamados?${link.split('?')[1]}`;
+    }
+
+    if (link.startsWith('/tickets/')) {
+      return `/chamados?ticket=${link.split('/').pop()}`;
+    }
+
+    if (link === '/tickets') {
+      return '/chamados';
+    }
+
+    if (link.startsWith('/clients/')) {
+      return link.replace(/^\/clients/, '/clientes');
+    }
+
+    if (link === '/clients') {
+      return '/clientes';
+    }
+
+    return link;
+  }
+
   private buildNotificationWhere(
     user: AuthUser,
     extra?: Prisma.NotificationWhereInput,
@@ -97,9 +125,10 @@ export class NotificationsService {
   ) {
     const client = this.getClient(tx);
     const recipients = this.normalizeRecipients(userIds);
-    const link =
+    const link = this.normalizeNotificationLink(
       input.link ??
-      (input.ticketId ? `/tickets?ticket=${input.ticketId}` : null);
+        (input.ticketId ? `/chamados?ticket=${input.ticketId}` : null),
+    );
     const recipientUsers =
       recipients.length > 0
         ? await client.user.findMany({

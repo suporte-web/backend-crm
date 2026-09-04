@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -29,7 +31,12 @@ import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
 import { ConvertLeadToProspectDto } from './dto/convert-lead-to-prospect.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 import { LeadsService } from './leads.service';
+import { CreateLeadObservacaoDto } from './dto/create-lead-observacao.dto';
+
+
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { diskStorage } = require('multer');
@@ -48,14 +55,67 @@ export class LeadsController {
     UserRole.MARKETING,
   )
   @Get()
-  findAll(
-    @CurrentUser() user: AuthUser,
-    @Query('q') q?: string,
-    @Query('source') source?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.leadsService.findAll(user, { q, source, status });
+findAll(
+  @CurrentUser() user: AuthUser,
+  @Query('q') q?: string,
+  @Query('source') source?: string,
+  @Query('status') status?: string,
+  @Query('convertidoParaCliente') convertidoParaCliente?: string,
+) {
+  let convertido: boolean | undefined;
+
+  if (convertidoParaCliente === 'true') {
+    convertido = true;
   }
+
+  if (convertidoParaCliente === 'false') {
+    convertido = false;
+  }
+
+  if (
+    convertidoParaCliente !== undefined &&
+    convertidoParaCliente !== 'true' &&
+    convertidoParaCliente !== 'false'
+  ) {
+    throw new BadRequestException(
+      'convertidoParaCliente deve ser true ou false.',
+    );
+  }
+
+  return this.leadsService.findAll(user, {
+    q,
+    source,
+    status,
+    convertidoParaCliente: convertido,
+  });
+}
+
+
+// ==========================================
+// RESUMO DOS LEADS
+// ==========================================
+
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(
+  UserRole.ADMIN,
+  UserRole.GESTAO,
+  UserRole.COMERCIAL,
+  UserRole.MARKETING,
+)
+@Get('resumo')
+getResumo(@CurrentUser() user: AuthUser) {
+  return this.leadsService.getResumo(user);
+}
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -70,14 +130,7 @@ export class LeadsController {
     return this.leadsService.getImportJobs(user);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.GESTAO,
-    UserRole.COMERCIAL,
-    UserRole.MARKETING,
-  )
+
   @Get('import-jobs/:id')
   getImportJob(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.leadsService.getImportJob(user, id);
@@ -106,6 +159,30 @@ export class LeadsController {
     @Body() dto: ConvertLeadToClientDto,
   ) {
     return this.leadsService.convertToClient(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Patch(':id/status')
+  updateStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadStatusDto,
+  ) {
+    return this.leadsService.updateStatus(user, id, dto.status);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadDto,
+  ) {
+    return this.leadsService.update(user, id, dto);
   }
 
   @ApiBearerAuth()
@@ -244,4 +321,50 @@ export class LeadsController {
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.leadsService.findOne(user, id);
   }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+  )
+  @Post(':id/observacoes')
+  criarObservacao(
+  @CurrentUser() user: AuthUser,
+  @Param('id') id: string,
+  @Body() dto: CreateLeadObservacaoDto,
+  ) {
+  return this.leadsService.criarObservacao(user, id, dto);
+  }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.GESTAO,
+    UserRole.COMERCIAL,
+    UserRole.MARKETING,
+  )
+  @Get(':id/observacoes')
+  listarObservacoes(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.leadsService.listarObservacoes(user, id);
+  }
+
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(
+  UserRole.ADMIN,
+  UserRole.GESTAO,
+  UserRole.COMERCIAL,
+)
+@Delete(':id')
+excluir(
+  @CurrentUser() user: AuthUser,
+  @Param('id') id: string,
+) {
+  return this.leadsService.excluir(user, id);
+}
 }

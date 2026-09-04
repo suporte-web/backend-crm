@@ -1,8 +1,9 @@
 import { IsEmail, IsOptional, IsString } from 'class-validator';
 
-export class CreateLeadDto {
+export class UpdateLeadDto {
+  @IsOptional()
   @IsString()
-  name!: string;
+  name?: string;
 
   @IsOptional()
   @IsEmail()

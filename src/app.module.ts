@@ -23,6 +23,8 @@ import { EntradasModule } from './modules/entradas/entradas.module';
 import { HelpCenterModule } from './modules/help-center/help-center.module';
 import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
 import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entregas-por-placas.module';
+import { SolicitacoesSiteModule } from './modules/solicitacoes-site/solicitacoes-site.module';
+
 
 
 @Module({
@@ -51,6 +53,7 @@ import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entre
     HelpCenterModule,
     ScreenPermissionsModule,
     EntregasPorPlacasModule,
+    SolicitacoesSiteModule,
       
   ],
 })

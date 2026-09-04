@@ -26,6 +26,9 @@ model Lead {
   importRows        LeadImportRowResult[]
   timeline          LeadTimelineEvent[]
   tickets           Ticket[]
+  observations      LeadObservacao[]
+
+  convertidoParaCliente Boolean @default(false)
 
   @@index([normalizedEmail])
   @@index([normalizedPhone])

@@ -21,7 +21,7 @@ import {
   UserRole,
   TimelineEventType,
 } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+
 import { readFile, unlink } from 'fs/promises';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
@@ -29,13 +29,16 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ConvertLeadToClientDto } from './dto/convert-lead-to-client.dto';
 import { ConvertLeadToProspectDto } from './dto/convert-lead-to-prospect.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { CreateLeadObservacaoDto } from './dto/create-lead-observacao.dto';
 import { ImportLeadsCsvDto } from './dto/import-leads-csv.dto';
 import { ReceiveWhatsAppLeadDto } from './dto/receive-whatsapp-lead.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
 
 type LeadFilters = {
   q?: string;
   source?: string;
   status?: string;
+  convertidoParaCliente?: boolean;
 };
 
 type UploadFile = {
@@ -71,6 +74,35 @@ type NormalizedWhatsAppWebhookPayload = {
 
 type ParsedCsvRow = Record<string, string>;
 
+const LEAD_FUNNEL_STAGES = [
+  'entrada_leads',
+  'conversao',
+  'homologacao',
+  'cotacao',
+  'venda_efetivada',
+  'pos_venda',
+  'perdido',
+] as const;
+
+const LEAD_FUNNEL_STAGE_LABELS: Record<string, string> = {
+  entrada_leads: 'Entrada de Leads',
+  conversao: 'Conversão',
+  homologacao: 'Homologação',
+  cotacao: 'Cotação',
+  venda_efetivada: 'Venda Efetivada',
+  pos_venda: 'Pós-venda',
+  perdido: 'Perdido',
+};
+
+const LEGACY_LEAD_STATUS_TO_FUNNEL_STAGE: Record<string, string> = {
+  new: 'entrada_leads',
+  contacted: 'conversao',
+  qualified: 'homologacao',
+  converted: 'venda_efetivada',
+  converted_to_prospect: 'venda_efetivada',
+  archived: 'perdido',
+};
+
 @Injectable()
 export class LeadsService {
   constructor(
@@ -101,6 +133,113 @@ export class LeadsService {
   private sanitizeText(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private parseOptionalDate(value?: string | null) {
+    const sanitized = this.sanitizeText(value);
+
+    if (!sanitized) {
+      return null;
+    }
+
+    const parsed = new Date(sanitized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private buildLeadCommercialMetadata(dto: CreateLeadDto) {
+    const metadata: Record<string, string> = {};
+    const fields: Array<[keyof CreateLeadDto, string]> = [
+      ['logoUrl', 'logoUrl'],
+      ['segment', 'segment'],
+      ['transport', 'transport'],
+      ['storage', 'storage'],
+      ['entryDate', 'entryDate'],
+      ['lastInteractionDate', 'lastInteractionDate'],
+      ['monthlyEstimatedValue', 'monthlyEstimatedValue'],
+      ['responsible', 'responsible'],
+      ['currentStatus', 'currentStatus'],
+      ['nextAction', 'nextAction'],
+    ];
+
+    fields.forEach(([dtoKey, metadataKey]) => {
+      const value = this.sanitizeText(dto[dtoKey] as string | undefined);
+
+      if (value) {
+        metadata[metadataKey] = value;
+      }
+    });
+
+    return Object.keys(metadata).length > 0
+      ? (metadata as Prisma.InputJsonValue)
+      : undefined;
+  }
+
+  private updateLeadCommercialMetadata(
+    currentMetadata: Prisma.JsonValue | null | undefined,
+    dto: UpdateLeadDto,
+  ) {
+    const metadata =
+      currentMetadata && !Array.isArray(currentMetadata) && typeof currentMetadata === 'object'
+        ? { ...(currentMetadata as Record<string, Prisma.JsonValue>) }
+        : {};
+    const fields: Array<[keyof UpdateLeadDto, string]> = [
+      ['logoUrl', 'logoUrl'],
+      ['segment', 'segment'],
+      ['transport', 'transport'],
+      ['storage', 'storage'],
+      ['entryDate', 'entryDate'],
+      ['lastInteractionDate', 'lastInteractionDate'],
+      ['monthlyEstimatedValue', 'monthlyEstimatedValue'],
+      ['responsible', 'responsible'],
+      ['currentStatus', 'currentStatus'],
+      ['nextAction', 'nextAction'],
+    ];
+
+    fields.forEach(([dtoKey, metadataKey]) => {
+      if (dto[dtoKey] === undefined) {
+        return;
+      }
+
+      const value = this.sanitizeText(dto[dtoKey] as string | undefined);
+
+      if (value) {
+        metadata[metadataKey] = value;
+      } else {
+        delete metadata[metadataKey];
+      }
+    });
+
+    return metadata as Prisma.InputJsonValue;
+  }
+
+  private normalizeLeadFunnelStage(status?: string | null) {
+    const value = this.sanitizeText(status)?.toLowerCase();
+
+    if (!value) {
+      return 'entrada_leads';
+    }
+
+    if ((LEAD_FUNNEL_STAGES as readonly string[]).includes(value)) {
+      return value;
+    }
+
+    return LEGACY_LEAD_STATUS_TO_FUNNEL_STAGE[value] ?? 'entrada_leads';
+  }
+
+  private formatLeadFunnelStage(status?: string | null) {
+    return (
+      LEAD_FUNNEL_STAGE_LABELS[this.normalizeLeadFunnelStage(status)] ??
+      'Entrada de Leads'
+    );
+  }
+
+  private getEquivalentLeadStatuses(status?: string | null) {
+    const normalized = this.normalizeLeadFunnelStage(status);
+    const legacyStatuses = Object.entries(LEGACY_LEAD_STATUS_TO_FUNNEL_STAGE)
+      .filter(([, stage]) => stage === normalized)
+      .map(([legacyStatus]) => legacyStatus);
+
+    return Array.from(new Set([normalized, ...legacyStatuses]));
   }
 
   private ensureObject(value: unknown) {
@@ -382,7 +521,7 @@ export class LeadsService {
         phone: payload.phone,
         company: payload.company,
         source: payload.source,
-        status: payload.status,
+        status: this.normalizeLeadFunnelStage(payload.status),
         notes: payload.notes,
         channel: payload.channel,
         sourcePhone: payload.sourcePhone,
@@ -618,14 +757,19 @@ export class LeadsService {
   async findAll(user: AuthUser, filters: LeadFilters) {
     this.ensureInternalUser(user);
 
-    const where: Prisma.LeadWhereInput = {};
+const where: Prisma.LeadWhereInput = {
+  convertidoParaCliente:
+    filters.convertidoParaCliente ?? false,
+};
 
     if (filters.source) {
       where.source = filters.source;
     }
 
     if (filters.status) {
-      where.status = filters.status;
+      where.status = {
+        in: this.getEquivalentLeadStatuses(filters.status),
+      };
     }
 
     if (filters.q?.trim()) {
@@ -661,11 +805,673 @@ export class LeadsService {
     });
   }
 
-  async findOne(user: AuthUser, id: string) {
+  async getResumo(user: AuthUser) {
+  this.ensureInternalUser(user);
+
+  const [ativos, convertidos] = await Promise.all([
+    this.prisma.lead.count({
+      where: {
+        convertidoParaCliente: false,
+      },
+    }),
+
+    this.prisma.lead.count({
+      where: {
+        convertidoParaCliente: true,
+      },
+    }),
+  ]);
+
+  return {
+    ativos,
+    convertidos,
+    total: ativos + convertidos,
+  };
+}
+
+async findOne(user: AuthUser, id: string) {
+  this.ensureInternalUser(user);
+
+  const lead = await this.prisma.lead.findUnique({
+    where: { id },
+
+    include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      updatedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      observations: {
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+
+      timeline: {
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+    },
+  });
+
+  if (!lead) {
+    throw new NotFoundException('Lead não encontrado.');
+  }
+
+  return lead;
+}
+
+  async criarObservacao(
+  user: AuthUser,
+  leadId: string,
+  dto: CreateLeadObservacaoDto,
+) {
+  this.ensureInternalUser(user);
+  
+
+  const content = this.sanitizeText(dto.content);
+
+  if (!content) {
+    throw new BadRequestException('Informe a observação.');
+  }
+
+  
+
+  const lead = await this.prisma.lead.findUnique({
+    where: {
+      id: leadId,
+    },
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!lead) {
+    throw new NotFoundException('Lead não encontrado.');
+  }
+
+  const stage = this.normalizeLeadFunnelStage(lead.status);
+
+  return this.prisma.$transaction(async (tx) => {
+    const observacao = await tx.leadObservacao.create({
+      data: {
+        leadId: lead.id,
+        content,
+        stage,
+        createdById: user.sub,
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await tx.lead.update({
+      where: {
+        id: lead.id,
+      },
+      data: {
+        lastInteractionAt: new Date(),
+        updatedById: user.sub,
+      },
+    });
+
+    return observacao;
+  });
+}
+
+async listarObservacoes(
+  user: AuthUser,
+  leadId: string,
+) {
+  this.ensureInternalUser(user);
+
+  const lead = await this.prisma.lead.findUnique({
+    where: {
+      id: leadId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!lead) {
+    throw new NotFoundException('Lead não encontrado.');
+  }
+
+  return this.prisma.leadObservacao.findMany({
+    where: {
+      leadId,
+    },
+    include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
+
+  async createManual(user: AuthUser, dto: CreateLeadDto) {
+    this.ensureInternalUser(user);
+
+    const name = dto.name?.trim();
+    if (!name) {
+      throw new BadRequestException('Informe o nome do lead.');
+    }
+
+    const duplicate = await this.findDuplicateLead(dto.email, dto.phone);
+    if (duplicate) {
+      throw new ConflictException(
+        `Ja existe um lead com este contato: ${duplicate.name}.`,
+      );
+    }
+
+    return this.prisma.$transaction((tx) =>
+      this.createLeadWithTimeline(
+        tx,
+        {
+          name,
+          email: this.sanitizeText(dto.email),
+          phone: this.sanitizeText(dto.phone),
+          company: this.sanitizeText(dto.company),
+          source: this.sanitizeText(dto.source) ?? 'manual',
+          status: this.normalizeLeadFunnelStage(dto.status),
+          notes: this.sanitizeText(dto.notes),
+          metadata: this.buildLeadCommercialMetadata(dto),
+          lastInteractionAt: this.parseOptionalDate(dto.lastInteractionDate),
+          createdById: user.sub,
+          updatedById: user.sub,
+        },
+        {
+          type: LeadTimelineEventType.CREATED_MANUAL,
+          title: 'Lead criado manualmente',
+          description: 'Lead cadastrado manualmente no CRM.',
+          createdById: user.sub,
+        },
+        {
+          createTicket: true,
+          ticketActorId: user.sub,
+        },
+      ),
+    );
+  }
+
+  // Excluir lead
+
+  async excluir(user: AuthUser, leadId: string) {
+  this.ensureInternalUser(user);
+
+  const lead = await this.prisma.lead.findUnique({
+    where: {
+      id: leadId,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!lead) {
+    throw new NotFoundException('Lead não encontrado.');
+  }
+
+  await this.prisma.lead.delete({
+    where: {
+      id: leadId,
+    },
+  });
+
+  return {
+    message: 'Lead excluído com sucesso.',
+  };
+}
+
+  async update(user: AuthUser, leadId: string, dto: UpdateLeadDto) {
     this.ensureInternalUser(user);
 
     const lead = await this.prisma.lead.findUnique({
-      where: { id },
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead não encontrado.');
+    }
+
+    const name = dto.name !== undefined ? dto.name.trim() : undefined;
+
+    if (dto.name !== undefined && !name) {
+      throw new BadRequestException('Informe o nome do lead.');
+    }
+
+    const nextStatus =
+      dto.status !== undefined
+        ? this.normalizeLeadFunnelStage(dto.status)
+        : undefined;
+    const previousStatus = this.normalizeLeadFunnelStage(lead.status);
+    const metadata = this.updateLeadCommercialMetadata(lead.metadata, dto);
+    const lastInteractionAt =
+      dto.lastInteractionDate !== undefined
+        ? this.parseOptionalDate(dto.lastInteractionDate)
+        : undefined;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedLead = await tx.lead.update({
+        where: { id: leadId },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(dto.email !== undefined
+            ? {
+                email: this.sanitizeText(dto.email),
+                normalizedEmail: this.normalizeEmail(dto.email),
+              }
+            : {}),
+          ...(dto.phone !== undefined
+            ? {
+                phone: this.sanitizeText(dto.phone),
+                normalizedPhone: this.normalizePhone(dto.phone),
+              }
+            : {}),
+          ...(dto.company !== undefined
+            ? { company: this.sanitizeText(dto.company) }
+            : {}),
+          ...(dto.source !== undefined
+            ? { source: this.sanitizeText(dto.source) ?? 'manual' }
+            : {}),
+          ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+          ...(dto.notes !== undefined ? { notes: this.sanitizeText(dto.notes) } : {}),
+          ...(lastInteractionAt !== undefined ? { lastInteractionAt } : {}),
+          metadata,
+          updatedById: user.sub,
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          updatedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          timeline: {
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+        },
+      });
+
+      await this.addTimelineEvent(tx, leadId, {
+        type: LeadTimelineEventType.UPDATED,
+        title: 'Lead atualizado',
+        description:
+          nextStatus && nextStatus !== previousStatus
+            ? `Dados atualizados e etapa alterada de ${this.formatLeadFunnelStage(previousStatus)} para ${this.formatLeadFunnelStage(nextStatus)}.`
+            : 'Dados comerciais do lead atualizados.',
+        createdById: user.sub,
+      });
+
+      return {
+        ...updatedLead,
+        timeline: await tx.leadTimelineEvent.findMany({
+          where: { leadId },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+      };
+    });
+  }
+
+//
+
+async convertToClient(
+  user: AuthUser,
+  leadId: string,
+  dto: ConvertLeadToClientDto,
+) {
+  this.ensureInternalUser(user);
+
+  // Procura o lead que será convertido
+  const lead = await this.prisma.lead.findUnique({
+    where: {
+      id: leadId,
+    },
+  });
+
+  if (!lead) {
+    throw new NotFoundException('Lead não encontrado.');
+  }
+
+  // CNPJ/documento continua sendo obrigatório para criar o cliente
+  const document = this.sanitizeText(dto.document);
+
+  if (!document) {
+    throw new BadRequestException(
+      'Informe o CNPJ/documento do cliente.',
+    );
+  }
+
+  // Dados que serão aproveitados do lead
+  const email =
+    this.sanitizeText(dto.email) ??
+    this.sanitizeText(lead.email);
+
+  const name =
+    this.sanitizeText(dto.name) ??
+    lead.name;
+
+  const companyName =
+    this.sanitizeText(dto.companyName) ??
+    this.sanitizeText(lead.company) ??
+    name;
+
+  const phone =
+    this.sanitizeText(dto.phone) ??
+    this.sanitizeText(lead.phone);
+
+  const segment =
+    this.sanitizeText(dto.segment);
+
+  const status =
+    this.sanitizeText(dto.status) ??
+    'PENDENTE';
+
+  const internalOwnerId =
+    this.sanitizeText(dto.internalOwnerId) ??
+    user.sub;
+
+  // Verifica se já existe cliente com esse documento
+  const existingClient = await this.prisma.client.findFirst({
+    where: {
+      document,
+    },
+    select: {
+      id: true,
+      document: true,
+    },
+  });
+
+  if (existingClient) {
+    throw new ConflictException(
+      'Já existe um cliente com este documento.',
+    );
+  }
+
+  return this.prisma.$transaction(async (tx) => {
+
+    // Lead convertido para cliente, marca o lead como convertido
+
+
+    await tx.lead.update({
+  where: {
+    id: lead.id,
+  },
+  data: {
+    convertidoParaCliente: true,
+  },
+  });
+
+
+    const client = await tx.client.create({
+      data: {
+        document,
+        phone,
+        companyName,
+        segment,
+        status,
+        internalOwnerId,
+        notes: lead.notes,
+
+        // Guarda e-mail/telefone como contato principal do cliente
+        ...(email || phone
+          ? {
+              contacts: {
+                create: {
+                  name,
+                  email,
+                  phone,
+                  isPrimary: true,
+                },
+              },
+            }
+          : {}),
+
+        // Registra a criação na timeline do cliente
+        timelineEvents: {
+          create: {
+            type: TimelineEventType.LEAD_CREATED,
+            title: 'Cliente convertido de lead',
+            description: `Cliente criado a partir do lead ${lead.name}.`,
+            metadata: {
+              leadId: lead.id,
+              leadSource: lead.source,
+            },
+            createdById: user.sub,
+          },
+        },
+      },
+
+      include: {
+        contacts: true,
+
+        timelineEvents: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    });
+
+    
+    // ATUALIZA O LEAD
+ 
+
+    const updatedLead = await tx.lead.update({
+      where: {
+        id: lead.id,
+      },
+
+      data: {
+        status: 'venda_efetivada',
+        convertidoParaCliente: true,
+
+        updatedById: user.sub,
+
+        metadata: {
+          ...(this.ensureObject(lead.metadata)
+            ? (lead.metadata as Prisma.JsonObject)
+            : {}),
+
+          conversionTarget: 'client',
+
+          clientId: client.id,
+
+          convertedAt: new Date().toISOString(),
+        },
+
+        timeline: {
+          create: {
+            type: LeadTimelineEventType.UPDATED,
+
+            title: 'Lead convertido em cliente',
+
+            description: `Cliente criado com o documento ${document}.`,
+
+            metadata: {
+              clientId: client.id,
+              document,
+            },
+
+            createdById: user.sub,
+          },
+        },
+      },
+
+      include: {
+        timeline: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+
+        updatedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+   
+    // VINCULA TICKETS EXISTENTES AO NOVO CLIENTE
+  
+    await tx.ticket.updateMany({
+      where: {
+        leadId: lead.id,
+        clientId: null,
+      },
+
+      data: {
+        clientId: client.id,
+      },
+    });
+
+    
+    // RESPOSTA
+    
+
+    return {
+      lead: updatedLead,
+      client,
+    };
+  });
+}
+
+  async updateStatus(user: AuthUser, leadId: string, status: string) {
+    this.ensureInternalUser(user);
+
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead não encontrado.');
+    }
+
+    const nextStatus = this.normalizeLeadFunnelStage(status);
+    const previousStatus = this.normalizeLeadFunnelStage(lead.status);
+
+    const updatedLead = await this.prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        status: nextStatus,
+        updatedById: user.sub,
+        lastInteractionAt: new Date(),
+        timeline:
+          previousStatus === nextStatus
+            ? undefined
+            : {
+                create: {
+                  type: LeadTimelineEventType.UPDATED,
+                  title: 'Etapa do funil atualizada',
+                  description: `${this.formatLeadFunnelStage(previousStatus)} → ${this.formatLeadFunnelStage(nextStatus)}.`,
+                  metadata: {
+                    previousStatus,
+                    nextStatus,
+                  },
+                  createdById: user.sub,
+                },
+              },
+      },
       include: {
         createdBy: {
           select: {
@@ -698,250 +1504,7 @@ export class LeadsService {
       },
     });
 
-    if (!lead) {
-      throw new NotFoundException('Lead não encontrado.');
-    }
-
-    return lead;
-  }
-
-  async createManual(user: AuthUser, dto: CreateLeadDto) {
-    this.ensureInternalUser(user);
-
-    const name = dto.name?.trim();
-    if (!name) {
-      throw new BadRequestException('Informe o nome do lead.');
-    }
-
-    const duplicate = await this.findDuplicateLead(dto.email, dto.phone);
-    if (duplicate) {
-      throw new ConflictException(
-        `Ja existe um lead com este contato: ${duplicate.name}.`,
-      );
-    }
-
-    return this.prisma.$transaction((tx) =>
-      this.createLeadWithTimeline(
-        tx,
-        {
-          name,
-          email: this.sanitizeText(dto.email),
-          phone: this.sanitizeText(dto.phone),
-          company: this.sanitizeText(dto.company),
-          source: this.sanitizeText(dto.source) ?? 'manual',
-          status: this.sanitizeText(dto.status) ?? 'new',
-          notes: this.sanitizeText(dto.notes),
-          createdById: user.sub,
-          updatedById: user.sub,
-        },
-        {
-          type: LeadTimelineEventType.CREATED_MANUAL,
-          title: 'Lead criado manualmente',
-          description: 'Lead cadastrado manualmente no CRM.',
-          createdById: user.sub,
-        },
-        {
-          createTicket: true,
-          ticketActorId: user.sub,
-        },
-      ),
-    );
-  }
-
-  async convertToClient(
-    user: AuthUser,
-    leadId: string,
-    dto: ConvertLeadToClientDto,
-  ) {
-    this.ensureInternalUser(user);
-
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-    });
-
-    if (!lead) {
-      throw new NotFoundException('Lead não encontrado.');
-    }
-
-    const document = this.sanitizeText(dto.document);
-    if (!document) {
-      throw new BadRequestException('Informe o CNPJ/documento do cliente.');
-    }
-
-    const email = this.sanitizeText(dto.email) ?? this.sanitizeText(lead.email);
-    if (!email) {
-      throw new BadRequestException(
-        'Informe o e-mail do cliente para criar acesso ao portal.',
-      );
-    }
-
-    const name = this.sanitizeText(dto.name) ?? lead.name;
-    const companyName =
-      this.sanitizeText(dto.companyName) ??
-      this.sanitizeText(lead.company) ??
-      name;
-    const phone = this.sanitizeText(dto.phone) ?? this.sanitizeText(lead.phone);
-    const segment = this.sanitizeText(dto.segment);
-    const status = this.sanitizeText(dto.status) ?? 'PENDENTE';
-    const internalOwnerId = this.sanitizeText(dto.internalOwnerId) ?? user.sub;
-
-    const [existingUser, existingClientDocument] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { email },
-        select: { id: true, email: true },
-      }),
-      this.prisma.client.findFirst({
-        where: { document },
-        select: { id: true, document: true },
-      }),
-    ]);
-
-    if (existingUser) {
-      throw new ConflictException('Já existe um usuário com este e-mail.');
-    }
-
-    if (existingClientDocument) {
-      throw new ConflictException('Já existe um cliente com este documento.');
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-
-    return this.prisma.$transaction(async (tx) => {
-      const clientUser = await tx.user.create({
-        data: {
-          name,
-          email,
-          passwordHash,
-          mustChangePassword: true,
-          role: UserRole.CLIENTE,
-          isActive: true,
-          clientProfile: {
-            create: {
-              document,
-              phone,
-              companyName,
-              segment,
-              status,
-              internalOwnerId,
-              notes: lead.notes,
-              timelineEvents: {
-                create: {
-                  type: TimelineEventType.LEAD_CREATED,
-                  title: 'Cliente convertido de lead',
-                  description: `Cliente criado a partir do lead ${lead.name}.`,
-                  metadata: {
-                    leadId: lead.id,
-                    leadSource: lead.source,
-                  },
-                  createdById: user.sub,
-                },
-              },
-            },
-          },
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          isActive: true,
-          mustChangePassword: true,
-          createdAt: true,
-          updatedAt: true,
-          clientProfile: {
-            select: {
-              id: true,
-              document: true,
-              phone: true,
-              companyName: true,
-              segment: true,
-              status: true,
-              internalOwnerId: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-        },
-      });
-
-      const updatedLead = await tx.lead.update({
-        where: { id: lead.id },
-        data: {
-          status: 'converted',
-          updatedById: user.sub,
-          metadata: {
-            ...(this.ensureObject(lead.metadata)
-              ? (lead.metadata as Prisma.JsonObject)
-              : {}),
-            conversionTarget: 'client',
-            clientId: clientUser.clientProfile?.id ?? null,
-            clientUserId: clientUser.id,
-            convertedAt: new Date().toISOString(),
-          },
-          timeline: {
-            create: {
-              type: LeadTimelineEventType.UPDATED,
-              title: 'Lead convertido em cliente',
-              description: `Cliente criado com o documento ${document}.`,
-              metadata: {
-                clientId: clientUser.clientProfile?.id,
-                userId: clientUser.id,
-                document,
-              },
-              createdById: user.sub,
-            },
-          },
-        },
-        include: {
-          timeline: {
-            include: {
-              createdBy: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                },
-              },
-            },
-            orderBy: {
-              createdAt: 'desc',
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          updatedBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      if (clientUser.clientProfile?.id) {
-        await tx.ticket.updateMany({
-          where: {
-            leadId: lead.id,
-            clientId: null,
-          },
-          data: {
-            clientId: clientUser.clientProfile.id,
-          },
-        });
-      }
-
-      return {
-        lead: updatedLead,
-        user: clientUser,
-        client: clientUser.clientProfile,
-      };
-    });
+    return updatedLead;
   }
 
   async convertToProspect(
@@ -1012,7 +1575,7 @@ export class LeadsService {
       const updatedLead = await tx.lead.update({
         where: { id: lead.id },
         data: {
-          status: 'converted_to_prospect',
+          status: 'conversao',
           updatedById: user.sub,
           metadata: {
             ...(this.ensureObject(lead.metadata)
@@ -1096,7 +1659,8 @@ export class LeadsService {
       const parsedRows = this.parseCsv(fileContent);
       const defaultSource =
         this.sanitizeText(dto.defaultSource) ?? 'import_csv';
-      const defaultStatus = this.sanitizeText(dto.defaultStatus) ?? 'new';
+      const defaultStatus =
+        this.sanitizeText(dto.defaultStatus) ?? 'entrada_leads';
       const rowResults: Array<Prisma.LeadImportRowResultCreateManyInput> = [];
       let successCount = 0;
       let ignoredCount = 0;
@@ -1147,7 +1711,7 @@ export class LeadsService {
                 phone: this.sanitizeText(mapped.phone),
                 company: this.sanitizeText(mapped.company),
                 source: mapped.source.trim(),
-                status: mapped.status.trim(),
+                status: this.normalizeLeadFunnelStage(mapped.status),
                 notes: this.sanitizeText(mapped.notes),
                 createdById: user.sub,
                 updatedById: user.sub,

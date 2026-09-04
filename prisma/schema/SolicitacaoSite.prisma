@@ -1,0 +1,72 @@
+model SolicitacaoSite {
+  id String @id @default(uuid())
+
+  // Controle da solicitação
+  tipo         String
+  departamento String?
+  status       String  @default("NOVO")
+  origem       String  @default("SITE_PIZZATTOLOG")
+
+  // Dados da pessoa
+  nome     String
+  email    String
+  telefone String?
+  cargo    String?
+
+  // Dados da empresa
+  empresa String?
+  cnpj    String?
+
+  // Solicitação de cotação
+  solucao String?
+
+  // Cadastro de agregados
+  cidade       String?
+  categoriaCnh String?
+  possuiMopp   Boolean?
+  possuiEar    Boolean?
+  marcaVeiculo String?
+  anoVeiculo   Int?
+
+  // Conteúdo da solicitação
+  assunto  String?
+  mensagem String?
+
+  // Consentimentos
+  aceitePrivacidade  Boolean @default(false)
+  aceiteComunicacoes Boolean @default(false)
+
+  // Controle interno do CRM
+  responsavelId     String?
+  observacaoInterna String?
+
+  // Datas
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Anexos
+  anexos AnexoSolicitacaoSite[]
+
+  @@index([tipo])
+  @@index([departamento])
+  @@index([status])
+  @@index([criadoEm])
+}
+
+model AnexoSolicitacaoSite {
+  id String @id @default(uuid())
+
+  solicitacaoId String
+
+  solicitacao SolicitacaoSite @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  nomeArquivo         String
+  nomeArquivoOriginal String
+  tipoArquivo         String?
+  tamanho             Int?
+  url                 String
+
+  criadoEm DateTime @default(now())
+
+  @@index([solicitacaoId])
+}

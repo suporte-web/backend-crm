@@ -79,28 +79,41 @@ export class UsersService {
     return `Cliente@${suffix}1`;
   }
 
-  async create(dto: CreateUserDto, actor?: AuthUser) {
-    const isClient = dto.role === UserRole.CLIENTE;
-    const email = dto.email?.trim() || (isClient ? this.createTechnicalClientEmail() : undefined);
-    const password = dto.password || (isClient ? this.createTechnicalClientPassword() : undefined);
+ async create(dto: CreateUserDto, actor?: AuthUser) {
+  const isClient = dto.role === UserRole.CLIENTE;
 
-    if (!email) {
-      throw new BadRequestException('Informe o e-mail do usuÃ¡rio.');
-    }
+  const email =
+    dto.email?.trim() ||
+    (isClient ? this.createTechnicalClientEmail() : undefined);
 
-    if (!password) {
-      throw new BadRequestException('Informe a senha do usuÃ¡rio.');
-    }
+  const defaultUserPassword =
+    process.env.DEFAULT_USER_PASSWORD?.trim();
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+  const password =
+    dto.password ||
+    (isClient
+      ? this.createTechnicalClientPassword()
+      : defaultUserPassword);
 
-    if (existingUser) {
-      throw new BadRequestException('E-mail já está em uso.');
-    }
+  if (!email) {
+    throw new BadRequestException('Informe o e-mail do usuário.');
+  }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+  if (!password) {
+    throw new BadRequestException(
+      'Senha padrão de usuário não configurada.',
+    );
+  }
+
+  const existingUser = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    throw new BadRequestException('E-mail já está em uso.');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
     const contacts = this.sanitizeClientContacts(dto);
 
     const user = await this.prisma.user.create({
@@ -324,6 +337,73 @@ export class UsersService {
       screenPermissions: await this.findRoleScreenPermissions(user.role),
     };
   }
+
+  async resetPasswordToDefault(userId: string, actor?: AuthUser) {
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  });
+
+  if (!user) {
+    throw new NotFoundException('Usuário não encontrado.');
+  }
+
+  const defaultUserPassword =
+    process.env.DEFAULT_USER_PASSWORD?.trim();
+
+  if (!defaultUserPassword) {
+    throw new BadRequestException(
+      'Senha padrão de usuário não configurada.',
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(
+    defaultUserPassword,
+    10,
+  );
+
+  const updatedUser = await this.prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      mustChangePassword: true,
+      createdAt: true,
+      updatedAt: true,
+      clientProfile: true,
+    },
+  });
+
+  await this.auditLogsService.create({
+    category: AuditLogCategory.USER,
+    action: AuditLogAction.USER_UPDATED,
+    message: `Senha redefinida para o padrão por administrador para ${updatedUser.email}.`,
+    targetType: 'User',
+    targetId: updatedUser.id,
+    userId: actor?.sub,
+    details: {
+      mustChangePassword: true,
+      source: 'admin-reset-password',
+    },
+  });
+
+  return {
+    ...updatedUser,
+    screenPermissions:
+      await this.findRoleScreenPermissions(updatedUser.role),
+  };
+}
 
 
 

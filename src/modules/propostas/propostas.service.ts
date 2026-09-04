@@ -772,7 +772,7 @@ export class PropostasService {
     );
 
     const now = new Date();
-    const link = `/tickets?ticket=${ticketId}`;
+    const link = `/chamados?ticket=${ticketId}`;
     const emailSubject = 'Proposta disponível para análise';
     const pendingData = this.buildPropostaData(dto);
 
@@ -1074,7 +1074,7 @@ export class PropostasService {
               title: 'Proposta aguardando aprovação da Gestão',
               message:
                 'Uma proposta formal foi enviada para análise e aprovação da Gestão.',
-              link: `/tickets?ticket=${ticketId}`,
+              link: `/chamados?ticket=${ticketId}`,
               metadata: {
                 propostaId,
                 propostaCode: proposta.code,
@@ -1332,7 +1332,7 @@ export class PropostasService {
               ticketId,
               title: options.notificationTitle,
               message: options.notificationMessage,
-              link: `/tickets?ticket=${ticketId}`,
+              link: `/chamados?ticket=${ticketId}`,
               metadata: {
                 propostaId,
                 versao: proposta.versao,
@@ -1395,7 +1395,7 @@ export class PropostasService {
       })),
       subject: options.notificationTitle,
       message: options.notificationMessage,
-      link: `/tickets?ticket=${ticketId}`,
+      link: `/chamados?ticket=${ticketId}`,
     });
 
     return {
@@ -1632,7 +1632,7 @@ export class PropostasService {
               ticketId,
               title: options.notificationTitle,
               message: options.notificationMessage,
-              link: `/tickets?ticket=${ticketId}`,
+              link: `/chamados?ticket=${ticketId}`,
               metadata: {
                 propostaId,
                 propostaCode: proposta.code,
@@ -1679,7 +1679,7 @@ export class PropostasService {
       })),
       subject: options.notificationTitle,
       message: options.notificationMessage,
-      link: `/tickets?ticket=${ticketId}`,
+      link: `/chamados?ticket=${ticketId}`,
     });
 
     return {

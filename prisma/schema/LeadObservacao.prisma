@@ -1,0 +1,16 @@
+model LeadObservacao {
+  id          String   @id @default(uuid())
+  leadId      String
+  content     String
+  stage       String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lead      Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("LeadObservacaoAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([stage, createdAt])
+  @@index([createdById])
+}

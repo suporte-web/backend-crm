@@ -61,4 +61,16 @@ export class UsersController {
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.usersService.remove(id, user);
   }
+
+  @Patch(':id/reset-password')
+@Roles(AuthUserRole.ADMIN)
+resetPassword(
+  @Param('id') id: string,
+  @CurrentUser() actor: AuthUser,
+) {
+  return this.usersService.resetPasswordToDefault(
+    id,
+    actor,
+  );
+}
 }

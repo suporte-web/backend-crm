@@ -43,6 +43,35 @@ type UploadedClientDocumentFile = {
   size: number;
 };
 
+const LEAD_FUNNEL_STAGES = [
+  'entrada_leads',
+  'conversao',
+  'homologacao',
+  'cotacao',
+  'venda_efetivada',
+  'pos_venda',
+  'perdido',
+] as const;
+
+const LEAD_FUNNEL_STAGE_LABELS: Record<string, string> = {
+  entrada_leads: 'Entrada de Leads',
+  conversao: 'Conversão',
+  homologacao: 'Homologação',
+  cotacao: 'Cotação',
+  venda_efetivada: 'Venda Efetivada',
+  pos_venda: 'Pós-venda',
+  perdido: 'Perdido',
+};
+
+const LEGACY_LEAD_STATUS_TO_FUNNEL_STAGE: Record<string, string> = {
+  new: 'entrada_leads',
+  contacted: 'conversao',
+  qualified: 'homologacao',
+  converted: 'venda_efetivada',
+  converted_to_prospect: 'venda_efetivada',
+  archived: 'perdido',
+};
+
 @Injectable()
 export class ClientsService {
   constructor(
@@ -75,6 +104,20 @@ export class ClientsService {
   private sanitize(value?: string | null) {
     const trimmed = value?.trim();
     return trimmed || null;
+  }
+
+  private normalizeLeadFunnelStage(status?: string | null) {
+    const value = this.sanitize(status)?.toLowerCase();
+
+    if (!value) {
+      return 'entrada_leads';
+    }
+
+    if ((LEAD_FUNNEL_STAGES as readonly string[]).includes(value)) {
+      return value;
+    }
+
+    return LEGACY_LEAD_STATUS_TO_FUNNEL_STAGE[value] ?? 'entrada_leads';
   }
 
   private sanitizeClientContacts(contacts?: CreateClientContactDto[]) {
@@ -300,6 +343,33 @@ export class ClientsService {
 
   private toNumber(value: Prisma.Decimal | null | undefined) {
     return Number(value?.toString() ?? 0);
+  }
+
+  private getLeadMetadataString(
+    metadata: Prisma.JsonValue | null | undefined,
+    key: string,
+  ) {
+    if (!metadata || Array.isArray(metadata) || typeof metadata !== 'object') {
+      return null;
+    }
+
+    const value = (metadata as Record<string, Prisma.JsonValue>)[key];
+    return typeof value === 'string' || typeof value === 'number'
+      ? String(value)
+      : null;
+  }
+
+  private getLeadMonthlyEstimatedValue(
+    metadata: Prisma.JsonValue | null | undefined,
+  ) {
+    const value = this.getLeadMetadataString(metadata, 'monthlyEstimatedValue');
+
+    if (!value) {
+      return 0;
+    }
+
+    const parsed = Number(value.replace(/[^\d,.-]/g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private normalizeDocument(document?: string | null): string | null {
@@ -1213,6 +1283,7 @@ export class ClientsService {
           select: {
             id: true,
             status: true,
+            metadata: true,
           },
         }),
       ]);
@@ -1229,7 +1300,9 @@ export class ClientsService {
       activeClients: clients.filter((client) => client.status === 'ATIVO')
         .length,
       totalLeads: leads.length,
-      newLeads: leads.filter((lead) => lead.status === 'new').length,
+      newLeads: leads.filter(
+        (lead) => this.normalizeLeadFunnelStage(lead.status) === 'entrada_leads',
+      ).length,
       openOpportunities: openOpportunities.length,
       wonOpportunities: wonOpportunities.length,
       totalQuotes: quotes.length,
@@ -1283,6 +1356,20 @@ export class ClientsService {
           ),
         };
       }),
+      leadsByStage: LEAD_FUNNEL_STAGES.map((stage) => ({
+        stage,
+        label: LEAD_FUNNEL_STAGE_LABELS[stage],
+        count: leads.filter(
+          (lead) => this.normalizeLeadFunnelStage(lead.status) === stage,
+        ).length,
+        monthlyEstimatedValue: leads
+          .filter((lead) => this.normalizeLeadFunnelStage(lead.status) === stage)
+          .reduce(
+            (total, lead) =>
+              total + this.getLeadMonthlyEstimatedValue(lead.metadata),
+            0,
+          ),
+      })),
     };
   }
 
@@ -1521,7 +1608,7 @@ export class ClientsService {
             updatedClient.user?.name ??
             'Cliente sem nome'
           } atualizado: ${changedFields.join(', ')}.`,
-          link: `/clients/${updatedClient.id}`,
+          link: `/clientes/${updatedClient.id}`,
           actorId: user.sub,
           metadata: {
             clientId: updatedClient.id,
@@ -1683,7 +1770,7 @@ export class ClientsService {
       {
         title: 'Solicitação de exclusão de cliente',
         message: `${clientName} foi enviado para aprovação de exclusao.`,
-        link: '/clients',
+        link: '/clientes',
         actorId: user.sub,
         metadata: {
           clientId: client.id,
@@ -1801,7 +1888,7 @@ export class ClientsService {
         message: `A solicitacao de exclusao de ${
           request.clientNameSnapshot ?? request.client?.companyName ?? 'cliente'
         } foi recusada.`,
-        link: request.clientId ? `/clients/${request.clientId}` : '/clients',
+        link: request.clientId ? `/clientes/${request.clientId}` : '/clientes',
         actorId: user.sub,
         metadata: {
           clientId: request.clientId,
@@ -1889,7 +1976,7 @@ export class ClientsService {
     await this.notificationsService.notifyUsers([request.requestedBy.id], {
       title: 'Cliente excluído',
       message: `${targetName} foi excluído apos aprovação da Gestão.`,
-      link: '/clients',
+      link: '/clientes',
       actorId: user.sub,
       metadata: {
         clientId: targetClientId,
