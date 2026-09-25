@@ -24,7 +24,8 @@ import { HelpCenterModule } from './modules/help-center/help-center.module';
 import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
 import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entregas-por-placas.module';
 import { SolicitacoesSiteModule } from './modules/solicitacoes-site/solicitacoes-site.module';
-
+import { SiteInstitucionalModule } from './modules/site-institucional/site-institucional.module';
+import { MarketingIntegrationsModule } from './marketing-integrations/marketing-integrations.module';
 
 
 @Module({
@@ -54,6 +55,8 @@ import { SolicitacoesSiteModule } from './modules/solicitacoes-site/solicitacoes
     ScreenPermissionsModule,
     EntregasPorPlacasModule,
     SolicitacoesSiteModule,
+    SiteInstitucionalModule,
+    MarketingIntegrationsModule,
       
   ],
 })

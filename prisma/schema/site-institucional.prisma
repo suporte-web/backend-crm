@@ -1,0 +1,16 @@
+model PaginaSite {
+  id   String @id @default(uuid())
+  nome String
+  slug String @unique
+
+  conteudoRascunho  Json?
+  conteudoPublicado Json?
+
+  publicado                  Boolean @default(false)
+  temAlteracoesNaoPublicadas Boolean @default(false)
+
+  publicadoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

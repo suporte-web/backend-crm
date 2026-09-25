@@ -1,0 +1,16 @@
+model MarketingIntegration {
+  id                    String                     @id @default(uuid())
+  provider              MarketingProvider          @unique
+  status                MarketingIntegrationStatus @default(NAO_CONFIGURADO)
+  accountId             String?
+  accountName           String?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  metadata              Json?
+  lastSyncAt            DateTime?
+  lastError             String?
+  ativo                 Boolean                    @default(true)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+}

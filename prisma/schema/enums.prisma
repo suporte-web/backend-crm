@@ -275,3 +275,18 @@ enum ClientDeletionRequestStatus {
   RECUSADA
   CANCELADA
 }
+
+enum MarketingProvider {
+  GOOGLE_ANALYTICS
+  GOOGLE_ADS
+  META
+  LINKEDIN
+}
+
+enum MarketingIntegrationStatus {
+  NAO_CONFIGURADO
+  CONECTANDO
+  CONECTADO
+  ERRO
+  EXPIRADO
+}

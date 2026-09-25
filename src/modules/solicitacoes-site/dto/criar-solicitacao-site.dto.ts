@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -10,11 +11,18 @@ import {
 
 export class CriarSolicitacaoSiteDto {
   @IsString()
-  tipo: string;
+  @IsIn([
+  'COTACAO',
+  'AGREGADO',
+  'FORNECEDOR',
+  'FROTA',
+  'MARKETING',
+  'FINANCEIRO',
+  'JURIDICO',
+  'FISCAL',
+])
+tipo: string;
 
-  @IsOptional()
-  @IsString()
-  departamento?: string;
 
   @IsString()
   nome: string;
