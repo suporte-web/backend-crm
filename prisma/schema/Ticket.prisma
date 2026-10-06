@@ -1,4 +1,5 @@
 model Ticket {
+  atendimentoSac AtendimentoSac?
   id                  String          @id @default(uuid())
   clientId            String?
   subject             String

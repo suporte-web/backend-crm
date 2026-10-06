@@ -12,6 +12,8 @@ type RoleScreenPermissions = {
 @Injectable()
 export class ScreenPermissionsService {
   private permissions: RoleScreenPermissions[] = [
+    { role: UserRole.LIDER_ATENDIMENTO, permissions: [] },
+    { role: UserRole.ATENDIMENTO, permissions: [] },
     {
       role: UserRole.ADMIN,
       permissions: [],

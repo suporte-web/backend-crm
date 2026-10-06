@@ -1,0 +1,32 @@
+Validação de múltiplos perfis — 05/10/2026
+
+Concluído:
+- Seleção múltipla no cadastro e edição e exibição de todos os perfis.
+- Persistência e compatibilidade com usuários e pedidos antigos de perfil único.
+- União das permissões por perfil no menu, rotas, páginas e responsabilidades de chamados.
+- Autenticação considera os perfis atuais do banco, incluindo sessões existentes.
+- Migração aplicada no banco local crm_portal (localhost).
+- Compilações de produção do frontend e backend passaram.
+- 18 testes novos do backend e 6 testes do frontend passaram.
+- Teste de integração no banco local passou; todos os dados temporários foram revertidos.
+
+Limitações da suíte geral:
+- 23 suítes passaram, 11 falharam e 1 foi ignorada.
+- 102 testes passaram, 9 falharam e 2 foram ignorados.
+- Os testes antigos de controllers/services abaixo não configuram as dependências Nest.
+- ChatsService: o teste existente instancia o serviço com dois argumentos; o construtor exige três.
+- users.controller.spec.ts: o arquivo existente não contém testes.
+- O lint do frontend não pôde executar porque o projeto não possui eslint.config.js/mjs/cjs.
+
+Arquivos de testes existentes com falha:
+- src/modules/clientes/clients.controller.spec.ts
+- src/modules/tickets/tickets.controller.spec.ts
+- src/modules/auth/auth.controller.spec.ts
+- src/modules/quotes/quotes.controller.spec.ts
+- src/modules/clientes/clients.service.spec.ts
+- src/modules/quotes/quotes.service.spec.ts
+- src/modules/auth/auth.service.spec.ts
+- src/modules/users/users.service.spec.ts
+- src/modules/tickets/tickets.service.spec.ts
+- src/modules/chats/chats.service.spec.ts
+- src/modules/users/users.controller.spec.ts

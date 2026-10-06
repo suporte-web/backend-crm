@@ -1,9 +1,12 @@
 import {
   IsArray,
+  ArrayNotEmpty,
+  ArrayUnique,
   IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
+  ValidateIf,
   IsString,
   MinLength,
   ValidateNested,
@@ -50,8 +53,16 @@ export class CreateUserDto {
   @MinLength(6)
   password?: string;
 
+  @ValidateIf((dto: CreateUserDto) => dto.role !== undefined || dto.roles === undefined)
   @IsEnum(UserRole)
-  role!: UserRole;
+  role?: UserRole;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsEnum(UserRole, { each: true })
+  roles?: UserRole[];
 
   @IsOptional()
   @IsBoolean()

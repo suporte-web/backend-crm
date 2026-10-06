@@ -1,4 +1,7 @@
-﻿import { Module } from '@nestjs/common';
+import { AtendimentoSacModule } from './modules/atendimento-sac/atendimento-sac.module';
+import { Module } from '@nestjs/common';
+import { MarketingMetricsModule } from './marketing-metrics/marketing-metrics.module';
+import { InformativoModule } from './modules/informativo/informativo.module';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -51,12 +54,15 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     PropostasModule,
     ChatsModule,
     EntradasModule,
+    AtendimentoSacModule,
     HelpCenterModule,
     ScreenPermissionsModule,
     EntregasPorPlacasModule,
     SolicitacoesSiteModule,
     SiteInstitucionalModule,
     MarketingIntegrationsModule,
+    MarketingMetricsModule,
+    InformativoModule,
       
   ],
 })

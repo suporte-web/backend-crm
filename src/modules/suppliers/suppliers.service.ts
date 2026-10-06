@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ForbiddenException,
@@ -18,7 +19,7 @@ export class SuppliersService {
   ) {}
 
   private ensureInternalUser(user: AuthUser) {
-    if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL'])) {
       throw new ForbiddenException(
         'Você não tem permissão para convidar fornecedores.',
       );

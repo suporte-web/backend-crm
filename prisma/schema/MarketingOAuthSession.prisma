@@ -1,0 +1,19 @@
+// Autorizações temporárias isoladas da integração já conectada.
+model MarketingOAuthSession {
+  id                    String            @id @default(uuid())
+  provider              MarketingProvider
+  userId                String
+  stateHash             String            @unique
+  browserHash           String?
+  codeVerifierEncrypted String
+  startedAt             DateTime?
+  consumedAt            DateTime?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  expiresAt             DateTime
+  createdAt             DateTime          @default(now())
+
+  @@index([provider, userId])
+  @@index([expiresAt])
+}

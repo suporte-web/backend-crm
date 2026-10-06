@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../../common/user-roles';
 import {
   CanActivate,
   ExecutionContext,
@@ -30,7 +31,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User role not found');
     }
 
-    const hasPermission = requiredRoles.includes(user.role);
+    const hasPermission = hasAnyRole(user, requiredRoles);
 
     if (!hasPermission) {
       throw new ForbiddenException(

@@ -50,6 +50,7 @@ type ChatWithParticipants = Prisma.ChatGetPayload<{
           select: {
             id: true;
             role: true;
+            roles: true;
           };
         };
       };
@@ -72,12 +73,12 @@ export class ChatsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  private isInternalRole(role: string) {
-    return this.internalRoles.has(role);
+  private isInternalRole(role: string | string[]) {
+    return (Array.isArray(role) ? role : [role]).some((profile) => this.internalRoles.has(profile));
   }
 
-  private isGestaoComercialRole(role: string) {
-    return this.internalRoles.has(role);
+  private isGestaoComercialRole(role: string | string[]) {
+    return this.isInternalRole(role);
   }
 
   private stripUnsafeControlCharacters(value: string) {
@@ -241,7 +242,7 @@ export class ChatsService {
       throw new NotFoundException('Chat não encontrado.');
     }
 
-    if (!this.isInternalRole(user.role)) {
+    if (!this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
       throw new ForbiddenException(
         'Você não tem permissão para alterar este chat.',
       );
@@ -272,7 +273,7 @@ export class ChatsService {
   }
 
   canViewVisibility(
-    userRole: string,
+    userRole: string | string[],
     visibility: ChatMessageVisibility,
     isParticipant: boolean,
     isPrivateRecipient: boolean,
@@ -296,7 +297,7 @@ export class ChatsService {
     return isPrivateRecipient;
   }
 
-  canUseVisibility(userRole: string, visibility: ChatMessageVisibility) {
+  canUseVisibility(userRole: string | string[], visibility: ChatMessageVisibility) {
     if (visibility === ChatMessageVisibility.PUBLICA_CLIENTE) {
       return true;
     }
@@ -309,7 +310,7 @@ export class ChatsService {
     visibility: ChatMessageVisibility,
     authorizedUserIds?: string[],
   ) {
-    if (!this.canUseVisibility(user.role, visibility)) {
+    if (!this.canUseVisibility(user.roles?.length ? user.roles : user.role, visibility)) {
       throw new ForbiddenException(
         'Você não tem permissão para usar esta visibilidade.',
       );
@@ -344,7 +345,7 @@ export class ChatsService {
         }
 
         return this.canViewVisibility(
-          participant.user.role,
+          participant.user.roles?.length ? participant.user.roles : participant.user.role,
           visibility,
           true,
           false,
@@ -363,6 +364,7 @@ export class ChatsService {
               select: {
                 id: true,
                 role: true,
+                roles: true,
               },
             },
           },
@@ -412,7 +414,7 @@ export class ChatsService {
         throw new NotFoundException('Ticket não encontrado.');
       }
 
-      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
+      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
         throw new ForbiddenException(
           'Você não tem permissão para acessar este ticket.',
         );
@@ -454,7 +456,7 @@ export class ChatsService {
         throw new NotFoundException('Cliente não encontrado.');
       }
 
-      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
+      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
         throw new ForbiddenException(
           'Você não tem permissão para acessar este cliente.',
         );
@@ -496,7 +498,7 @@ export class ChatsService {
         throw new NotFoundException('Cotação não encontrada.');
       }
 
-      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
+      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
         throw new ForbiddenException(
           'Você não tem permissão para acessar esta cotação.',
         );
@@ -534,7 +536,7 @@ export class ChatsService {
         throw new NotFoundException('Proposta não encontrada.');
       }
 
-      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.role)) {
+      if (user.role !== UserRole.CLIENTE && !this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
         throw new ForbiddenException(
           'Você não tem permissão para acessar esta proposta.',
         );
@@ -567,7 +569,7 @@ export class ChatsService {
       throw new NotFoundException('Lead não encontrado.');
     }
 
-    if (!this.isInternalRole(user.role)) {
+    if (!this.isInternalRole(user.roles?.length ? user.roles : user.role)) {
       throw new ForbiddenException('Leads são restritos a usuários internos.');
     }
 
@@ -614,6 +616,7 @@ export class ChatsService {
                   select: {
                     id: true,
                     role: true,
+                    roles: true,
                   },
                 },
               },
@@ -655,6 +658,7 @@ export class ChatsService {
                   select: {
                     id: true,
                     role: true,
+                    roles: true,
                   },
                 },
               },
@@ -698,6 +702,7 @@ export class ChatsService {
                   select: {
                     id: true,
                     role: true,
+                    roles: true,
                   },
                 },
               },
@@ -790,6 +795,7 @@ export class ChatsService {
                 id: true,
                 name: true,
                 role: true,
+                roles: true,
               },
             },
           },
@@ -835,7 +841,7 @@ export class ChatsService {
             id: true,
             subject: true,
             status: true,
-            internalOnly: this.isInternalRole(user.role),
+            internalOnly: this.isInternalRole(user.roles?.length ? user.roles : user.role),
           },
         },
         messages: {
@@ -846,6 +852,7 @@ export class ChatsService {
                 id: true,
                 name: true,
                 role: true,
+                roles: true,
               },
             },
           },
@@ -1053,10 +1060,10 @@ export class ChatsService {
       deletedAt: null,
       OR: [
         { visibility: ChatMessageVisibility.PUBLICA_CLIENTE },
-        ...(this.isInternalRole(user.role)
+        ...(this.isInternalRole(user.roles?.length ? user.roles : user.role)
           ? [{ visibility: ChatMessageVisibility.INTERNA }]
           : []),
-        ...(this.isGestaoComercialRole(user.role)
+        ...(this.isGestaoComercialRole(user.roles?.length ? user.roles : user.role)
           ? [{ visibility: ChatMessageVisibility.GESTAO_COMERCIAL }]
           : []),
         {
@@ -1082,11 +1089,12 @@ export class ChatsService {
           select: {
             id: true,
             name: true,
-            email: this.isInternalRole(user.role),
+            email: this.isInternalRole(user.roles?.length ? user.roles : user.role),
             role: true,
+            roles: true,
           },
         },
-        recipients: this.isInternalRole(user.role)
+        recipients: this.isInternalRole(user.roles?.length ? user.roles : user.role)
           ? {
               include: {
                 user: {
@@ -1095,6 +1103,7 @@ export class ChatsService {
                     name: true,
                     email: true,
                     role: true,
+                    roles: true,
                   },
                 },
               },
@@ -1237,6 +1246,7 @@ export class ChatsService {
               name: true,
               email: true,
               role: true,
+              roles: true,
             },
           },
           recipients: true,

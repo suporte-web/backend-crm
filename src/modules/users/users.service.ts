@@ -1,3 +1,4 @@
+import { getUserRoles, normalizeUserRoles } from '../../common/user-roles';
 import {
   BadRequestException,
   Injectable,
@@ -80,6 +81,8 @@ export class UsersService {
   }
 
  async create(dto: CreateUserDto, actor?: AuthUser) {
+  const roles = normalizeUserRoles(dto.roles ?? (dto.role ? [dto.role] : []));
+  dto.role = roles[0];
   const isClient = dto.role === UserRole.CLIENTE;
 
   const email =
@@ -123,6 +126,7 @@ export class UsersService {
         passwordHash,
         mustChangePassword: true,
         role: dto.role,
+        roles,
         isActive: dto.isActive ?? (isClient ? false : true),
         clientProfile:
           isClient
@@ -178,6 +182,8 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        roles: true,
+        isActive: true,
         mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
@@ -232,7 +238,8 @@ export class UsersService {
 
     return {
       ...user,
-      screenPermissions: await this.findRoleScreenPermissions(user.role),
+      roles: getUserRoles(user),
+      screenPermissions: await this.findUserScreenPermissions(user),
     };
   }
 
@@ -244,6 +251,7 @@ export class UsersService {
           name: true,
           email: true,
           role: true,
+          roles: true,
           isActive: true,
           mustChangePassword: true,
           createdAt: true,
@@ -285,7 +293,8 @@ export class UsersService {
 
     return users.map((user) => ({
       ...user,
-      screenPermissions: permissionsByRole.get(user.role) ?? [],
+      roles: getUserRoles(user),
+      screenPermissions: getUserRoles(user).flatMap((role) => permissionsByRole.get(role) ?? []),
     }));
   }
 
@@ -297,6 +306,7 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        roles: true,
         isActive: true,
         mustChangePassword: true,
         createdAt: true,
@@ -334,7 +344,8 @@ export class UsersService {
 
     return {
       ...user,
-      screenPermissions: await this.findRoleScreenPermissions(user.role),
+      roles: getUserRoles(user),
+      screenPermissions: await this.findUserScreenPermissions(user),
     };
   }
 
@@ -377,6 +388,7 @@ export class UsersService {
       name: true,
       email: true,
       role: true,
+      roles: true,
       isActive: true,
       mustChangePassword: true,
       createdAt: true,
@@ -401,7 +413,7 @@ export class UsersService {
   return {
     ...updatedUser,
     screenPermissions:
-      await this.findRoleScreenPermissions(updatedUser.role),
+      await this.findUserScreenPermissions(updatedUser),
   };
 }
 
@@ -433,6 +445,7 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        roles: true,
         isActive: true,
         mustChangePassword: true,
         createdAt: true,
@@ -456,22 +469,25 @@ export class UsersService {
 
     return {
       ...updated,
-      screenPermissions: await this.findRoleScreenPermissions(updated.role),
+      roles: getUserRoles(updated),
+      screenPermissions: await this.findUserScreenPermissions(updated),
     };
   }
 
   async findInternalUsers() {
     return this.prisma.user.findMany({
       where: {
-        role: {
-          in: [UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL],
-        },
+        OR: [
+          { role: { in: [UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL] } },
+          { roles: { hasSome: [UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL] } },
+        ],
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        roles: true,
         isActive: true,
         mustChangePassword: true,
       },
@@ -531,6 +547,7 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        roles: true,
         isActive: true,
         mustChangePassword: true,
         createdAt: true,
@@ -553,7 +570,8 @@ export class UsersService {
 
     return {
       ...updated,
-      screenPermissions: await this.findRoleScreenPermissions(updated.role),
+      roles: getUserRoles(updated),
+      screenPermissions: await this.findUserScreenPermissions(updated),
     };
   }
 
@@ -577,8 +595,12 @@ export class UsersService {
       }
     }
 
+    const roles = dto.roles !== undefined || dto.role !== undefined
+      ? normalizeUserRoles(dto.roles ?? [dto.role!])
+      : undefined;
+
     const shouldManageClientProfile =
-      dto.role === UserRole.CLIENTE ||
+      roles?.includes(UserRole.CLIENTE) ||
       existingUser.role === UserRole.CLIENTE ||
       !!existingUser.clientProfile;
 
@@ -587,7 +609,8 @@ export class UsersService {
       data: {
         name: dto.name,
         email: dto.email,
-        role: dto.role,
+        role: roles?.[0],
+        roles,
         isActive: dto.isActive,
         clientProfile: shouldManageClientProfile
           ? {
@@ -659,6 +682,7 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        roles: true,
         isActive: true,
         mustChangePassword: true,
         createdAt: true,
@@ -713,7 +737,8 @@ export class UsersService {
 
     return {
       ...updatedUser,
-      screenPermissions: await this.findRoleScreenPermissions(updatedUser.role),
+      roles: getUserRoles(updatedUser),
+      screenPermissions: await this.findUserScreenPermissions(updatedUser),
     };
   }
 
@@ -728,6 +753,14 @@ export class UsersService {
       role,
       screens: permissionsByRole.get(role) ?? [],
     }));
+  }
+
+  async findUserScreenPermissions(user: { role: UserRole; roles?: UserRole[] }) {
+    return this.prisma.roleScreenPermission.findMany({
+      where: { role: { in: getUserRoles(user) } },
+      select: roleScreenPermissionSelect,
+      orderBy: [{ role: 'asc' }, { screenKey: 'asc' }],
+    });
   }
 
   async findRoleScreenPermissions(role: UserRole) {

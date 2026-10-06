@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ForbiddenException,
@@ -93,7 +94,7 @@ export class PropostasService {
   }
 
   private isInternalUser(user: AuthUser) {
-    return ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role);
+    return hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL']);
   }
 
   private ensureInternalUser(user: AuthUser) {
@@ -111,7 +112,7 @@ export class PropostasService {
   }
 
   private ensureManagementUser(user: AuthUser) {
-    if (!['ADMIN', 'GESTAO'].includes(user.role)) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO'])) {
       throw new ForbiddenException('Apenas a Gestão pode executar esta ação.');
     }
   }

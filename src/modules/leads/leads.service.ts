@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ConflictException,
@@ -113,7 +114,7 @@ export class LeadsService {
   private ensureInternalUser(user: AuthUser) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
 
-    if (!allowedRoles.includes(user.role)) {
+    if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar este recurso.',
       );

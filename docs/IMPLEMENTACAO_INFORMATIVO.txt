@@ -1,0 +1,122 @@
+Informativo Pizzattolog — implementação e teste local
+
+Projetos utilizados
+CRM backend: C:\Users\caroline.augusto\Desktop\repositório\frontend-crm\backend-crm
+CRM frontend: C:\Users\caroline.augusto\Desktop\repositório\frontend-crm\frontend-crm
+Site frontend: C:\Users\caroline.augusto\Desktop\repositório\site_pizzattolog\site_pizzattolog_frontend
+O backend do site institucional não precisou de alterações. A outra cópia de backend-crm na raiz de repositório não foi alterada.
+
+Fluxo implementado
+Formulário do site -> POST /api/informativo (Next.js) -> POST /api/informativo/site (CRM) -> InformativoAssinante.
+O módulo não depende de Leads, Entradas ou Solicitações do Site.
+O nome é normalizado removendo espaços excedentes; o e-mail é convertido para minúsculas e tem espaços nas extremidades removidos.
+O upsert pela chave única email impede duplicatas, atualiza o nome e reativa DESCADASTRADO para ATIVO.
+O aceite omitido em um recadastro preserva o valor anterior. O formulário existente informa o aceite ao assinar; esse aviso foi preservado e o envio registra aceitePrivacidade=true.
+Nenhuma alteração foi feita nas permissões das telas existentes. A nova tela registra sua própria chave informativo e respeita o bloqueio dessa chave.
+
+Arquivos criados — caminhos relativos a cada projeto acima
+
+CRM backend:
+prisma/schema/InformativoAssinante.prisma
+prisma/migrations/20261001120000_criar_informativo_assinante/migration.sql
+src/modules/informativo/informativo.module.ts
+src/modules/informativo/informativo.controller.ts
+src/modules/informativo/informativo.service.ts
+src/modules/informativo/dto/criar-assinante.dto.ts
+src/modules/informativo/dto/listar-assinantes.dto.ts
+src/modules/informativo/guards/integracao-informativo.guard.ts
+src/modules/informativo/informativo.controller.spec.ts
+docs/IMPLEMENTACAO_INFORMATIVO.txt (este relatório)
+
+CRM frontend:
+src/app/marketing/informativo/page.tsx
+src/app/marketing/informativo/components/InformativoPage.tsx
+src/services/informativo.service.ts
+src/types/informativo.ts
+
+Site frontend:
+src/app/api/informativo/route.ts
+scripts/informativo.test.mjs
+.env.example
+
+Arquivos alterados
+CRM backend: src/app.module.ts (registro do módulo), .env.example (documentação do token).
+CRM backend: .env local (mesmo token já existente no site, sem exibir ou versionar o segredo).
+CRM frontend: src/config/screens.ts, src/components/layout/sidebar-config.ts, src/components/layout/header.tsx.
+Site frontend: src/components/site/layout/SiteNewsletter.tsx.
+Nenhum package.json ou package-lock.json foi alterado. Não é necessário npm install para esta implementação.
+
+Prisma
+Enum StatusInformativo: ATIVO e DESCADASTRADO.
+Model InformativoAssinante: id, nome, email único, status, origem, aceitePrivacidade, criadoEm e atualizadoEm.
+Status inicial ATIVO, origem SITE_PIZZATTOLOG, datas automáticas e aceite padrão false.
+Migration aditiva: cria somente o enum, a tabela e o índice único de e-mail. Migrations anteriores foram preservadas.
+Executados: npx prisma validate, npx prisma generate e prisma migrate deploy (CLI local).
+A nova migration já foi aplicada no PostgreSQL local crm_portal, localhost:5432.
+Em outro banco/ambiente, executar dentro do CRM backend:
+  npx prisma migrate deploy
+  npx prisma generate
+Não é necessário criar outra migration. Reiniciar o backend após mudar variáveis de ambiente.
+
+Endpoints
+Site: POST /api/informativo — valida o payload e chama o CRM server-side.
+CRM: POST /api/informativo/site — exige header x-integration-token com SITE_LEAD_INTEGRATION_TOKEN.
+CRM: GET /api/informativo — exige JWT válido e perfil ADMIN ou MARKETING.
+Filtros da listagem: ?q=maria&status=ATIVO. q pesquisa nome/e-mail sem diferenciar maiúsculas; status aceita ATIVO ou DESCADASTRADO.
+Formato da listagem: { assinantes: [...], totais: { total, ativos, descadastrados } }.
+Os totais são gerais e não mudam com os filtros. Registros ordenados por criadoEm decrescente.
+O cadastro retorna HTTP 200 com confirmação amigável, também para e-mails já cadastrados.
+Erros internos não são repassados ao visitante.
+
+Tela do CRM
+Marketing -> Informativo Pizzattolog
+Rota: /marketing/informativo
+Cards de total, ativos e descadastrados; pesquisa e filtro; tabela no desktop e cartões no mobile.
+Datas no formato dd/MM/yyyy HH:mm, fuso America/Sao_Paulo. Status com Chip e origem Site Pizzattolog.
+
+Variáveis de ambiente
+Site frontend, .env.local:
+  NEXT_PUBLIC_API_URL=http://localhost:3003/api
+  CRM_API_URL=http://localhost:3001/api
+  SITE_LEAD_INTEGRATION_TOKEN=<segredo compartilhado>
+CRM backend, .env:
+  SITE_LEAD_INTEGRATION_TOKEN=<mesmo segredo do site>
+  DATABASE_URL=<conexão PostgreSQL já utilizada>
+CRM frontend, .env.local:
+  NEXT_PUBLIC_API_URL=http://localhost:3001/api
+CRM_API_URL já existia no site. O token do site já existente foi configurado no CRM local.
+Nunca usar prefixo NEXT_PUBLIC_ para o token ou para CRM_API_URL. Em produção, definir a URL completa da API do CRM pelas variáveis, sem alterar o código.
+
+Como testar manualmente de ponta a ponta
+1. Iniciar CRM backend com npm run dev (3001), CRM frontend com npm run dev (3000), site backend com npm run dev (3003) e site frontend com npm run dev (3002). Se já estiverem em execução, reiniciar somente os processos que precisarem recarregar variáveis.
+2. Abrir http://localhost:3002 e preencher Nome e E-mail em Informativo Pizzattolog. Clicar Assine. O botão deve mostrar Enviando..., ficar desabilitado e apresentar sucesso; os campos devem ser limpos.
+3. Entrar no CRM em http://localhost:3000 com perfil ADMIN ou MARKETING. Abrir Marketing -> Informativo Pizzattolog ou http://localhost:3000/marketing/informativo.
+4. Conferir nome, e-mail em minúsculas, status Ativo, origem Site Pizzattolog e data. Pesquisar por nome/e-mail e filtrar Ativos ou Descadastrados.
+5. Reenviar o mesmo e-mail no site, inclusive com letras maiúsculas. Deve retornar sucesso e manter um único registro, atualizando o nome.
+6. Para testar reativação, alterar apenas um assinante de teste para DESCADASTRADO via Prisma Studio (npx prisma studio), então reenviar o mesmo e-mail pelo site. Deve ficar ATIVO e manter ID e data inicial.
+7. Confirmar que o e-mail de teste não apareceu como Lead ou Solicitação do Site.
+8. Testar nome vazio/e-mail inválido e falha de conexão: deve aparecer mensagem amigável, sem dados técnicos. Uma tentativa que falhar deve preservar os campos.
+
+Verificações executadas
+17 testes novos passaram: 12 testes HTTP NestJS e 5 testes da rota Next.js.
+TypeScript dos dois frontends e TypeScript de produção do backend passaram.
+Prisma schema validado e Prisma Client gerado.
+Teste real HTTP Next.js -> CRM -> PostgreSQL passou, incluindo normalização, aceite, três reenvios simultâneos, reativação, filtros/totais, ausência de Lead/Solicitação e proteção dos endpoints.
+O registro aleatório usado no teste real foi removido ao final.
+A ordem da rota inicial Dashboard foi preservada e o bloqueio da nova permissão foi verificado.
+
+Comandos para repetir testes automatizados
+CRM backend:
+  node node_modules/jest/bin/jest.js --runInBand informativo.controller.spec.ts
+  node node_modules/typescript/bin/tsc --project tsconfig.build.json --noEmit --incremental false
+Site frontend:
+  node scripts/informativo.test.mjs
+  node node_modules/typescript/bin/tsc --noEmit --incremental false
+CRM frontend:
+  node node_modules/typescript/bin/tsc --noEmit --incremental false
+
+Limitações das verificações gerais existentes
+A checagem TypeScript incluindo todos os testes do backend encontrou um erro anterior em src/modules/chats/chats.service.spec.ts:19, construtor chamado com 2 argumentos quando espera 3. A checagem de produção passou.
+scripts/site-home-navigation.test.mjs apresentou duas falhas em testes anteriores de contatos, relativas a AGREGADO e à expectativa antiga /entradas/site. Os arquivos de contato envolvidos não foram modificados nesta integração.
+ESLint do CRM frontend não pôde executar porque o projeto não possui eslint.config.js/mjs/cjs compatível com a versão instalada.
+Esses problemas foram mantidos fora do escopo. A tela do CRM foi validada por TypeScript, sem inspeção visual em uma sessão autenticada.

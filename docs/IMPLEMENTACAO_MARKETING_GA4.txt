@@ -1,0 +1,176 @@
+Marketing — integração Google Analytics 4 e métricas
+
+Projetos alterados
+Backend: C:\Users\caroline.augusto\Desktop\repositório\frontend-crm\backend-crm
+Frontend: C:\Users\caroline.augusto\Desktop\repositório\frontend-crm\frontend-crm
+Não foram alterados os projetos do site, Leads, Solicitações do Site, Informativo, Blog, autenticação ou usuários.
+A tela Marketing > Integrações foi reaproveitada; os quatro cards e os estados atuais foram preservados. Apenas o GA4 tem conexão implementada. Google Ads, Meta e LinkedIn continuam preparados para implementação futura.
+
+O que foi implementado
+- Conectar GA4: autorização Google com escopo somente leitura analytics.readonly e acesso offline.
+- Callback validado por state aleatório, vínculo com o navegador via cookie HttpOnly, PKCE e consumo atômico de uso único.
+- Sessões de OAuth persistidas no PostgreSQL e vinculadas ao usuário do CRM que iniciou a conexão.
+- Credenciais temporárias criptografadas até a seleção de propriedade; nenhuma credencial Google é enviada ao frontend.
+- Listagem de propriedades pela Google Analytics Admin API, incluindo paginação.
+- Seleção explícita de propriedade disponível para a conta autorizada e teste na Google Analytics Data API antes de salvar.
+- Armazenamento de tokens na estrutura MarketingIntegration existente, com AES-256-GCM, IV aleatório e chave somente no .env do backend.
+- Renovação automática do access token, preservando refresh token quando o Google não retorna um novo.
+- Tratamento de autorização revogada/expirada, falhas de API, status, nome da conta/propriedade, Property ID, última sincronização e mensagens amigáveis.
+- Desconexão limpa tokens e sessões pendentes e solicita revogação no Google. Uma falha na revogação não mantém a integração ativa no CRM.
+- Uma renovação em andamento não pode restaurar uma integração já desconectada.
+- Reconectar não substitui uma conexão existente até que a nova autorização e seleção tenham sido concluídas.
+- Metadados públicos são filtrados: apenas propertyId e propertyName são retornados. Tokens criptografados, sessions, verifier e secrets nunca são retornados.
+
+Marketing > Métricas
+Rota: /marketing/metricas
+Acesso: ADMIN e MARKETING, respeitando a nova chave de permissão marketingMetrics.
+Sem integração ativa com propriedade selecionada, mostra:
+Google Analytics ainda não conectado. Configure em Marketing > Integrações.
+Com integração, consulta automaticamente dados pelo backend:
+usuários, sessões, visualizações, novos usuários, conversões/eventos principais e eventos;
+gráfico diário com escolha de indicador;
+origem/mídia e canal de tráfego;
+páginas mais acessadas;
+eventos mais relevantes.
+Períodos: 7, 30, 90 dias e personalizado. Datas incluem o dia atual no calendário America/Sao_Paulo; o GA4 agrega os dias conforme o fuso da propriedade, informado na tela. Período personalizado aceita até 366 dias, sem datas futuras.
+Os totais de usuários são consultados separadamente da série diária, evitando somar usuários repetidos entre dias. Datas sem linhas no relatório diário são mostradas como zero.
+Tabelas ordenadas pelos indicadores relevantes e limitadas aos 20 primeiros resultados. Erros, carregamento, ausência de dados e limitações de privacidade/agregação são tratados.
+Conversões usam keyEvents, a métrica de eventos principais do GA4. O total eventCount é exibido separadamente.
+
+Arquivos criados — caminhos relativos aos projetos indicados acima
+
+Backend:
+prisma/schema/MarketingOAuthSession.prisma
+prisma/migrations/20261001160000_marketing_oauth_sessions/migration.sql
+src/marketing-integrations/token-cipher.service.ts
+src/marketing-integrations/google-api.types.ts
+src/marketing-integrations/google-analytics.service.ts
+src/marketing-integrations/google-analytics.controller.ts
+src/marketing-integrations/dto/select-property.dto.ts
+src/marketing-integrations/google-analytics.spec.ts
+src/marketing-integrations/marketing-http.spec.ts
+src/marketing-integrations/providers/google-analytics.provider.spec.ts
+src/marketing-metrics/dto/metrics-period.dto.ts
+src/marketing-metrics/marketing-metrics.service.ts
+src/marketing-metrics/marketing-metrics.service.spec.ts
+src/marketing-metrics/marketing-metrics.controller.ts
+src/marketing-metrics/marketing-metrics.module.ts
+docs/IMPLEMENTACAO_MARKETING_GA4.txt (este relatório)
+
+Frontend:
+src/components/marketing/GoogleAnalyticsControls.tsx
+src/app/marketing/metricas/page.tsx
+src/app/marketing/metricas/components/MarketingMetricsPage.tsx
+src/services/marketing-metrics.service.ts
+src/types/marketing-metrics.ts
+
+Arquivos alterados
+Backend:
+src/app.module.ts
+src/marketing-integrations/marketing-integrations.module.ts
+src/marketing-integrations/marketing-integrations.service.ts
+src/marketing-integrations/providers/google-analytics.provider.ts
+.env.example
+.env local, sem versionar ou exibir secrets
+
+Frontend:
+src/app/marketing/integracoes/components/MarketingIntegrationsPage.tsx
+src/services/marketing-integrations.service.ts
+src/types/marketing-integrations.ts
+src/config/screens.ts
+src/components/layout/sidebar-config.ts
+src/components/layout/header.tsx
+
+Prisma
+MarketingIntegration foi preservado sem alteração de schema.
+Foi criada a tabela MarketingOAuthSession para estados, vínculo com navegador/usuário, PKCE e autorizações temporárias. State e vínculo do navegador são armazenados como hashes. Tokens e verifier são criptografados.
+State expira em 10 minutos; seleção pendente expira em 20 minutos após callback. Sessões expiradas são removidas ao iniciar conexão ou consultar propriedades. Autorizações pendentes de um usuário são substituídas quando ele inicia uma nova conexão.
+Migration aditiva já aplicada no PostgreSQL local crm_portal. Nenhuma migration anterior foi modificada.
+Prisma Client gerado e schema validado.
+
+Variáveis — somente backend/.env
+GOOGLE_CLIENT_ID=<Client ID OAuth Web do Google Cloud>
+GOOGLE_CLIENT_SECRET=<Client Secret OAuth Web do Google Cloud>
+GOOGLE_REDIRECT_URI=http://localhost:3001/api/marketing-integrations/google/callback
+MARKETING_FRONTEND_URL=http://localhost:3000
+MARKETING_TOKEN_ENCRYPTION_KEY=<32 bytes aleatórios em base64, ou 64 caracteres hexadecimais>
+
+Endpoints oficiais configuráveis, com valores documentados no .env.example:
+GOOGLE_OAUTH_AUTHORIZE_URL=https://accounts.google.com/o/oauth2/v2/auth
+GOOGLE_OAUTH_TOKEN_URL=https://oauth2.googleapis.com/token
+GOOGLE_OAUTH_REVOKE_URL=https://oauth2.googleapis.com/revoke
+GOOGLE_ANALYTICS_ADMIN_API_URL=https://analyticsadmin.googleapis.com/v1beta
+GOOGLE_ANALYTICS_DATA_API_URL=https://analyticsdata.googleapis.com/v1beta
+
+DATABASE_URL, JWT_SECRET e as configurações existentes de CORS continuam sendo utilizadas.
+No frontend, somente a variável pública já existente NEXT_PUBLIC_API_URL=http://localhost:3001/api é necessária. Nenhuma credencial Google deve ser configurada no frontend.
+As URLs locais, endpoints oficiais e uma chave de criptografia aleatória já foram configurados no backend local. GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET continuam ausentes e precisam ser preenchidos pela equipe técnica.
+Preserve a chave de criptografia entre reinicializações e deploys. Trocar a chave impede ler as autorizações anteriores e exige migração das credenciais ou reconexão.
+Em produção, configure HTTPS para as URLs do backend e do CRM e cadastre no Google exatamente o mesmo redirect URI usado no .env.
+
+Endpoints (prefixo global /api)
+GET /marketing-integrations — listagem existente, sem tokens ou metadados privados.
+GET /marketing-integrations/google/connect — JWT ADMIN/MARKETING; retorna URL de início de autorização, sem secrets.
+GET /marketing-integrations/google/authorize?ticket=... — troca o ticket de uso único por redirect ao Google e cria cookie HttpOnly.
+GET /marketing-integrations/google/callback — público porque recebe o redirect do Google; valida state, cookie, prazo, PKCE e uso único.
+GET /marketing-integrations/google-analytics/properties — JWT ADMIN/MARKETING; propriedades da autorização pendente do próprio usuário.
+POST /marketing-integrations/google-analytics/select-property — JWT ADMIN/MARKETING; body { "propertyId": "123456789" }.
+POST /marketing-integrations/google-analytics/test — JWT ADMIN/MARKETING.
+DELETE /marketing-integrations/google-analytics — JWT ADMIN/MARKETING.
+GET /marketing-metrics/resumo
+GET /marketing-metrics/trafego
+GET /marketing-metrics/paginas
+GET /marketing-metrics/eventos
+Todos os endpoints de métricas exigem JWT ADMIN/MARKETING.
+Filtros de métricas: ?periodo=7, ?periodo=30, ?periodo=90 ou ?periodo=personalizado&inicio=2026-09-01&fim=2026-09-30.
+O callback redireciona apenas com google=selecione, google=erro ou google=cancelado. Não redireciona códigos de autorização nem tokens para o CRM.
+
+Comandos
+Não é necessário npm install: foram utilizadas as dependências existentes e fetch do Node.js, sem SDK adicional.
+Dentro do backend, para outro banco/ambiente:
+  npx prisma migrate deploy
+  npx prisma generate
+Reiniciar o backend depois de configurar o .env.
+Desenvolvimento:
+  Backend: npm run dev (3001)
+  Frontend: npm run dev (3000)
+Não é necessário iniciar os projetos do site para testar estas telas.
+
+Configuração e teste real local
+1. No Google Cloud, habilitar Google Analytics Admin API e Google Analytics Data API.
+2. Configurar a tela de consentimento OAuth. Se o aplicativo estiver em modo de teste, incluir a conta que fará a autorização como usuário de teste.
+3. Criar credenciais OAuth do tipo Web application. Cadastrar exatamente:
+   http://localhost:3001/api/marketing-integrations/google/callback
+4. Preencher GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET somente no backend/.env. Reiniciar o backend.
+5. Entrar no CRM como ADMIN ou MARKETING e abrir Marketing > Métricas. Antes da conexão, conferir o estado vazio.
+6. Abrir Marketing > Integrações. No card Google Analytics 4, clicar Conectar. Autorizar uma conta Google com acesso de leitura à propriedade GA4 da Pizzattolog.
+7. De volta ao CRM, selecionar a propriedade e clicar Salvar e conectar. O backend verifica a propriedade pela Data API antes de salvar.
+8. Conferir status Conectado, conta/propriedade, Property ID e última sincronização. Clicar Testar conexão.
+9. Abrir Marketing > Métricas e testar 7/30/90 dias e período personalizado. Os dados dependem dos eventos realmente coletados pela propriedade GA4.
+10. Conferir os cards, o gráfico, origem do tráfego, páginas e eventos. Nenhum dado demonstrativo é utilizado na aplicação.
+11. Testar cancelamento da autorização, seleção inválida e reconexão. Uma autorização cancelada não substitui a conexão anterior.
+12. Desconectar e confirmar o retorno ao estado vazio em Métricas. Para testar EXPIRADO, revogar o acesso no Google e testar a conexão no CRM.
+13. Na aba Network do navegador, conferir que respostas do CRM não possuem client_secret, access_token, refresh_token, private key, tokens criptografados ou verifier. As chamadas à Admin API e à Data API ocorrem somente no backend.
+
+Validações realizadas
+36 testes de Marketing em 5 suites passaram: ciclo OAuth, criptografia, APIs Google simuladas, DTOs, filtros, métricas, fronteiras HTTP, permissões, callback e listagem existente.
+TypeScript de produção do backend e TypeScript do frontend passaram.
+ESLint dos módulos de Marketing do backend passou.
+Schema Prisma validado, migration aplicada e client gerado.
+O ciclo de persistência foi validado no PostgreSQL real com Google simulado, dentro de uma transação revertida: callback concorrente consumido apenas uma vez, tokens criptografados, seleção, renovação e desconexão. Nenhuma escrita de teste foi mantida.
+A nova rota respeita permissões e a rota inicial Dashboard foi preservada.
+Não foi realizada autorização com uma conta Google real nem consulta de dados reais de uma propriedade, porque Client ID e Client Secret ainda não estão configurados. A tela não foi inspecionada em uma sessão visual autenticada; sua tipagem e fluxo de dados foram verificados.
+
+Como repetir os testes
+Backend:
+  node node_modules/jest/bin/jest.js --runInBand --testPathPattern=marketing
+  node node_modules/typescript/bin/tsc --project tsconfig.build.json --noEmit --incremental false
+  node node_modules/eslint/bin/eslint.js src/marketing-integrations src/marketing-metrics
+Frontend:
+  node node_modules/typescript/bin/tsc --noEmit --incremental false
+
+Referências oficiais utilizadas
+OAuth de aplicações servidor: https://developers.google.com/identity/protocols/oauth2/web-server
+Propriedades disponíveis: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/accountSummaries/list
+Data API runReport: https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runReport
+Dimensões e métricas GA4: https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema

@@ -1,3 +1,4 @@
+import { getUserRoles, hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ForbiddenException,
@@ -67,18 +68,18 @@ export class TicketsService {
     private readonly chatsService: ChatsService,
   ) {}
 
-  private ensureInternalUser(user: { sub: string; role: string }) {
+  private ensureInternalUser(user: { sub: string; role: string; roles?: string[] }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
 
-    if (!allowedRoles.includes(user.role)) {
+    if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar este recurso.',
       );
     }
   }
 
-  private isInternalUser(user: { role: string }) {
-    return ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role);
+  private isInternalUser(user: { role: string; roles?: string[] }) {
+    return hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL']);
   }
 
   private sanitize(value?: string | null) {
@@ -176,6 +177,7 @@ export class TicketsService {
 
   private includeTicketRelations(user?: {
     role: string;
+    roles?: string[];
   }): Prisma.TicketInclude {
     const hideInternal = user?.role === 'CLIENTE';
 
@@ -343,12 +345,12 @@ export class TicketsService {
   }
 
   private buildWhereForUser(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     filters: TicketFilters,
   ): Prisma.TicketWhereInput {
     const status = this.validateStatus(filters.status);
     const type = this.validateType(filters.type);
-    const and: Prisma.TicketWhereInput[] = [];
+    const and: Prisma.TicketWhereInput[] = [{ atendimentoSac: { is: null } }];
 
     if (status) {
       and.push({ status });
@@ -360,6 +362,23 @@ export class TicketsService {
 
     if (filters.q?.trim()) {
       and.push(this.buildTextSearchWhere(filters.q.trim()));
+    }
+
+    const profiles = getUserRoles(user);
+    if (hasAnyRole(user, ['ADMIN'])) return { AND: and };
+    if (profiles.length > 1) {
+      const ticketProfiles = profiles.filter((profile) =>
+        ['CLIENTE', 'COMERCIAL', 'GESTAO'].includes(profile),
+      );
+      if (!ticketProfiles.length) {
+        throw new ForbiddenException('Você não tem permissão para acessar tickets.');
+      }
+      and.push({
+        OR: ticketProfiles.map((role) =>
+          this.buildWhereForUser({ sub: user.sub, role }, {}),
+        ),
+      });
+      return { AND: and };
     }
 
     if (user.role === 'CLIENTE') {
@@ -426,6 +445,7 @@ export class TicketsService {
     user: {
       sub: string;
       role: string;
+    roles?: string[];
     },
     ticket: {
       client?: {
@@ -836,7 +856,7 @@ export class TicketsService {
     return this.findAll({ sub: userId, role: 'CLIENTE' }, filters);
   }
 
-  async findAll(user: { sub: string; role: string }, filters: TicketFilters) {
+  async findAll(user: { sub: string; role: string; roles?: string[] }, filters: TicketFilters) {
     const where = this.buildWhereForUser(user, filters);
 
     return this.prisma.ticket.findMany({
@@ -853,7 +873,7 @@ export class TicketsService {
     });
   }
 
-  async findOne(user: { sub: string; role: string }, id: string) {
+  async findOne(user: { sub: string; role: string; roles?: string[] }, id: string) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       include: this.includeTicketRelations(user),
@@ -863,6 +883,7 @@ export class TicketsService {
       throw new NotFoundException('Ticket não encontrado.');
     }
 
+    if ((ticket.formPayload as Record<string, unknown> | null)?.canal === 'RECLAMACOES_ELOGIOS') throw new ForbiddenException('Abra esta ocorrência no módulo Atendimento SAC.');
     this.assertTicketAccess(user, ticket);
     await this.notificationsService.markTicketNotificationsRead(user.sub, id);
 
@@ -1562,7 +1583,7 @@ export class TicketsService {
     id: string,
     dto: ManagementTicketDecisionDto,
   ) {
-    if (!['ADMIN', 'GESTAO'].includes(user.role)) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO'])) {
       throw new ForbiddenException('Apenas Gestão pode executar esta ação.');
     }
 

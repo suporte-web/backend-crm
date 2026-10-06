@@ -27,6 +27,7 @@ model Lead {
   timeline          LeadTimelineEvent[]
   tickets           Ticket[]
   observations      LeadObservacao[]
+  anexos            LeadAnexo[]
 
   convertidoParaCliente Boolean @default(false)
 

@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ConflictException,
@@ -81,20 +82,20 @@ export class ClientsService {
     private readonly usersService: UsersService,
   ) {}
 
-  private ensureInternalUser(user: { sub: string; role: string }) {
+  private ensureInternalUser(user: { sub: string; role: string; roles?: string[] }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
 
-    if (!allowedRoles.includes(user.role)) {
+    if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar este recurso.',
       );
     }
   }
 
-  private ensureManagementUser(user: { sub: string; role: string }) {
+  private ensureManagementUser(user: { sub: string; role: string; roles?: string[] }) {
     const allowedRoles = ['ADMIN', 'GESTAO'];
 
-    if (!allowedRoles.includes(user.role)) {
+    if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
         'Você não tem permissão para aprovar esta solicitação.',
       );
@@ -507,7 +508,7 @@ export class ClientsService {
   }
 
   async findAll(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     filters: {
       internalOwnerId?: string;
       status?: string;
@@ -556,7 +557,7 @@ export class ClientsService {
   }
 
   async getMyPortfolio(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     filters: { status?: string; segment?: string },
   ) {
     this.ensureInternalUser(user);
@@ -598,7 +599,7 @@ export class ClientsService {
     });
   }
 
-  async getOwnersSummary(user: { sub: string; role: string }) {
+  async getOwnersSummary(user: { sub: string; role: string; roles?: string[] }) {
     this.ensureInternalUser(user);
 
     const internalUsers = await this.prisma.user.findMany({
@@ -645,12 +646,12 @@ export class ClientsService {
     });
   }
 
-  async findOne(user: { sub: string; role: string }, id: string) {
+  async findOne(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
     return this.getClientOrFail(id);
   }
 
-  async getSummary(user: { sub: string; role: string }, id: string) {
+  async getSummary(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
 
     const client = await this.getClientOrFail(id);
@@ -814,7 +815,7 @@ export class ClientsService {
     };
   }
 
-  async getTimeline(user: { sub: string; role: string }, id: string) {
+  async getTimeline(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
     const client = await this.getClientOrFail(id);
     return this.buildCombinedTimeline(client);
@@ -1374,7 +1375,7 @@ export class ClientsService {
   }
 
   async update(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     id: string,
     dto: UpdateClientDto,
   ) {

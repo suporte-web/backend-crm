@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TokenCipherService } from './token-cipher.service';
+import { GoogleAnalyticsService } from './google-analytics.service';
+import { GoogleAnalyticsController } from './google-analytics.controller';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { GoogleAdsProvider } from './providers/google-ads.provider';
@@ -9,15 +13,17 @@ import { MarketingIntegrationsController } from './marketing-integrations.contro
 import { MarketingIntegrationsService } from './marketing-integrations.service';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [MarketingIntegrationsController],
+  imports: [PrismaModule, ConfigModule],
+  controllers: [MarketingIntegrationsController, GoogleAnalyticsController],
   providers: [
     MarketingIntegrationsService,
+    GoogleAnalyticsService,
+    TokenCipherService,
     GoogleAnalyticsProvider,
     GoogleAdsProvider,
     MetaProvider,
     LinkedinProvider,
   ],
-  exports: [MarketingIntegrationsService],
+  exports: [MarketingIntegrationsService, GoogleAnalyticsService],
 })
 export class MarketingIntegrationsModule {}

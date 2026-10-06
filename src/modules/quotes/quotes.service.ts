@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ForbiddenException,
@@ -70,8 +71,8 @@ export class QuotesService {
     };
   }
 
-  private isInternalUser(user: { role: string }) {
-    return ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role);
+  private isInternalUser(user: { role: string; roles?: string[] }) {
+    return hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL']);
   }
 
   private sanitize(value?: string | null) {
@@ -128,10 +129,10 @@ export class QuotesService {
     return `${prefix}-${String(hash).padStart(6, '0')}`;
   }
 
-  private ensureInternalUser(user: { sub: string; role: string }) {
+  private ensureInternalUser(user: { sub: string; role: string; roles?: string[] }) {
     const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL'];
 
-    if (!allowedRoles.includes(user.role)) {
+    if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
         'Você não tem permissão para executar esta ação.',
       );
@@ -318,7 +319,7 @@ export class QuotesService {
   }
 
   async createInternal(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     dto: CreateInternalQuoteDto,
   ) {
     this.ensureInternalUser(user);
@@ -535,7 +536,7 @@ export class QuotesService {
   }
 
   async findAll(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     filters: { status?: string; clientId?: string },
   ) {
     this.ensureInternalUser(user);
@@ -572,7 +573,7 @@ export class QuotesService {
     });
   }
 
-  async findOne(user: { sub: string; role: string }, id: string) {
+  async findOne(user: { sub: string; role: string; roles?: string[] }, id: string) {
     const quote = await this.prisma.quote.findUnique({
       where: { id },
       include: {
@@ -592,7 +593,7 @@ export class QuotesService {
   }
 
   async update(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     id: string,
     dto: UpdateQuoteDto,
   ) {
@@ -606,7 +607,7 @@ export class QuotesService {
     const canClientEdit =
       isClientOwner && editableStatuses.includes(quote.status);
 
-    if (!this.isInternalUser({ role: user.role }) && !canClientEdit) {
+    if (!this.isInternalUser(user) && !canClientEdit) {
       throw new ForbiddenException('Você não pode editar esta cotação.');
     }
 
@@ -793,7 +794,7 @@ export class QuotesService {
   }
 
   async updateStatus(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     id: string,
     dto: UpdateQuoteStatusDto,
   ) {
@@ -867,7 +868,7 @@ export class QuotesService {
   }
 
   async respond(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     id: string,
     dto: RespondQuoteDto,
   ) {
@@ -985,7 +986,7 @@ export class QuotesService {
     return updatedQuote;
   }
 
-  async remove(user: { sub: string; role: string }, id: string) {
+  async remove(user: { sub: string; role: string; roles?: string[] }, id: string) {
     const quote = await this.findOne(user, id);
     const isClientOwner =
       user.role === 'CLIENTE' && quote.client?.userId === user.sub;
@@ -996,7 +997,7 @@ export class QuotesService {
     const canClientDelete =
       isClientOwner && deletableStatuses.includes(quote.status);
 
-    if (!this.isInternalUser({ role: user.role }) && !canClientDelete) {
+    if (!this.isInternalUser(user) && !canClientDelete) {
       throw new ForbiddenException('Você não pode excluir esta cotação.');
     }
 

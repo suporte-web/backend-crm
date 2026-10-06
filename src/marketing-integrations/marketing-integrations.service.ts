@@ -14,6 +14,19 @@ const supportedProviders = [
   MarketingProvider.LINKEDIN,
 ] as const;
 
+export function publicMarketingMetadata(
+  metadata: Prisma.JsonValue | null,
+): Prisma.JsonValue | null {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    return null;
+  const keys = ['propertyId', 'propertyName'];
+  return Object.fromEntries(
+    keys.flatMap((key) =>
+      typeof metadata[key] === 'string' ? [[key, metadata[key]]] : [],
+    ),
+  );
+}
+
 type MarketingIntegrationRecord = {
   id: string;
   provider: MarketingProvider;
@@ -49,28 +62,27 @@ export class MarketingIntegrationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<MarketingIntegrationResponse[]> {
-    const integrations =
-      await this.prisma.marketingIntegration.findMany({
-        where: {
-          provider: {
-            in: [...supportedProviders],
-          },
+    const integrations = await this.prisma.marketingIntegration.findMany({
+      where: {
+        provider: {
+          in: [...supportedProviders],
         },
-        select: {
-          id: true,
-          provider: true,
-          status: true,
-          accountId: true,
-          accountName: true,
-          expiresAt: true,
-          metadata: true,
-          lastSyncAt: true,
-          lastError: true,
-          ativo: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+      },
+      select: {
+        id: true,
+        provider: true,
+        status: true,
+        accountId: true,
+        accountName: true,
+        expiresAt: true,
+        metadata: true,
+        lastSyncAt: true,
+        lastError: true,
+        ativo: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     const integrationsByProvider = new Map(
       integrations.map((integration) => [
@@ -79,40 +91,67 @@ export class MarketingIntegrationsService {
       ]),
     );
 
-    return supportedProviders.map((provider) => {
-      const integration = integrationsByProvider.get(provider);
+    return Promise.all(
+      supportedProviders.map(async (provider) => {
+        const integration = integrationsByProvider.get(provider);
 
-      if (!integration) {
+        if (!integration) {
+          return {
+            id: null,
+            provider,
+            status: MarketingIntegrationStatus.NAO_CONFIGURADO,
+            accountId: null,
+            accountName: null,
+            expiresAt: null,
+            metadata: null,
+            lastSyncAt: null,
+            lastError: null,
+            ativo: false,
+            createdAt: null,
+            updatedAt: null,
+          };
+        }
+
+        if (
+          integration.status === MarketingIntegrationStatus.CONECTANDO &&
+          !integration.ativo
+        ) {
+          const pending = await this.prisma.marketingOAuthSession.count({
+            where: { provider, expiresAt: { gt: new Date() } },
+          });
+          if (!pending) {
+            integration.status = MarketingIntegrationStatus.ERRO;
+            integration.lastError =
+              'A autorização expirou. Clique em Conectar novamente.';
+            await this.prisma.marketingIntegration.updateMany({
+              where: {
+                id: integration.id,
+                status: MarketingIntegrationStatus.CONECTANDO,
+                ativo: false,
+              },
+              data: {
+                status: integration.status,
+                lastError: integration.lastError,
+              },
+            });
+          }
+        }
+
         return {
-          id: null,
-          provider,
-          status: MarketingIntegrationStatus.NAO_CONFIGURADO,
-          accountId: null,
-          accountName: null,
-          expiresAt: null,
-          metadata: null,
-          lastSyncAt: null,
-          lastError: null,
-          ativo: false,
-          createdAt: null,
-          updatedAt: null,
+          id: integration.id,
+          provider: integration.provider,
+          status: integration.status,
+          accountId: integration.accountId,
+          accountName: integration.accountName,
+          expiresAt: integration.expiresAt,
+          metadata: publicMarketingMetadata(integration.metadata),
+          lastSyncAt: integration.lastSyncAt,
+          lastError: integration.lastError,
+          ativo: integration.ativo,
+          createdAt: integration.createdAt,
+          updatedAt: integration.updatedAt,
         };
-      }
-
-      return {
-        id: integration.id,
-        provider: integration.provider,
-        status: integration.status,
-        accountId: integration.accountId,
-        accountName: integration.accountName,
-        expiresAt: integration.expiresAt,
-        metadata: integration.metadata,
-        lastSyncAt: integration.lastSyncAt,
-        lastError: integration.lastError,
-        ativo: integration.ativo,
-        createdAt: integration.createdAt,
-        updatedAt: integration.updatedAt,
-      };
-    });
+      }),
+    );
   }
 }

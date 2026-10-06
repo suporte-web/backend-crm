@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
   AuditLogAction,
@@ -30,7 +31,7 @@ export class AuditLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private ensureCanView(user: AuthUser) {
-    if (!['ADMIN', 'GESTAO'].includes(user.role)) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO'])) {
       throw new ForbiddenException(
         'Acesso aos logs restrito a ADMIN e GESTAO.',
       );

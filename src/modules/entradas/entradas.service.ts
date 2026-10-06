@@ -1,3 +1,4 @@
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   ForbiddenException,
@@ -184,8 +185,8 @@ export class EntradasService {
     return key as TicketStatus;
   }
 
-  private ensureCanAccess(user: { role: string }) {
-    if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
+  private ensureCanAccess(user: { role: string; roles?: string[] }) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL'])) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar a Central de Entradas.',
       );
@@ -193,7 +194,7 @@ export class EntradasService {
   }
 
   private ensureCanManage(user: AuthUser) {
-    if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(user.role)) {
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL'])) {
       throw new ForbiddenException(
         'Você não tem permissão para executar esta ação.',
       );
@@ -201,7 +202,7 @@ export class EntradasService {
   }
 
   private assertCommercialCanHandle(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     ticket: { type: TicketType; assignedToId?: string | null },
   ) {
     if (user.role !== 'COMERCIAL') {
@@ -325,7 +326,7 @@ export class EntradasService {
   }
 
   private buildWhere(
-    user: { sub: string; role: string },
+    user: { sub: string; role: string; roles?: string[] },
     filters: EntradaFilters,
   ) {
     const status = this.normalizeStatus(filters.status);
@@ -337,6 +338,7 @@ export class EntradasService {
     const dateFrom = this.parseDateStart(filters.dateFrom);
     const dateTo = this.parseDateEnd(filters.dateTo);
     const and: Prisma.TicketWhereInput[] = [
+      { atendimentoSac: { is: null } },
       {
         origem,
       },
@@ -383,7 +385,7 @@ export class EntradasService {
     return { AND: and };
   }
 
-  async createFromSite(dto: CreateSiteTicketDto) {
+  async createFromSite(dto: CreateSiteTicketDto, destinoNotificacao: 'entradas' | 'chamados' | 'sac' = 'entradas') {
     const nomeSolicitante = this.sanitize(dto.nomeSolicitante);
     const emailSolicitante = this.sanitize(dto.emailSolicitante);
     const telefoneSolicitante = this.sanitize(dto.telefoneSolicitante);
@@ -417,7 +419,7 @@ export class EntradasService {
             dto.formPayload === undefined
               ? undefined
               : (dto.formPayload as Prisma.InputJsonValue),
-          subject: `Entrada do site: ${nomeSolicitante}`,
+          subject: destinoNotificacao !== 'entradas' ? `Registro de Reclamações e Elogios: ${nomeSolicitante}` : `Entrada do site: ${nomeSolicitante}`,
           description:
             mensagem ?? `Solicitação recebida pelo formulario publico do site.`,
           lastInteractionAt: new Date(),
@@ -451,13 +453,13 @@ export class EntradasService {
       });
     });
 
-    await this.notificationsService.notifyRoles(
+    if (destinoNotificacao !== 'sac') await this.notificationsService.notifyRoles(
       [UserRole.COMERCIAL, UserRole.ADMIN],
       {
         ticketId: ticket.id,
-        title: 'Nova entrada recebida pelo site',
+        title: destinoNotificacao !== 'entradas' ? 'Novo atendimento recebido pelo site' : 'Nova entrada recebida pelo site',
         message: `${nomeSolicitante} enviou uma solicitacao pelo site.`,
-        link: `/entradas/${ticket.id}`,
+        link: destinoNotificacao !== 'entradas' ? '/chamados' : `/entradas/${ticket.id}`,
         emailSubject: 'Nova entrada recebida pelo site',
       },
     );
@@ -507,6 +509,7 @@ export class EntradasService {
       throw new NotFoundException('Entrada não encontrada.');
     }
 
+    if ((ticket.formPayload as Record<string, unknown> | null)?.canal === 'RECLAMACOES_ELOGIOS') throw new ForbiddenException('Abra esta ocorrência no módulo Atendimento SAC.');
     this.assertCommercialCanHandle(user, ticket);
 
     return ticket;
@@ -922,14 +925,14 @@ export class EntradasService {
     if (dto.responsavelId) {
       const assignee = await this.prisma.user.findUnique({
         where: { id: dto.responsavelId },
-        select: { id: true, role: true, isActive: true },
+        select: { id: true, role: true, roles: true, isActive: true },
       });
 
       if (!assignee || !assignee.isActive) {
         throw new NotFoundException('Responsável não encontrado.');
       }
 
-      if (!['ADMIN', 'GESTAO', 'COMERCIAL'].includes(assignee.role)) {
+      if (!hasAnyRole(assignee, ['ADMIN', 'GESTAO', 'COMERCIAL'])) {
         throw new BadRequestException(
           'Responsável precisa ser usuário interno.',
         );

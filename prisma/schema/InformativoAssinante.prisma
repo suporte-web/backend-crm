@@ -1,0 +1,15 @@
+enum StatusInformativo {
+  ATIVO
+  DESCADASTRADO
+}
+
+model InformativoAssinante {
+  id                String            @id @default(uuid())
+  nome              String
+  email             String            @unique
+  status            StatusInformativo @default(ATIVO)
+  origem            String            @default("SITE_PIZZATTOLOG")
+  aceitePrivacidade Boolean           @default(false)
+  criadoEm          DateTime          @default(now())
+  atualizadoEm      DateTime          @updatedAt
+}

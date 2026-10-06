@@ -1,0 +1,162 @@
+VALIDAÇÃO DO SITE INSTITUCIONAL — 02/10/2026
+
+Resultado: imagens e leitura das páginas funcionam no ambiente local. A integração de textos ainda não está completa.
+
+ESCOPO E MÉTODO
+- CRM frontend em localhost:3000; CRM backend em localhost:3001; site em localhost:3002.
+- GET das 15 páginas do site e das 15 páginas publicadas na API: todas responderam HTTP 200 sem indicação de erro de servidor.
+- HEAD dos 24 arquivos locais de imagem referenciados no conteúdo publicado: todos responderam HTTP 200.
+- Conferência automática de 353 campos configurados no CRM: injeção de valores de teste em memória e avaliação dos componentes reais e de seus filhos, com serviços, componentes externos e hooks simulados. Não escreve no banco.
+- 272 campos aparecem nas propriedades/textos renderizados; 81 não aparecem no layout atual. Os 23 campos editáveis de imagem estão entre os 272 que aparecem.
+- Campos ausentes incluem texto fixo e seções atualmente não renderizadas. Não se deve tratar todos como erro de upload ou reativar seções sem revisar o layout.
+- Blog tem editor próprio e não faz parte da contagem de campos genéricos. Sua rota e a resposta pública foram verificadas; criação/edição de posts não foi exercitada.
+
+TESTES
+- 8 verificações de imagens de Soluções: banner, fallback, compatibilidade com Carreiras, ordem dos cards, imagens legadas, URLs públicas e prévia do CRM.
+- 9 verificações do upload: gravação e localização em diretório temporário para JPG/PNG/WEBP; ausência de arquivo; limite de 5 MB; formato inválido; caminho fora do diretório; arquivo inexistente; endpoint real rejeita upload sem autenticação com HTTP 401. Todos passaram; arquivos temporários removidos.
+- 4 testes existentes do backend: salvar rascunho, sincronizar conteúdo, publicar e buscar página. Todos passaram com Prisma simulado.
+- 5 testes existentes da rota de Informativo passaram.
+- Script existente de imagens locais do blog concluiu sem erro.
+- TypeScript dos dois frontends concluiu sem erros.
+
+CAMPOS POR PÁGINA
+
+home: 9/9 campos presentes; 3 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+quem-somos: 38/39 campos presentes; 2 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- unidades.etiqueta
+
+solucoes: 8/16 campos presentes; 4 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- solucoes.0.titulo
+- solucoes.0.descricao
+- solucoes.1.titulo
+- solucoes.1.descricao
+- solucoes.2.titulo
+- solucoes.2.descricao
+- cta.titulo
+- cta.descricao
+
+especialidades-logisticas: 21/21 campos presentes; 0 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+social: 14/33 campos presentes; 1 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- iniciativasCabecalho.titulo
+- iniciativasCabecalho.descricao
+- historiasCabecalho.titulo
+- historiasCabecalho.descricao
+- historias.0.nome
+- historias.0.cargo
+- historias.0.texto
+- historias.1.nome
+- historias.1.cargo
+- historias.1.texto
+- historias.2.nome
+- historias.2.cargo
+- historias.2.texto
+- historias.3.nome
+- historias.3.cargo
+- historias.3.texto
+- historias.4.nome
+- historias.4.cargo
+- historias.4.texto
+
+carreiras: 28/28 campos presentes; 4 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+agregados: 30/44 campos presentes; 3 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- intro.titulo
+- intro.texto
+- intro.botaoTexto
+- oQueE.titulo
+- oQueE.texto
+- requisitos.titulo
+- unidades.0.nome
+- unidades.0.endereco
+- unidades.1.nome
+- unidades.1.endereco
+- unidades.2.nome
+- unidades.2.endereco
+- cta.titulo
+- cta.descricao
+
+esg: 9/30 campos presentes; 4 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- empresaB.texto
+- ambiental.titulo
+- ambiental.texto
+- social.titulo
+- social.texto
+- programasCabecalho.titulo
+- programasCabecalho.descricao
+- programas.0.titulo
+- programas.0.descricao
+- programas.1.titulo
+- programas.1.descricao
+- programas.2.titulo
+- programas.2.descricao
+- programas.3.titulo
+- programas.3.descricao
+- governanca.titulo
+- governanca.texto
+- relatorio.etiqueta
+- relatorio.titulo
+- relatorio.texto
+- relatorio.botaoTexto
+
+seminovos: 45/55 campos presentes; 2 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- hero.etiqueta
+- hero.titulo
+- hero.descricao
+- hero.botaoTexto
+- introducao.etiqueta
+- introducao.titulo
+- introducao.texto
+- cta.titulo
+- cta.descricao
+- cta.botaoTexto
+
+solicitar-cotacao: 2/5 campos presentes; 0 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- hero.etiqueta
+- apoio.titulo
+- apoio.texto
+
+contatos: 14/19 campos presentes; 0 campos de imagem presentes.
+Campos que não aparecem no layout atual:
+- hero.etiqueta
+- hero.titulo
+- hero.descricao
+- unidades.titulo
+- unidades.descricao
+
+lei-geral-de-protecao-de-dados: 17/17 campos presentes; 0 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+politica-de-privacidade: 20/20 campos presentes; 0 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+termos-de-uso: 17/17 campos presentes; 0 campos de imagem presentes.
+Todos os campos configurados foram encontrados na renderização.
+
+PRINCIPAIS CAUSAS CONFIRMADAS
+- Soluções: imagens atuais são lidas, mas títulos e descrições dos cards continuam usando itens/fallback enquanto o CRM edita solucoes. CTA mantém título/descrição fixos.
+- ESG: parte dos textos é fixa; ProgramasSection e RelatorioSection são chamados sem conteúdo publicado e não têm leitura dos campos do CRM.
+- Social: iniciativas leem os textos individuais, mas cabeçalhos e histórias do editor não são renderizados na página atual.
+- Agregados e Seminovos: imagens funcionam, mas parte de introduções e chamadas permanece fixa. Há também campos de seções ausentes.
+- Quem Somos: etiqueta de unidades não é repassada ao componente.
+- Contatos e Cotação: há campos de cabeçalho/apoio não utilizados.
+
+LIMITES
+- Validação local. Não certifica implantação em produção.
+- Não houve login no navegador nem publicação de conteúdo de teste no CRM real. Upload autenticado pelo formulário não foi repetido; o usuário confirmou que a imagem de Soluções passou a funcionar.
+- Não valida entrega de formulários, envio de e-mails ou autorização real do Google Analytics.
+- Nenhum conteúdo publicado foi modificado nesta auditoria.
+
+PRÓXIMA CORREÇÃO NECESSÁRIA
+Conectar os campos de texto ao layout existente. Para campos de seções ausentes, alinhar o editor à página atual antes de acrescentar conteúdo visual.

@@ -96,3 +96,37 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Relatórios GA4 sem Google Cloud
+
+Em **Marketing > Métricas**, a origem padrão é **Importação de CSV (sem Google Cloud)**.
+Também há um atalho **Importar relatório do GA4** no cartão de Google Analytics em Integrações.
+
+1. No GA4, selecione a propriedade e o período, abra um relatório detalhado e use **Compartilhar relatório > Fazer download > CSV**.
+2. No CRM, informe o nome do relatório, o ID da propriedade (para este site, `283055240`) e o mesmo período da exportação.
+3. Selecione o arquivo e clique em **Importar e salvar**. O relatório ficará disponível para Marketing e Administração.
+
+O CSV deve estar em UTF-8, com vírgula ou ponto e vírgula como separador, uma tabela com cabeçalhos distintos, no máximo 50 colunas, 5.000 linhas e 2 MB. Metadados de exportação iniciados com `#` são ignorados, enquanto valores de dimensões como `#Campaign` são preservados. Arquivos vazios, malformados ou com múltiplas tabelas são rejeitados sem salvar dados. PDF e XLSX não são suportados nesta importação.
+
+Os valores são exibidos como exportados, sem somar usuários ou inferir métricas ausentes. O período e a propriedade são declarados pelo usuário na importação. O CRM mostra a origem manual e a data de importação; novas métricas precisam de uma nova exportação e importação. A consulta lista as 100 importações mais recentes e pagina cada tabela em 25 linhas. Este fluxo não muda as tags do site nem indica uma conexão OAuth ativa.
+
+### Banco e publicação
+
+A tabela `MarketingManualReport` é criada pela migração `20261006160000_marketing_manual_reports`.
+Para publicar em outro ambiente, inclua frontend e backend, gere o cliente Prisma, confira as migrações pendentes e aplique a migração antes de iniciar a versão nova:
+
+```sh
+npx prisma generate
+npx prisma migrate status
+npx prisma migrate deploy
+```
+
+O banco local recebeu esta migração em 06/10/2026. Nenhuma publicação em servidor foi feita nesta alteração.
+
+### Validação da alteração — 06/10/2026
+
+- TypeScript do frontend e do backend de produção: aprovados.
+- Testes da importação (`ga4-csv.spec.ts` e `manual-reports.spec.ts`): 16 aprovados, incluindo leitura de CSV, persistência/consulta via HTTP, arquivos inválidos e restrições de acesso.
+- ESLint dos arquivos alterados no backend: aprovado. O frontend não possui `eslint.config.*`, impedindo a execução do ESLint 9 existente.
+- A suíte completa do backend apresentou 28 suítes aprovadas, 11 com falhas e 2 ignoradas (141 testes aprovados, 9 com falhas, 3 ignorados). As falhas estão em testes não alterados nesta implementação: `chats/chats.service.spec.ts` (construtor incompleto), `users/users.controller.spec.ts` (arquivo sem testes), e testes com dependências não fornecidas em `tickets/tickets.controller.spec.ts`, `tickets/tickets.service.spec.ts`, `clientes/clients.controller.spec.ts`, `clientes/clients.service.spec.ts`, `quotes/quotes.controller.spec.ts`, `quotes/quotes.service.spec.ts`, `auth/auth.controller.spec.ts`, `auth/auth.service.spec.ts` e `users/users.service.spec.ts`, todos sob `src/modules`.
+- Ainda não foi verificada uma exportação real da propriedade nem realizada uma inspeção visual da tela autenticada.

@@ -1,0 +1,14 @@
+model LeadAnexo {
+  id String @id @default(uuid())
+  leadId String
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  criadoEm DateTime @default(now())
+  usuarioId String?
+  usuario User? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  @@index([leadId, criadoEm])
+}

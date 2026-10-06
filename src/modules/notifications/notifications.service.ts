@@ -96,9 +96,7 @@ export class NotificationsService {
 
     const users = await client.user.findMany({
       where: {
-        role: {
-          in: roles,
-        },
+        OR: [{ role: { in: roles } }, { roles: { hasSome: roles } }],
         isActive: true,
       },
       select: {

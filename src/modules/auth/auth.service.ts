@@ -1,3 +1,4 @@
+import { getUserRoles } from '../../common/user-roles';
 import {
   BadRequestException,
   Injectable,
@@ -73,17 +74,19 @@ export class AuthService {
       sub: string;
       email: string;
       role: UserRole;
+      roles: UserRole[];
       mustChangePassword: boolean;
     } = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      roles: getUserRoles(user),
       mustChangePassword: user.mustChangePassword,
     };
 
     const [accessToken, screenPermissions] = await Promise.all([
       this.jwtService.signAsync(payload),
-      this.usersService.findRoleScreenPermissions(user.role),
+      this.usersService.findUserScreenPermissions(user),
     ]);
 
     await this.auditLogsService.create({
@@ -102,6 +105,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        roles: getUserRoles(user),
         mustChangePassword: user.mustChangePassword,
         clientProfile: user.clientProfile ?? null,
         screenPermissions,

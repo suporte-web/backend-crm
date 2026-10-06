@@ -1,0 +1,121 @@
+enum StatusAtendimentoSac {
+  NOVO
+  ATRIBUIDO
+  EM_ATENDIMENTO
+  CLASSIFICADO
+  AGUARDANDO_ACAO
+  EM_TRATATIVA
+  AGUARDANDO_AVALIACAO
+  CONCLUIDO
+  REABERTO
+}
+enum TipoTarefaSac {
+  TRIAGEM
+  ATENDIMENTO
+  CLASSIFICACAO
+  ACAO_CORRETIVA
+  AVALIACAO_SOLUCAO
+  REGISTRO_RNC
+  CONCLUSAO
+}
+enum StatusTarefaSac {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+model AtendimentoSac {
+  id String @id @default(uuid())
+  numero Int @unique @default(autoincrement())
+  protocolo String? @unique
+  ticketOrigemId String @unique
+  ticketOrigem Ticket @relation(fields: [ticketOrigemId], references: [id], onDelete: Restrict)
+  relatoOriginal Json
+  tipo String
+  nome String
+  email String?
+  telefone String?
+  empresa String?
+  cidade String?
+  estado String?
+  status StatusAtendimentoSac @default(NOVO)
+  atendenteId String?
+  atendente User? @relation("SacAtendente", fields: [atendenteId], references: [id])
+  responsavelAcaoId String?
+  responsavelAcao User? @relation("SacAcao", fields: [responsavelAcaoId], references: [id])
+  area String?
+  tipoReclamacao String?
+  documento String?
+  motivo String?
+  observacoesClassificacao String?
+  planoAcao Json?
+  rnc Json?
+  prazo DateTime?
+  criadoEm DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  concluidoEm DateTime?
+  concluidoPorId String?
+  concluidoPor User? @relation("SacConclusao", fields: [concluidoPorId], references: [id])
+  historico AtendimentoSacHistorico[]
+  tarefas AtendimentoSacTarefa[]
+  anexos AtendimentoSacAnexo[]
+  @@index([status, criadoEm])
+  @@index([atendenteId, status])
+  @@index([responsavelAcaoId, status])
+  @@index([area])
+}
+model AtendimentoSacHistorico {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  tipo String
+  descricao String
+  usuarioId String?
+  usuario User? @relation("SacHistoricoUsuario", fields: [usuarioId], references: [id])
+  criadoEm DateTime @default(now())
+  statusAnterior StatusAtendimentoSac?
+  statusNovo StatusAtendimentoSac?
+  tarefaId String?
+  tarefa AtendimentoSacTarefa? @relation(fields: [tarefaId], references: [id])
+  dados Json?
+  @@index([atendimentoId, criadoEm])
+}
+model AtendimentoSacTarefa {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  titulo String
+  tipo TipoTarefaSac
+  responsavelId String?
+  responsavel User? @relation("SacTarefaResponsavel", fields: [responsavelId], references: [id])
+  perfilResponsavel UserRole?
+  criadorId String?
+  criador User? @relation("SacTarefaCriador", fields: [criadorId], references: [id])
+  criadoEm DateTime @default(now())
+  prazo DateTime?
+  iniciadoEm DateTime?
+  concluidoEm DateTime?
+  status StatusTarefaSac @default(PENDENTE)
+  observacao String?
+  historico AtendimentoSacHistorico[]
+  anexos AtendimentoSacAnexo[]
+  @@index([responsavelId, status])
+  @@index([atendimentoId, tipo])
+}
+model AtendimentoSacAnexo {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  etapa String
+  criadoEm DateTime @default(now())
+  usuarioId String?
+  usuario User? @relation("SacAnexoUsuario", fields: [usuarioId], references: [id])
+  tarefaId String?
+  tarefa AtendimentoSacTarefa? @relation(fields: [tarefaId], references: [id])
+  @@index([atendimentoId, etapa])
+}
