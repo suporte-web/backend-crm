@@ -62,6 +62,7 @@ enum TicketType {
 }
 
 enum EntradaOrigem {
+  VISITA
   SITE
   PORTAL
   MANUAL

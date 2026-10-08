@@ -5,6 +5,6 @@ import { AtendimentoSacService } from './atendimento-sac.service';
 @Module({
   controllers: [AtendimentoSacController],
   providers: [AtendimentoSacService, UsuarioSacGuard],
-  exports: [AtendimentoSacService],
+  exports: [AtendimentoSacService, UsuarioSacGuard],
 })
 export class AtendimentoSacModule {}

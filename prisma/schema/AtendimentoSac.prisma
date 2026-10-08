@@ -25,6 +25,7 @@ enum StatusTarefaSac {
   CANCELADA
 }
 model AtendimentoSac {
+  visita VisitaCliente?
   id String @id @default(uuid())
   numero Int @unique @default(autoincrement())
   protocolo String? @unique

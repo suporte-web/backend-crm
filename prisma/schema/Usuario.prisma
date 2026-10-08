@@ -1,4 +1,12 @@
 model User {
+  visitasResponsavel VisitaCliente[] @relation("VisitaResponsavel")
+  visitasCriadas VisitaCliente[] @relation("VisitaCriador")
+  visitasParticipante VisitaParticipante[] @relation("VisitaParticipanteUsuario")
+  visitasRealizadas VisitaRealizacao[] @relation("VisitaRealizacaoUsuario")
+  visitasValidadas VisitaValidacao[] @relation("VisitaValidacaoGestor")
+  visitasReagendadas VisitaReagendamento[] @relation("VisitaReagendamentoUsuario")
+  historicoVisitas VisitaHistorico[] @relation("VisitaHistoricoUsuario")
+  anexosVisitas VisitaAnexo[] @relation("VisitaAnexoUsuario")
   leadAnexos LeadAnexo[]
   atendimentosSac AtendimentoSac[] @relation("SacAtendente")
   acoesSac AtendimentoSac[] @relation("SacAcao")

@@ -1,3 +1,4 @@
+import { VisitasModule } from './modules/visitas/visitas.module';
 import { AtendimentoSacModule } from './modules/atendimento-sac/atendimento-sac.module';
 import { Module } from '@nestjs/common';
 import { MarketingMetricsModule } from './marketing-metrics/marketing-metrics.module';
@@ -55,6 +56,7 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     ChatsModule,
     EntradasModule,
     AtendimentoSacModule,
+    VisitasModule,
     HelpCenterModule,
     ScreenPermissionsModule,
     EntregasPorPlacasModule,

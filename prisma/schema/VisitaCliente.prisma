@@ -1,0 +1,158 @@
+enum StatusVisita {
+  AGENDADA
+  AGUARDANDO_REALIZACAO
+  REAGENDAMENTO
+  AGUARDANDO_VALIDACAO
+  POS_VISITA
+  ATENDIMENTO_SAC
+  CONCLUIDA
+}
+
+enum EtapaVisita {
+  VISITA
+  REALIZACAO
+  VALIDACAO
+  POS_VISITA
+}
+
+enum ClassificacaoVisita {
+  EXCELENTE
+  BOA
+  REGULAR
+  RUIM
+}
+
+model VisitaCliente {
+  id String @id @default(uuid())
+  numero Int @unique @default(autoincrement())
+  protocolo String? @unique
+  clienteNome String
+  // Identificador anterior preservado apenas como referência histórica, sem relação.
+  clienteId String?
+  cnpj String?
+  localVisita String
+  dataPrevista DateTime
+  dataRealizada DateTime?
+  responsavelId String
+  responsavel User @relation("VisitaResponsavel", fields: [responsavelId], references: [id], onDelete: Restrict)
+  criadoPorId String
+  criadoPor User @relation("VisitaCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
+  tipoVisita String
+  observacoes String?
+  status StatusVisita @default(AGENDADA)
+  relato String?
+  insights String?
+  pontosPositivos String?
+  pontosAtencao String?
+  pessoaAtendeu String?
+  contatoPessoaAtendeu String?
+  emailPessoaAtendeu String?
+  teveCusto Boolean?
+  custo Decimal? @db.Decimal(12, 2)
+  novaDataAceita Boolean?
+  atingiuObjetivo Boolean?
+  sentimentoCliente String?
+  possuiMelhoria Boolean?
+  melhoriaIdentificada String?
+  classificacao ClassificacaoVisita?
+  avaliacaoRegistradaEm DateTime?
+  sacId String? @unique
+  sac AtendimentoSac? @relation(fields: [sacId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  concluidoEm DateTime?
+  participantes VisitaParticipante[]
+  realizacoes VisitaRealizacao[]
+  validacoes VisitaValidacao[]
+  reagendamentos VisitaReagendamento[]
+  historico VisitaHistorico[]
+  anexos VisitaAnexo[]
+  @@index([responsavelId, status])
+  @@index([clienteNome, dataPrevista])
+  @@index([status, dataPrevista])
+  @@index([tipoVisita])
+}
+
+model VisitaParticipante {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  nome String
+  email String?
+  telefone String?
+  usuarioId String?
+  usuario User? @relation("VisitaParticipanteUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  comunicacaoStatus String @default("PENDENTE")
+  criadoEm DateTime @default(now())
+  @@index([visitaId])
+}
+
+model VisitaRealizacao {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaRealizacaoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  dataRealizada DateTime
+  dados Json
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaValidacao {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  gestorId String
+  gestor User @relation("VisitaValidacaoGestor", fields: [gestorId], references: [id], onDelete: Restrict)
+  decisao String
+  observacao String?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaReagendamento {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaReagendamentoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  dataAnterior DateTime
+  novaData DateTime
+  motivo String
+  observacoes String?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaHistorico {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaHistoricoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  tipo String
+  descricao String
+  observacao String?
+  statusAnterior StatusVisita?
+  statusNovo StatusVisita?
+  dados Json?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaAnexo {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  etapa EtapaVisita
+  usuarioId String
+  usuario User @relation("VisitaAnexoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now())
+  @@index([visitaId, etapa])
+}

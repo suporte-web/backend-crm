@@ -237,6 +237,100 @@ export class AtendimentoSacService {
         this.logger.warn('Não foi possível registrar uma notificação do SAC.'),
       );
   }
+  async receberTicketTransacional(
+    tx: Tx,
+    ticketId: string,
+    usuario: UsuarioSac | null = null,
+  ) {
+    const atual = await tx.atendimentoSac.findUnique({
+      where: { ticketOrigemId: ticketId },
+    });
+    if (atual) return atual;
+    const ticket = await tx.ticket.findUnique({ where: { id: ticketId } });
+    const p = ticket?.formPayload as Record<string, unknown> | null;
+    if (!ticket || p?.canal !== 'RECLAMACOES_ELOGIOS')
+      throw new BadRequestException('Origem inválida para Atendimento SAC.');
+    const original = {
+      nome: ticket.nomeSolicitante,
+      email: ticket.emailSolicitante,
+      telefone: ticket.telefoneSolicitante,
+      ...p,
+      enviadoEm: ticket.createdAt.toISOString(),
+      clientId: ticket.clientId,
+      leadId: ticket.leadId,
+    };
+    const registro = await tx.atendimentoSac.create({
+      data: {
+        ticketOrigemId: ticketId,
+        relatoOriginal: json(original),
+        tipo: String(p.tipoRegistro || 'RECLAMACAO'),
+        nome: ticket.nomeSolicitante || 'Solicitante',
+        email: ticket.emailSolicitante,
+        telefone: ticket.telefoneSolicitante,
+        empresa: typeof p.empresa === 'string' ? p.empresa : null,
+        cidade: typeof p.cidade === 'string' ? p.cidade : null,
+        estado: typeof p.estado === 'string' ? p.estado : null,
+      },
+    });
+    const atendimento = await tx.atendimentoSac.update({
+      where: { id: registro.id },
+      data: {
+        protocolo: `SAC-${ticket.createdAt.getFullYear()}-${String(registro.numero).padStart(6, '0')}`,
+      },
+    });
+    await this.evento(
+      tx,
+      atendimento,
+      usuario,
+      ticket.origem === 'VISITA' ? 'RECEBIDO_VISITA' : 'RECEBIDO_SITE',
+      ticket.origem === 'VISITA'
+        ? 'Atendimento gerado por visita.'
+        : 'Atendimento recebido pelo site.',
+    );
+    await this.evento(
+      tx,
+      atendimento,
+      usuario,
+      'PROTOCOLO_CRIADO',
+      `Protocolo ${atendimento.protocolo} criado.`,
+    );
+    const anexos = Array.isArray(p.anexos)
+      ? (p.anexos as Array<Record<string, unknown>>)
+      : [];
+    for (const anexo of anexos) {
+      if (typeof anexo.id !== 'string' || typeof anexo.arquivo !== 'string')
+        continue;
+      await tx.atendimentoSacAnexo.create({
+        data: {
+          id: anexo.id,
+          atendimentoId: atendimento.id,
+          nome: String(anexo.nome),
+          arquivo: anexo.arquivo,
+          tipo: String(anexo.tipo),
+          tamanho: Number(anexo.tamanho),
+          comentario:
+            typeof anexo.comentario === 'string' ? anexo.comentario : null,
+          etapa: 'SITE',
+          criadoEm: ticket.createdAt,
+        },
+      });
+      await this.evento(
+        tx,
+        atendimento,
+        usuario,
+        'ANEXO_ADICIONADO',
+        `Anexo recebido pelo site: ${anexo.nome}`,
+      );
+    }
+    await this.tarefa(
+      tx,
+      atendimento,
+      usuario,
+      'TRIAGEM',
+      'Direcionar atendimento para um atendente',
+    );
+    return atendimento;
+  }
   async receberTicket(ticketId: string, notificar = true) {
     const existente = await this.prisma.atendimentoSac.findUnique({
       where: { ticketOrigemId: ticketId },
@@ -245,94 +339,7 @@ export class AtendimentoSacService {
     let a: AtendimentoSac;
     try {
       a = await this.transacao(async (tx) => {
-        const atual = await tx.atendimentoSac.findUnique({
-          where: { ticketOrigemId: ticketId },
-        });
-        if (atual) return atual;
-        const ticket = await tx.ticket.findUnique({ where: { id: ticketId } });
-        const p = ticket?.formPayload as Record<string, unknown> | null;
-        if (!ticket || p?.canal !== 'RECLAMACOES_ELOGIOS')
-          throw new BadRequestException(
-            'Origem inválida para Atendimento SAC.',
-          );
-        const original = {
-          nome: ticket.nomeSolicitante,
-          email: ticket.emailSolicitante,
-          telefone: ticket.telefoneSolicitante,
-          ...p,
-          enviadoEm: ticket.createdAt.toISOString(),
-          clientId: ticket.clientId,
-          leadId: ticket.leadId,
-        };
-        const registro = await tx.atendimentoSac.create({
-          data: {
-            ticketOrigemId: ticketId,
-            relatoOriginal: json(original),
-            tipo: String(p.tipoRegistro || 'RECLAMACAO'),
-            nome: ticket.nomeSolicitante || 'Solicitante',
-            email: ticket.emailSolicitante,
-            telefone: ticket.telefoneSolicitante,
-            empresa: typeof p.empresa === 'string' ? p.empresa : null,
-            cidade: typeof p.cidade === 'string' ? p.cidade : null,
-            estado: typeof p.estado === 'string' ? p.estado : null,
-          },
-        });
-        const atendimento = await tx.atendimentoSac.update({
-          where: { id: registro.id },
-          data: {
-            protocolo: `SAC-${ticket.createdAt.getFullYear()}-${String(registro.numero).padStart(6, '0')}`,
-          },
-        });
-        await this.evento(
-          tx,
-          atendimento,
-          null,
-          'RECEBIDO_SITE',
-          'Atendimento recebido pelo site.',
-        );
-        await this.evento(
-          tx,
-          atendimento,
-          null,
-          'PROTOCOLO_CRIADO',
-          `Protocolo ${atendimento.protocolo} criado.`,
-        );
-        const anexos = Array.isArray(p.anexos)
-          ? (p.anexos as Array<Record<string, unknown>>)
-          : [];
-        for (const anexo of anexos) {
-          if (typeof anexo.id !== 'string' || typeof anexo.arquivo !== 'string')
-            continue;
-          await tx.atendimentoSacAnexo.create({
-            data: {
-              id: anexo.id,
-              atendimentoId: atendimento.id,
-              nome: String(anexo.nome),
-              arquivo: anexo.arquivo,
-              tipo: String(anexo.tipo),
-              tamanho: Number(anexo.tamanho),
-              comentario:
-                typeof anexo.comentario === 'string' ? anexo.comentario : null,
-              etapa: 'SITE',
-              criadoEm: ticket.createdAt,
-            },
-          });
-          await this.evento(
-            tx,
-            atendimento,
-            null,
-            'ANEXO_ADICIONADO',
-            `Anexo recebido pelo site: ${anexo.nome}`,
-          );
-        }
-        await this.tarefa(
-          tx,
-          atendimento,
-          null,
-          'TRIAGEM',
-          'Direcionar atendimento para um atendente',
-        );
-        return atendimento;
+        return this.receberTicketTransacional(tx, ticketId);
       });
     } catch (e) {
       // A origem possui chave única também entre processos; um reenvio recupera o SAC gravado.
@@ -356,6 +363,72 @@ export class AtendimentoSacService {
       );
     }
     return { sucesso: true, protocolo: a.protocolo };
+  }
+  async criarDaVisita(
+    tx: Tx,
+    u: UsuarioSac,
+    d: {
+      visitaId: string;
+      protocoloVisita: string;
+      cnpj?: string | null;
+      responsavelId: string;
+      nome: string;
+      email?: string;
+      telefone?: string;
+      empresa?: string;
+      cidade?: string;
+      estado?: string;
+      tipoReclamacao: string;
+      relato: string;
+    },
+  ) {
+    const ticket = await tx.ticket.create({
+      data: {
+        origem: 'VISITA',
+        assignedToId: d.responsavelId,
+        requesterId: u.sub,
+        subject: 'Atendimento decorrente da visita ' + d.protocoloVisita,
+        description: d.relato,
+        mensagem: d.relato,
+        internalOnly: true,
+        type: 'SUPORTE',
+        nomeSolicitante: d.nome,
+        emailSolicitante: d.email,
+        telefoneSolicitante: d.telefone,
+        formPayload: json({
+          ...d,
+          canal: 'RECLAMACOES_ELOGIOS',
+          origem: 'VISITA',
+          tipoRegistro: 'RECLAMACAO',
+          relato: d.relato,
+          documento: d.cnpj,
+        }),
+      },
+    });
+    const atendimento = await this.receberTicketTransacional(tx, ticket.id, u);
+    await this.finalizarTarefas(tx, atendimento, ['TRIAGEM'], u);
+    await this.tarefa(
+      tx,
+      atendimento,
+      u,
+      'ATENDIMENTO',
+      'Realizar atendimento decorrente da visita',
+      d.responsavelId,
+    );
+    await this.mudar(
+      tx,
+      atendimento,
+      u,
+      'ATRIBUIDO',
+      'DIRECIONADO',
+      'Atendimento atribuído ao responsável da visita',
+      {
+        atendenteId: d.responsavelId,
+        documento: d.cnpj,
+        tipoReclamacao: d.tipoReclamacao,
+      },
+    );
+    return atendimento;
   }
   async listar(u: UsuarioSac, q: FiltroSacDto) {
     this.verificarPerfil(u);
@@ -409,6 +482,7 @@ export class AtendimentoSacService {
       where: { id },
       include: {
         ...relacoes,
+        visita: { select: { id: true, protocolo: true } },
         historico: {
           include: { usuario: { select: pessoa } },
           orderBy: { criadoEm: 'asc' },

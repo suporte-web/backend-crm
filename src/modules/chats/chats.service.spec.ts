@@ -16,7 +16,14 @@ describe('ChatsService visibility rules', () => {
   };
 
   function createService(prisma: Record<string, unknown>) {
-    return new ChatsService(prisma as never, auditLogsService as never);
+    return new ChatsService(
+      prisma as never,
+      auditLogsService as never,
+      {
+        notifyUsers: jest.fn(),
+        getUserIdsByRoles: jest.fn().mockResolvedValue([]),
+      } as never,
+    );
   }
 
   beforeEach(() => {
