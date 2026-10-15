@@ -29,6 +29,12 @@ model Client {
   invoiceContactPhone  String?
   commercialTermsNotes String?
   userId               String?   @unique
+  prospectedById       String?
+  prospectedByName     String?
+  sourceLeadId         String?
+  sourceLead           Lead? @relation("ClientSourceLead", fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  sourceProspectId     String?
+  sourceProspect       Prospect? @relation("ClientSourceProspect", fields: [sourceProspectId], references: [id], onDelete: SetNull)
 
   chats            Chat[]
   user             User?                   @relation("ClientLoginUser", fields: [userId], references: [id])
@@ -43,6 +49,9 @@ model Client {
   trackings        Tracking[]
 
   @@index([internalOwnerId])
+  @@index([prospectedById, createdAt])
+  @@index([sourceLeadId])
+  @@index([sourceProspectId])
 }
 
 model ClientDocument {

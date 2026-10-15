@@ -1,3 +1,4 @@
+import { capturarProspeccao } from '../../common/prospeccao';
 import { getUserRoles, normalizeUserRoles } from '../../common/user-roles';
 import {
   BadRequestException,
@@ -118,6 +119,7 @@ export class UsersService {
 
   const passwordHash = await bcrypt.hash(password, 10);
     const contacts = this.sanitizeClientContacts(dto);
+    const origin = isClient && actor ? await capturarProspeccao(this.prisma, actor) : {};
 
     const user = await this.prisma.user.create({
       data: {
@@ -132,6 +134,7 @@ export class UsersService {
           isClient
             ? {
               create: {
+                ...origin,
                 document: dto.document,
                 phone: dto.phone,
                 companyName: dto.companyName,

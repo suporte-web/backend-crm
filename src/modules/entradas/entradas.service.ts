@@ -700,8 +700,14 @@ export class EntradasService {
       criteria.email ??
       `Prospect ${ticket.protocolo ?? ticket.id}`;
     const prospect = await this.prisma.$transaction(async (tx) => {
+      const sourceLead = ticket.leadId
+        ? await tx.lead.findUnique({ where: { id: ticket.leadId }, select: { id: true, prospectedById: true, prospectedByName: true } })
+        : null;
       const createdProspect = await tx.prospect.create({
         data: {
+          sourceLeadId: sourceLead?.id,
+          prospectedById: sourceLead?.prospectedById,
+          prospectedByName: sourceLead?.prospectedByName,
           nomeRazaoSocial,
           nomeContato:
             this.sanitize(dto.nomeContato) ?? ticket.nomeSolicitante ?? null,
@@ -720,6 +726,13 @@ export class EntradasService {
           createdFromTicketId: ticket.id,
         },
       });
+
+      if (sourceLead) {
+        await tx.lead.update({
+          where: { id: sourceLead.id },
+          data: { convertedProspectId: createdProspect.id },
+        });
+      }
 
       return tx.ticket.update({
         where: { id },

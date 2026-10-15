@@ -13,6 +13,12 @@ model Prospect {
   createdFromTicketId String?
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
+  prospectedById      String?
+  prospectedByName    String?
+  sourceLeadId        String?
+  sourceLead          Lead? @relation("ProspectSourceLead", fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  convertedLeads      Lead[] @relation("LeadConvertedProspect")
+  convertedClients    Client[] @relation("ClientSourceProspect")
   createdFromTicket   Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
   quotes              Quote[]
   tickets             Ticket[]                   @relation("TicketProspect")
@@ -22,4 +28,6 @@ model Prospect {
   @@index([document])
   @@index([statusCadastral, createdAt])
   @@index([origem, createdAt])
+  @@index([prospectedById, createdAt])
+  @@index([sourceLeadId])
 }
