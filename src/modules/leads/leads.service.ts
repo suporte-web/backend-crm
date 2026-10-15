@@ -1052,32 +1052,38 @@ async listarObservacoes(
   // Excluir lead
 
   async excluir(user: AuthUser, leadId: string) {
-  this.ensureInternalUser(user);
-
-  const lead = await this.prisma.lead.findUnique({
-    where: {
-      id: leadId,
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  if (!lead) {
-    throw new NotFoundException('Lead não encontrado.');
+    this.ensureInternalUser(user);
+    return this.prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.findUnique({
+        where: { id: leadId },
+        include: {
+          timeline: true, observations: true, anexos: true,
+          chats: { include: { messages: true, participants: true } },
+        },
+      });
+      if (!lead) throw new NotFoundException('Lead não encontrado.');
+      const snapshot = JSON.stringify(lead);
+      await tx.leadDeletionRequest.updateMany({
+        where: { leadId, status: 'PENDENTE' },
+        data: {
+          status: 'CANCELADA', approvedById: user.sub, decidedAt: new Date(),
+          managementResponse: 'Lead excluído diretamente por usuário autorizado.',
+          leadSnapshot: snapshot,
+        },
+      });
+      await tx.ticket.updateMany({ where: { leadId }, data: { leadId: null } });
+      await tx.chat.updateMany({ where: { leadId }, data: { leadId: null } });
+      await tx.leadImportRowResult.updateMany({ where: { leadId }, data: { leadId: null } });
+      await tx.lead.delete({ where: { id: leadId } });
+      await tx.auditLog.create({ data: {
+        category: 'CLIENT', action: 'CUSTOM', userId: user.sub,
+        targetType: 'Lead', targetId: leadId,
+        message: `Lead ${lead.name} excluído diretamente.`,
+        details: { snapshot },
+      } });
+      return { message: 'Lead excluído com sucesso.' };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
-
-  await this.prisma.lead.delete({
-    where: {
-      id: leadId,
-    },
-  });
-
-  return {
-    message: 'Lead excluído com sucesso.',
-  };
-}
 
   async update(user: AuthUser, leadId: string, dto: UpdateLeadDto) {
     this.ensureInternalUser(user);

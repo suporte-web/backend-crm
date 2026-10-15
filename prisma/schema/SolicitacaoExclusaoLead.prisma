@@ -1,0 +1,29 @@
+model LeadDeletionRequest {
+  id                 String                    @id @default(uuid())
+  leadId             String?
+  requestedById      String
+  approvedById       String?
+  status             LeadDeletionRequestStatus @default(PENDENTE)
+  reason             String
+  managementResponse String?
+  leadNameSnapshot   String
+  leadEmailSnapshot  String?
+  leadSnapshot       String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  decidedAt          DateTime?
+  lead               Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  requestedBy        User                      @relation("LeadDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy         User?                     @relation("LeadDeletionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, status])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+enum LeadDeletionRequestStatus {
+  PENDENTE
+  APROVADA
+  RECUSADA
+  CANCELADA
+}
