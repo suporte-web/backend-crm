@@ -34,6 +34,7 @@ model Lead {
   tickets           Ticket[]
   observations      LeadObservacao[]
   anexos            LeadAnexo[]
+  deletionRequests  LeadDeletionRequest[]
 
   convertidoParaCliente Boolean @default(false)
 

@@ -35,6 +35,9 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 import { LeadsService } from './leads.service';
 import { CreateLeadObservacaoDto } from './dto/create-lead-observacao.dto';
+import { ExclusoesLeadsService } from './exclusoes-leads.service';
+import { RequestLeadDeletionDto } from './dto/request-lead-deletion.dto';
+import { DecideLeadDeletionDto } from './dto/decide-lead-deletion.dto';
 
 
 
@@ -44,7 +47,43 @@ const { diskStorage } = require('multer');
 @ApiTags('Leads')
 @Controller('leads')
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) {}
+  constructor(
+    private readonly leadsService: LeadsService,
+    private readonly exclusoesLeadsService: ExclusoesLeadsService,
+  ) {}
+
+  // Rotas estáticas devem preceder GET :id para não serem tratadas como IDs.
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Get('deletion-requests')
+  listarSolicitacoesExclusao(@CurrentUser() user: AuthUser) {
+    return this.exclusoesLeadsService.listar(user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Post('deletion-requests/:id/decision')
+  decidirSolicitacaoExclusao(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: DecideLeadDeletionDto,
+  ) {
+    return this.exclusoesLeadsService.decidir(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CONSULTORA)
+  @Post(':id/deletion-request')
+  solicitarExclusao(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RequestLeadDeletionDto,
+  ) {
+    return this.exclusoesLeadsService.solicitar(user, id, dto);
+  }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

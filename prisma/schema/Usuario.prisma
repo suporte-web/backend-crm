@@ -32,6 +32,8 @@ model User {
   clientProfile                   Client?                 @relation("ClientLoginUser")
   approvedClientDeletionRequests  ClientDeletionRequest[] @relation("ClientDeletionApprovedBy")
   requestedClientDeletionRequests ClientDeletionRequest[] @relation("ClientDeletionRequestedBy")
+  requestedLeadDeletionRequests   LeadDeletionRequest[] @relation("LeadDeletionRequestedBy")
+  approvedLeadDeletionRequests    LeadDeletionRequest[] @relation("LeadDeletionApprovedBy")
   uploadedClientDocuments         ClientDocument[]
   helpCenterArticlesCreated       HelpCenterArticle[]     @relation("HelpCenterArticleCreatedBy")
   helpCenterArticlesUpdated       HelpCenterArticle[]     @relation("HelpCenterArticleUpdatedBy")

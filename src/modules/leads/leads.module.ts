@@ -6,6 +6,7 @@ import { LeadAnexosService } from './lead-anexos.service';
 
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
+import { ExclusoesLeadsService } from './exclusoes-leads.service';
 
 import { GestaoProspeccoesController } from './gestao-prospeccoes.controller';
 import { GestaoProspeccoesService } from './gestao-prospeccoes.service';
@@ -17,7 +18,12 @@ import { GestaoProspeccoesService } from './gestao-prospeccoes.service';
     LeadAnexosController,
     GestaoProspeccoesController,
   ],
-  providers: [LeadsService, LeadAnexosService, GestaoProspeccoesService],
+  providers: [
+    LeadsService,
+    LeadAnexosService,
+    GestaoProspeccoesService,
+    ExclusoesLeadsService,
+  ],
   exports: [LeadsService],
 })
 export class LeadsModule {}
