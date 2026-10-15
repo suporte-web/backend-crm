@@ -8,7 +8,7 @@ export function hasAnyRole(user: { role?: string; roles?: string[] } | null | un
 }
 // Keep a primary profile for older integrations; effective access uses all profiles.
 export function normalizeUserRoles(roles: UserRole[]): UserRole[] {
-  const priority: UserRole[] = ['ADMIN', 'GESTAO', 'LIDER_ATENDIMENTO', 'COMERCIAL', 'OPERACAO', 'MARKETING', 'ATENDIMENTO', 'CLIENTE'];
+  const priority: UserRole[] = ['ADMIN', 'GESTAO', 'LIDER_ATENDIMENTO', 'COMERCIAL', 'OPERACAO', 'MARKETING', 'ATENDIMENTO', 'CLIENTE', 'CONSULTORA'];
   if (!roles.length || roles.some((role) => !priority.includes(role))) {
     throw new BadRequestException('Selecione pelo menos um perfil válido.');
   }

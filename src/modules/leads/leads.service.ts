@@ -1,4 +1,5 @@
 import { hasAnyRole } from '../../common/user-roles';
+import { capturarProspeccao } from '../../common/prospeccao';
 import {
   BadRequestException,
   ConflictException,
@@ -502,6 +503,8 @@ export class LeadsService {
       lastInteractionAt?: Date | null;
       createdById?: string | null;
       updatedById?: string | null;
+      prospectedById?: string;
+      prospectedByName?: string;
     },
     timeline: {
       type: LeadTimelineEventType;
@@ -533,6 +536,8 @@ export class LeadsService {
         lastInteractionAt: payload.lastInteractionAt,
         createdById: payload.createdById,
         updatedById: payload.updatedById,
+        prospectedById: payload.prospectedById,
+        prospectedByName: payload.prospectedByName,
         normalizedEmail: this.normalizeEmail(payload.email),
         normalizedPhone: this.normalizePhone(payload.phone),
         timeline: {
@@ -1012,10 +1017,12 @@ async listarObservacoes(
       );
     }
 
+    const origin = await capturarProspeccao(this.prisma, user);
     return this.prisma.$transaction((tx) =>
       this.createLeadWithTimeline(
         tx,
         {
+          ...origin,
           name,
           email: this.sanitizeText(dto.email),
           phone: this.sanitizeText(dto.phone),
@@ -1268,6 +1275,15 @@ async convertToClient(
   }
 
   return this.prisma.$transaction(async (tx) => {
+    const metadata = lead.metadata && typeof lead.metadata === 'object' && !Array.isArray(lead.metadata)
+      ? lead.metadata : null;
+    const prospectId = lead.convertedProspectId ??
+      (typeof metadata?.prospectId === 'string' ? metadata.prospectId : null);
+    const sourceProspect = prospectId
+      ? await tx.prospect.findUnique({ where: { id: prospectId } })
+      : null;
+    const origin = lead.prospectedById ? lead : sourceProspect;
+
 
     // Lead convertido para cliente, marca o lead como convertido
 
@@ -1284,6 +1300,10 @@ async convertToClient(
 
     const client = await tx.client.create({
       data: {
+        sourceLeadId: lead.id,
+        sourceProspectId: sourceProspect?.id,
+        prospectedById: origin?.prospectedById,
+        prospectedByName: origin?.prospectedByName,
         document,
         phone,
         companyName,
@@ -1557,6 +1577,9 @@ async convertToClient(
         existingProspect ??
         (await tx.prospect.create({
           data: {
+            sourceLeadId: lead.id,
+            prospectedById: lead.prospectedById,
+            prospectedByName: lead.prospectedByName,
             nomeRazaoSocial:
               this.sanitizeText(dto.nomeRazaoSocial) ??
               this.sanitizeText(lead.company) ??
@@ -1577,6 +1600,7 @@ async convertToClient(
         where: { id: lead.id },
         data: {
           status: 'conversao',
+          convertedProspectId: prospect.id,
           updatedById: user.sub,
           metadata: {
             ...(this.ensureObject(lead.metadata)
@@ -1656,6 +1680,7 @@ async convertToClient(
     });
 
     try {
+      const origin = await capturarProspeccao(this.prisma, user);
       const fileContent = await readFile(file.path, 'utf-8');
       const parsedRows = this.parseCsv(fileContent);
       const defaultSource =
@@ -1707,6 +1732,7 @@ async convertToClient(
             this.createLeadWithTimeline(
               tx,
               {
+                ...origin,
                 name: mapped.name.trim(),
                 email: this.sanitizeText(mapped.email),
                 phone: this.sanitizeText(mapped.phone),

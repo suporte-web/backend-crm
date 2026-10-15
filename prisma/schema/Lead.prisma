@@ -20,6 +20,12 @@ model Lead {
   updatedById       String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  prospectedById    String?
+  prospectedByName  String?
+  convertedProspectId String?
+  convertedProspect Prospect? @relation("LeadConvertedProspect", fields: [convertedProspectId], references: [id], onDelete: SetNull)
+  originatedProspects Prospect[] @relation("ProspectSourceLead")
+  convertedClients Client[] @relation("ClientSourceLead")
   chats             Chat[]
   createdBy         User?                 @relation("LeadCreatedBy", fields: [createdById], references: [id])
   updatedBy         User?                 @relation("LeadUpdatedBy", fields: [updatedById], references: [id])
@@ -35,4 +41,6 @@ model Lead {
   @@index([normalizedPhone])
   @@index([source, createdAt])
   @@index([status, createdAt])
+  @@index([prospectedById, createdAt])
+  @@index([convertedProspectId])
 }

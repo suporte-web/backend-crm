@@ -7,6 +7,7 @@ enum UserRole {
   OPERACAO
   MARKETING
   CLIENTE
+  CONSULTORA
 }
 
 enum QuoteStatus {
