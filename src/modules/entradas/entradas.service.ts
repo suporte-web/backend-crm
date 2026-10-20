@@ -591,7 +591,7 @@ export class EntradasService {
         : [],
       clientOr.length
         ? this.prisma.client.findMany({
-            where: { OR: clientOr },
+            where: { OR: clientOr, modalidadeCadastro: 'CLIENTE' },
             include: {
               user: {
                 select: {

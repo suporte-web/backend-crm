@@ -62,10 +62,11 @@ describe('Solicitações próprias de exclusão de Leads', () => {
     | 'chat'
     | 'leadImportRowResult',
     ReturnType<typeof delegate>
-  > & { $transaction: jest.Mock };
+  > & { $transaction: jest.Mock; $queryRaw: jest.Mock };
   let service: ExclusoesLeadsService;
   beforeEach(async () => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       lead: delegate(),
       leadDeletionRequest: delegate(),
       auditLog: delegate(),
@@ -105,6 +106,11 @@ describe('Solicitações próprias de exclusão de Leads', () => {
       }),
     });
     expect(prisma.leadTimelineEvent.create).toHaveBeenCalled();
+  });
+
+  it('não confunde cadastro compartilhado LEAD com conversão em cliente', async () => {
+    prisma.lead.findFirst.mockResolvedValue({ ...lead, convertedClients: [{ id: 'cadastro-lead', modalidadeCadastro: 'LEAD' }] });
+    await expect(service.solicitar(consultora, 'l1', { reason: 'Duplicado' })).resolves.toMatchObject({ id: 'r1' });
   });
   it('não revela nem solicita exclusão de lead de outra pessoa', async () => {
     prisma.lead.findFirst.mockResolvedValue(null);
@@ -183,16 +189,15 @@ describe('Solicitações próprias de exclusão de Leads', () => {
     expect(prisma.lead.delete).toHaveBeenCalledWith({ where: { id: 'l1' } });
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
-  it('bloqueia exclusão de uma jornada convertida sem alterar a solicitação', async () => {
+  it('permite ao Comercial aprovar exclusão mesmo com histórico de conversão', async () => {
     prisma.lead.findUnique.mockResolvedValue({
       ...lead,
       convertedProspectId: 'p1',
     });
-    await expect(
-      service.decidir(comercial, 'r1', { action: 'APPROVE' }),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(prisma.leadDeletionRequest.updateMany).not.toHaveBeenCalled();
-    expect(prisma.lead.delete).not.toHaveBeenCalled();
+    await expect(service.decidir(comercial, 'r1', { action: 'APPROVE' }))
+      .resolves.toMatchObject({ message: 'Lead excluído com sucesso.' });
+    expect(prisma.leadDeletionRequest.updateMany).toHaveBeenCalled();
+    expect(prisma.lead.delete).toHaveBeenCalledWith({ where: { id: 'l1' } });
   });
   it('não decide duas vezes nem exclui após conflito de concorrência', async () => {
     prisma.leadDeletionRequest.updateMany.mockResolvedValue({ count: 0 });
@@ -232,5 +237,11 @@ describe('Solicitações próprias de exclusão de Leads', () => {
       where: { leadId: 'l1' },
       data: { leadId: null },
     });
+  });
+
+  it.each([UserRole.CONSULTORA, UserRole.MARKETING, UserRole.CLIENTE])('bloqueia exclusão direta de lead por %s também no serviço', async (role) => {
+    const service = new LeadsService(prisma as unknown as PrismaService, {} as NotificationsService);
+    await expect(service.excluir({ ...comercial, role }, 'l1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.lead.delete).not.toHaveBeenCalled();
   });
 });

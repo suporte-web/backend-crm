@@ -29,6 +29,8 @@ describe('Rastreabilidade das conversões existentes', () => {
   let service: LeadsService;
   const delegate = () => ({
     findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -40,6 +42,7 @@ describe('Rastreabilidade das conversões existentes', () => {
     client: ReturnType<typeof delegate>;
     ticket: ReturnType<typeof delegate>;
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   beforeEach(async () => {
     prisma = {
@@ -48,12 +51,15 @@ describe('Rastreabilidade das conversões existentes', () => {
       client: delegate(),
       ticket: delegate(),
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
     prisma.lead.findUnique.mockResolvedValue(lead);
     prisma.lead.update.mockResolvedValue(lead);
+    prisma.lead.findUniqueOrThrow.mockImplementation(args => prisma.lead.findUnique(args));
+    prisma.client.update.mockResolvedValue({ id: "c1" });
     prisma.prospect.create.mockResolvedValue({ id: 'p1' });
     prisma.client.create.mockResolvedValue({ id: 'c1' });
     const module = await Test.createTestingModule({
@@ -106,7 +112,6 @@ describe('Rastreabilidade das conversões existentes', () => {
         data: expect.objectContaining({
           ...origin,
           sourceLeadId: 'l1',
-          sourceProspectId: 'p1',
           contacts: {
             create: expect.objectContaining({
               email: lead.email,
@@ -124,9 +129,7 @@ describe('Rastreabilidade das conversões existentes', () => {
     });
     prisma.prospect.findUnique.mockResolvedValue(null);
     await service.convertToClient(actor, 'l1', { document: '12345678000100' });
-    expect(
-      prisma.client.create.mock.calls[0][0].data.sourceProspectId,
-    ).toBeUndefined();
+    expect(prisma.client.update.mock.calls[0][0].data.sourceProspectId).toBeUndefined();
   });
   it('mantém a rejeição de documento de cliente duplicado', async () => {
     prisma.client.findFirst.mockResolvedValue({ id: 'existing' });

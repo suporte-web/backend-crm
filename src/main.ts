@@ -30,6 +30,8 @@ function buildAllowedOrigins(): string[] {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Fotos de até 1,5 MB são enviadas como data URL, seguindo o cadastro de leads.
+  app.use(express.json({ limit: '3mb' }));
   const uploadsDir = join(process.cwd(), 'uploads');
   const portalContentUploadsDir = join(uploadsDir, 'portal-content');
   const leadImportsDir = join(uploadsDir, 'lead-imports');

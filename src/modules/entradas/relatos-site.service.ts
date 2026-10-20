@@ -183,7 +183,7 @@ export class RelatosSiteService {
       payload?.canal === 'RECLAMACOES_ELOGIOS'
         ? anexos.find((item) => item.id === anexoId)
         : undefined;
-    if (!anexo || !/^[a-f0-9-]{36}\.(pdf|png|jpg)$/.test(anexo.arquivo))
+    if (!anexo || !/^[a-f0-9-]{36}\.(pdf|png|jpg|xls|xlsx)$/.test(anexo.arquivo))
       throw new NotFoundException('Anexo não encontrado.');
     const conteudo = await lerArquivoRelato(this.diretorio(), anexo.arquivo);
     return { conteudo, nome: anexo.nome, tipo: anexo.tipo };

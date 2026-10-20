@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { hasAnyRole } from '../../common/user-roles';
+import { removerCadastroLead } from '../../common/cadastros';
+import { desvincularSolicitacoesSite } from '../../common/solicitacoes-site-vinculos';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { DecideLeadDeletionDto } from './dto/decide-lead-deletion.dto';
@@ -15,7 +17,7 @@ import { RequestLeadDeletionDto } from './dto/request-lead-deletion.dto';
 const approvers = ['ADMIN', 'GESTAO', 'COMERCIAL'];
 const person = { id: true, name: true, email: true } as const;
 const journey = {
-  convertedClients: { select: { id: true } },
+  convertedClients: { select: { id: true, modalidadeCadastro: true } },
   originatedProspects: { select: { id: true } },
 } satisfies Prisma.LeadInclude;
 type Journey = Prisma.LeadGetPayload<{ include: typeof journey }>;
@@ -35,7 +37,7 @@ export class ExclusoesLeadsService {
     if (
       lead.convertidoParaCliente ||
       lead.convertedProspectId ||
-      lead.convertedClients.length ||
+      lead.convertedClients.some(cadastro => cadastro.modalidadeCadastro !== 'LEAD') ||
       lead.originatedProspects.length
     ) {
       throw new ConflictException(
@@ -159,7 +161,6 @@ export class ExclusoesLeadsService {
             },
           });
           if (!lead) throw new NotFoundException('Lead não encontrado.');
-          if (dto.action === 'APPROVE') this.ensureNoConversion(lead);
           const changed = await tx.leadDeletionRequest.updateMany({
             where: { id, status: 'PENDENTE' },
             data: {
@@ -188,6 +189,8 @@ export class ExclusoesLeadsService {
               where: { leadId: lead.id },
               data: { leadId: null },
             });
+            await desvincularSolicitacoesSite(tx, { leadId: lead.id });
+            await removerCadastroLead(tx, lead, user);
             await tx.lead.delete({ where: { id: lead.id } });
           } else {
             await tx.leadTimelineEvent.create({

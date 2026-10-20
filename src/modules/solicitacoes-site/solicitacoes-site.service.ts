@@ -1,3 +1,7 @@
+import { CotacaoSiteTriagemService } from './cotacao-site-triagem.service';
+import type { AuthUser } from '../auth/types/auth-user.type';
+import { ForbiddenException } from '@nestjs/common';
+import { garantirCadastroLead } from '../../common/cadastros';
 import {
   BadRequestException,
   Injectable,
@@ -78,6 +82,7 @@ export class SolicitacoesSiteService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly triagem: CotacaoSiteTriagemService,
   ) {}
 
   async criar(dto: CriarSolicitacaoSiteDto) {
@@ -85,6 +90,7 @@ export class SolicitacoesSiteService {
       const solicitacao = await tx.solicitacaoSite.create({
         data: {
           tipo: dto.tipo,
+          departamento: dto.tipo === 'COTACAO' ? 'MARKETING' : undefined,
 
           status: 'NOVO',
           origem: 'SITE_PIZZATTOLOG',
@@ -212,7 +218,7 @@ export class SolicitacoesSiteService {
     return anexo;
   }
 
-  async listar(filtros: ListarSolicitacoesSiteDto) {
+  async listar(filtros: ListarSolicitacoesSiteDto, user: AuthUser) {
     const { tipo, excluirTipo, status, departamento, busca } = filtros;
 
     const solicitacoes = await this.prisma.solicitacaoSite.findMany({
@@ -279,43 +285,15 @@ export class SolicitacoesSiteService {
         criadoEm: 'desc',
       },
 
-      select: {
-        id: true,
 
-        tipo: true,
-        departamento: true,
-
-        status: true,
-        origem: true,
-
-        nome: true,
-        email: true,
-        telefone: true,
-
-        empresa: true,
-        cnpj: true,
-
-        solucao: true,
-
-        cidade: true,
-        categoriaCnh: true,
-        marcaVeiculo: true,
-
-        assunto: true,
-
-        criadoEm: true,
-        atualizadoEm: true,
-      },
     });
 
-    return {
-      sucesso: true,
-      total: solicitacoes.length,
-      solicitacoes,
-    };
+    const completas = await Promise.all(solicitacoes.map((item) => this.triagem.enriquecer(item)));
+    const visiveis = completas.filter((item) => this.triagem.podeVisualizar(user, item));
+    return { sucesso: true, total: visiveis.length, solicitacoes: visiveis };
   }
 
-  async buscarPorId(id: string) {
+  async buscarPorId(id: string, user: AuthUser) {
     const solicitacao = await this.prisma.solicitacaoSite.findUnique({
       where: {
         id,
@@ -334,10 +312,9 @@ export class SolicitacoesSiteService {
       throw new NotFoundException('Solicitação não encontrada.');
     }
 
-    return {
-      sucesso: true,
-      solicitacao,
-    };
+    const completa = await this.triagem.enriquecer(solicitacao);
+    if (!this.triagem.podeVisualizar(user, completa)) throw new ForbiddenException('Esta cotação está em triagem de Marketing.');
+    return { sucesso: true, solicitacao: completa };
   }
 
   private sanitizeText(value?: string | null) {
@@ -390,6 +367,7 @@ export class SolicitacoesSiteService {
         normalizedPhone,
         metadata: {
           origem: 'SITE_PIZZATTOLOG',
+          triagemSite: { etapa: 'LEAD' },
           tipoSolicitacao: dto.tipo,
           solicitacaoSiteId: solicitacaoId,
           solucao: dto.solucao ?? null,
@@ -414,6 +392,8 @@ export class SolicitacoesSiteService {
       },
     });
 
+    await garantirCadastroLead(tx, lead);
+
     const ticketDescription = [
       dto.empresa ? `Empresa: ${dto.empresa}.` : null,
       email ? `E-mail: ${email}.` : null,
@@ -424,12 +404,12 @@ export class SolicitacoesSiteService {
       .join(' ');
 
     await this.notificationsService.notifyRoles(
-      [UserRole.COMERCIAL, UserRole.ADMIN],
+      [UserRole.MARKETING, UserRole.ADMIN, UserRole.GESTAO],
       {
         title: 'Nova cotação do site',
         message:
-          'Solicitação de cotação recebida pelo site e registrada como lead.',
-        link: `/leads/${lead.id}`,
+          'Cotação recebida como lead. Aguardando triagem de Marketing na Fila do site.',
+        link: `/solicitacoes-site/${solicitacaoId}`,
         emailSubject: 'Nova cotação recebida pelo site',
         emailSummary: `${lead.name}${lead.company ? ` - ${lead.company}` : ''}`,
         metadata: {

@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { extname, join } from 'path';
 import { ClientsService } from './clients.service';
+import { AcessoCadastroGuard } from '../cadastros/acesso-cadastro.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -71,7 +72,7 @@ const clientDocumentFileInterceptor = FileFieldsInterceptor(
 
 @ApiTags('Clientes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AcessoCadastroGuard)
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
@@ -165,6 +166,7 @@ export class ClientsController {
     UserRole.GESTAO,
     UserRole.COMERCIAL,
     UserRole.MARKETING,
+    UserRole.CONSULTORA,
   )
   @Get(':id/summary')
   getSummary(@CurrentUser() user: AuthUser, @Param('id') id: string) {
@@ -177,6 +179,7 @@ export class ClientsController {
     UserRole.GESTAO,
     UserRole.COMERCIAL,
     UserRole.MARKETING,
+    UserRole.CONSULTORA,
   )
   @Get(':id/detail')
   getDetail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
@@ -189,6 +192,7 @@ export class ClientsController {
     UserRole.GESTAO,
     UserRole.COMERCIAL,
     UserRole.MARKETING,
+    UserRole.CONSULTORA,
   )
   @Get(':id/timeline')
   getTimeline(@CurrentUser() user: AuthUser, @Param('id') id: string) {
@@ -196,7 +200,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Post(':id/timeline')
   createTimelineNote(
     @CurrentUser() user: AuthUser,
@@ -207,7 +211,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Post(':id/contacts')
   createContact(
     @CurrentUser() user: AuthUser,
@@ -218,7 +222,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Patch(':id/contacts/:contactId')
   updateContact(
     @CurrentUser() user: AuthUser,
@@ -230,7 +234,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Delete(':id/contacts/:contactId')
   deleteContact(
     @CurrentUser() user: AuthUser,
@@ -241,7 +245,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Post(':id/documents')
   @UseInterceptors(clientDocumentFileInterceptor)
   uploadDocument(
@@ -289,6 +293,7 @@ export class ClientsController {
     UserRole.GESTAO,
     UserRole.COMERCIAL,
     UserRole.MARKETING,
+    UserRole.CONSULTORA,
   )
   @Get(':id/documents/:documentId/download')
   async downloadDocument(
@@ -332,6 +337,7 @@ export class ClientsController {
     UserRole.GESTAO,
     UserRole.COMERCIAL,
     UserRole.MARKETING,
+    UserRole.CONSULTORA,
   )
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
@@ -339,7 +345,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Patch(':id')
   update(
     @CurrentUser() user: AuthUser,
@@ -350,7 +356,7 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Post(':id/deletion-request')
   requestDeletion(
     @CurrentUser() user: AuthUser,

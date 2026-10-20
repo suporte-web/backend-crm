@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clientes/clients.module';
+import { CadastrosModule } from './modules/cadastros/cadastros.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { TrackingsModule } from './modules/trackings/trackings.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
@@ -15,7 +16,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { FaqModule } from './modules/faq/faq.module';
 import { AiModule } from './modules/ai/ai.module';
 import { PortalContentModule } from './modules/portal-content/portal-content.module';
-import { OpportunitiesModule } from './modules/opportunities/opportunities.module';
+import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
@@ -39,6 +40,7 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     AuthModule,
     UsersModule,
     ClientsModule,
+    CadastrosModule,
     QuotesModule,
     TrackingsModule,
     TicketsModule,
@@ -46,7 +48,7 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     FaqModule,
     AiModule,
     PortalContentModule,
-    OpportunitiesModule,
+    OportunidadesModule,
     LeadsModule,
     DeliveriesModule,
     AuditLogsModule,

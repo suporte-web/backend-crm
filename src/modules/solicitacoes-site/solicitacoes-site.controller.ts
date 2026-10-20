@@ -1,3 +1,7 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/types/auth-user.type';
+import { CotacaoSiteTriagemService } from './cotacao-site-triagem.service';
+import { EncaminharCotacaoSiteDto, ReprovarCotacaoSiteDto } from './dto/triagem-cotacao-site.dto';
 import {
   Body,
   Controller,
@@ -40,6 +44,7 @@ mkdirSync(diretorioAnexos, {
 export class SolicitacoesSiteController {
   constructor(
     private readonly solicitacoesSiteService: SolicitacoesSiteService,
+    private readonly triagem: CotacaoSiteTriagemService,
   ) {}
 
   @Post()
@@ -70,11 +75,12 @@ export class SolicitacoesSiteController {
       },
 
       fileFilter: (_request, file, callback) => {
-        const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png'];
+        const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png',
+          'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
 
         if (!tiposPermitidos.includes(file.mimetype)) {
           callback(
-            new Error('Tipo de arquivo não permitido. Envie PDF, JPG ou PNG.'),
+            new Error('Tipo de arquivo não permitido. Envie PDF, JPG, PNG ou Excel (.xls e .xlsx).'),
             false,
           );
 
@@ -100,8 +106,27 @@ export class SolicitacoesSiteController {
   listar(
     @Query()
     filtros: ListarSolicitacoesSiteDto,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.solicitacoesSiteService.listar(filtros);
+    return this.solicitacoesSiteService.listar(filtros, user);
+  }
+
+  @Get('responsaveis-comerciais')
+  @UseGuards(JwtAuthGuard)
+  responsaveis(@CurrentUser() user: AuthUser) {
+    return this.triagem.responsaveis(user);
+  }
+
+  @Post(':id/direcionar')
+  @UseGuards(JwtAuthGuard)
+  encaminhar(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: EncaminharCotacaoSiteDto) {
+    return this.triagem.encaminhar(user, id, dto);
+  }
+
+  @Post(':id/reprovar')
+  @UseGuards(JwtAuthGuard)
+  reprovar(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ReprovarCotacaoSiteDto) {
+    return this.triagem.reprovar(user, id, dto);
   }
 
   @Get(':id')
@@ -109,8 +134,9 @@ export class SolicitacoesSiteController {
   buscarPorId(
     @Param('id')
     id: string,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.solicitacoesSiteService.buscarPorId(id);
+    return this.solicitacoesSiteService.buscarPorId(id, user);
   }
   @Get(':id/anexos/:anexoId/download')
   @UseGuards(JwtAuthGuard)

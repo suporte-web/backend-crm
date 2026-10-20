@@ -99,7 +99,7 @@ export class GestaoProspeccoesService {
       AND: [{ status: { notIn: ['converted', 'converted_to_prospect'] } }],
       convertidoParaCliente: false,
       convertedProspect: null,
-      convertedClients: { none: {} },
+      convertedClients: { none: { modalidadeCadastro: 'CLIENTE' } },
       ...(filters.status ? { status: filters.status } : {}),
     };
     // Um prospect pode ser reutilizado por leads de consultoras diferentes.
@@ -111,12 +111,13 @@ export class GestaoProspeccoesService {
     const prospectWhere: Prisma.ProspectWhereInput = {
       ...(common.createdAt ? { createdAt: common.createdAt } : {}),
       ...origemProspect(provenance),
-      convertedClients: { none: {} },
+      convertedClients: { none: { modalidadeCadastro: 'CLIENTE' } },
       ...(filters.status && statusProspect(filters.status)
         ? { statusCadastral: filters.status }
         : {}),
     };
     const clientWhere: Prisma.ClientWhereInput = {
+      modalidadeCadastro: 'CLIENTE',
       ...origemCliente(provenance),
       ...(common.createdAt ? { createdAt: common.createdAt } : {}),
       ...(filters.status ? { status: filters.status } : {}),
@@ -309,7 +310,7 @@ export class GestaoProspeccoesService {
         },
       }),
       this.prisma.client.findMany({
-        where: origemCliente(where),
+        where: { ...origemCliente(where), modalidadeCadastro: 'CLIENTE' },
         distinct: ['prospectedById', 'status'],
         select: { prospectedById: true, prospectedByName: true, status: true },
       }),
@@ -346,9 +347,9 @@ export class GestaoProspeccoesService {
         where,
         include: {
           ...leadHistoryInclude,
-          convertedProspect: { include: { convertedClients: true } },
-          originatedProspects: { include: { convertedClients: true } },
-          convertedClients: true,
+          convertedProspect: { include: { convertedClients: { where: { modalidadeCadastro: 'CLIENTE' } } } },
+          originatedProspects: { include: { convertedClients: { where: { modalidadeCadastro: 'CLIENTE' } } } },
+          convertedClients: { where: { modalidadeCadastro: 'CLIENTE' } },
         },
       });
       if (!record) throw new NotFoundException('Prospecção não encontrada.');
@@ -395,7 +396,7 @@ export class GestaoProspeccoesService {
         include: {
           sourceLead: { include: leadHistoryInclude },
           convertedLeads: { include: leadHistoryInclude },
-          convertedClients: true,
+          convertedClients: { where: { modalidadeCadastro: 'CLIENTE' } },
         },
       });
       if (!record) throw new NotFoundException('Prospecção não encontrada.');

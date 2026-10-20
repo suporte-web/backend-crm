@@ -1,4 +1,6 @@
 model Client {
+  modalidadeCadastro     ModalidadeCadastro @default(CLIENTE) @map("registrationType")
+  leadCadastro     Lead? @relation("CadastroLead")
   id                   String    @id @default(uuid())
   document             String?   @unique
   phone                String?
@@ -52,6 +54,14 @@ model Client {
   @@index([prospectedById, createdAt])
   @@index([sourceLeadId])
   @@index([sourceProspectId])
+  @@index([modalidadeCadastro, createdAt], map: "Client_registrationType_createdAt_idx")
+}
+
+enum ModalidadeCadastro {
+  CLIENTE @map("CLIENT")
+  LEAD
+
+  @@map("RegistrationType")
 }
 
 model ClientDocument {

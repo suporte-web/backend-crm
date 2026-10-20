@@ -33,7 +33,7 @@ export class AnexoLeadDto {
 
 @Controller('leads/:leadId/anexos')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING)
+@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING, UserRole.CONSULTORA)
 export class LeadAnexosController {
   constructor(private readonly anexos: LeadAnexosService) {}
   @Get()

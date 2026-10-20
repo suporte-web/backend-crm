@@ -1,4 +1,6 @@
+import { garantirCadastroLead, removerCadastroLead } from '../../common/cadastros';
 import { hasAnyRole } from '../../common/user-roles';
+import { desvincularSolicitacoesSite } from '../../common/solicitacoes-site-vinculos';
 import { capturarProspeccao } from '../../common/prospeccao';
 import {
   BadRequestException,
@@ -113,7 +115,7 @@ export class LeadsService {
   ) {}
 
   private ensureInternalUser(user: AuthUser) {
-    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
+    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING', 'CONSULTORA'];
 
     if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
@@ -575,6 +577,8 @@ export class LeadsService {
       },
     });
 
+    await garantirCadastroLead(tx, lead);
+
     if (options?.createTicket) {
       const ticketDescription = [
         payload.company ? `Empresa: ${payload.company}.` : null,
@@ -895,6 +899,7 @@ async findOne(user: AuthUser, id: string) {
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
   }
+  if (hasAnyRole(user, ['CONSULTORA']) && lead.createdById !== user.sub && lead.prospectedById !== user.sub) throw new ForbiddenException('Você não tem permissão para acessar este lead.');
 
   return lead;
 }
@@ -1052,7 +1057,8 @@ async listarObservacoes(
   // Excluir lead
 
   async excluir(user: AuthUser, leadId: string) {
-    this.ensureInternalUser(user);
+    if (!hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL']))
+      throw new ForbiddenException('Somente Comercial, Gestão ou Administrador podem excluir leads diretamente.');
     return this.prisma.$transaction(async (tx) => {
       const lead = await tx.lead.findUnique({
         where: { id: leadId },
@@ -1074,6 +1080,8 @@ async listarObservacoes(
       await tx.ticket.updateMany({ where: { leadId }, data: { leadId: null } });
       await tx.chat.updateMany({ where: { leadId }, data: { leadId: null } });
       await tx.leadImportRowResult.updateMany({ where: { leadId }, data: { leadId: null } });
+      await desvincularSolicitacoesSite(tx, { leadId });
+      await removerCadastroLead(tx, lead, user);
       await tx.lead.delete({ where: { id: leadId } });
       await tx.auditLog.create({ data: {
         category: 'CLIENT', action: 'CUSTOM', userId: user.sub,
@@ -1174,6 +1182,29 @@ async listarObservacoes(
         },
       });
 
+      if (updatedLead.cadastroId) {
+        await tx.client.update({
+          where: { id: updatedLead.cadastroId },
+          data: {
+            companyName: updatedLead.company || updatedLead.name,
+            phone: updatedLead.phone,
+            notes: updatedLead.notes,
+            ...(dto.segment !== undefined ? { segment: dto.segment } : {}),
+          },
+        });
+        await tx.clientContact.updateMany({
+          where: { clientId: updatedLead.cadastroId, isPrimary: true },
+          data: {
+            ...(dto.name !== undefined && dto.name.trim() !== lead.name
+              ? { name: updatedLead.name } : {}),
+            ...(dto.email !== undefined && dto.email !== lead.email
+              ? { email: updatedLead.email } : {}),
+            ...(dto.phone !== undefined && dto.phone !== lead.phone
+              ? { phone: updatedLead.phone } : {}),
+          },
+        });
+      }
+
       await this.addTimelineEvent(tx, leadId, {
         type: LeadTimelineEventType.UPDATED,
         title: 'Lead atualizado',
@@ -1226,7 +1257,7 @@ async convertToClient(
   }
 
   // CNPJ/documento continua sendo obrigatório para criar o cliente
-  const document = this.sanitizeText(dto.document);
+  const document = this.normalizePhone(dto.document);
 
   if (!document) {
     throw new BadRequestException(
@@ -1274,7 +1305,7 @@ async convertToClient(
     },
   });
 
-  if (existingClient) {
+  if (existingClient && existingClient.id !== lead.cadastroId) {
     throw new ConflictException(
       'Já existe um cliente com este documento.',
     );
@@ -1304,8 +1335,11 @@ async convertToClient(
   });
 
 
-    const client = await tx.client.create({
+    const cadastroVinculado = await garantirCadastroLead(tx, lead);
+    const client = await tx.client.update({
+      where: { id: cadastroVinculado.id },
       data: {
+        modalidadeCadastro: 'CLIENTE',
         sourceLeadId: lead.id,
         sourceProspectId: sourceProspect?.id,
         prospectedById: origin?.prospectedById,
@@ -1315,22 +1349,8 @@ async convertToClient(
         companyName,
         segment,
         status,
-        internalOwnerId,
+        internalOwnerId: dto.internalOwnerId ?? cadastroVinculado.internalOwnerId ?? internalOwnerId,
         notes: lead.notes,
-
-        // Guarda e-mail/telefone como contato principal do cliente
-        ...(email || phone
-          ? {
-              contacts: {
-                create: {
-                  name,
-                  email,
-                  phone,
-                  isPrimary: true,
-                },
-              },
-            }
-          : {}),
 
         // Registra a criação na timeline do cliente
         timelineEvents: {
@@ -1362,12 +1382,22 @@ async convertToClient(
     // ATUALIZA O LEAD
  
 
+    if (dto.name !== undefined || dto.email !== undefined || dto.phone !== undefined) {
+      await tx.clientContact.updateMany({ where: { clientId: client.id, isPrimary: true }, data: {
+        ...(dto.name !== undefined ? { name } : {}), ...(dto.email !== undefined ? { email } : {}), ...(dto.phone !== undefined ? { phone } : {}),
+      } });
+    }
+
     const updatedLead = await tx.lead.update({
       where: {
         id: lead.id,
       },
 
       data: {
+        cadastroId: client.id,
+        ...(dto.name !== undefined ? { name } : {}),
+        ...(dto.email !== undefined ? { email, normalizedEmail: this.normalizeEmail(email) } : {}),
+        ...(dto.phone !== undefined ? { phone, normalizedPhone: this.normalizePhone(phone) } : {}),
         status: 'venda_efetivada',
         convertidoParaCliente: true,
 
@@ -2055,7 +2085,7 @@ async convertToClient(
             sourcePhone:
               this.sanitizeText(dto.sourcePhone) ?? existingLead.sourcePhone,
             lastInteractionAt: interactionDate,
-            metadata: this.toJsonValue(dto.metadata ?? existingLead.metadata),
+            metadata: this.toJsonValue({ ...(this.ensureObject(existingLead.metadata) ? existingLead.metadata as Record<string, unknown> : {}), ...(this.ensureObject(dto.metadata) ? dto.metadata as Record<string, unknown> : {}) }),
             rawPayload: this.toJsonValue(
               dto.rawPayload ?? existingLead.rawPayload,
             ),

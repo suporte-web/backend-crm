@@ -1,4 +1,6 @@
 import { hasAnyRole } from '../../common/user-roles';
+import { excluirCadastroComHistorico } from '../../common/exclusao-cadastros';
+import { normalizarContatoLead, sincronizarContatoLead } from '../../common/cadastros';
 import {
   BadRequestException,
   ConflictException,
@@ -83,7 +85,7 @@ export class ClientsService {
   ) {}
 
   private ensureInternalUser(user: { sub: string; role: string; roles?: string[] }) {
-    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'];
+    const allowedRoles = ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING', 'CONSULTORA'];
 
     if (!hasAnyRole(user, allowedRoles)) {
       throw new ForbiddenException(
@@ -210,6 +212,7 @@ export class ClientsService {
     const client = await this.prisma.client.findUnique({
       where: { id },
       include: {
+        leadCadastro: { select: { metadata: true } },
         user: true,
         quotes: {
           include: {
@@ -536,7 +539,7 @@ export class ClientsService {
     }
 
     return this.prisma.client.findMany({
-      where,
+      where: { ...where, modalidadeCadastro: 'CLIENTE' },
       include: {
         user: true,
         opportunities: {
@@ -579,7 +582,7 @@ export class ClientsService {
     }
 
     return this.prisma.client.findMany({
-      where,
+      where: { ...where, modalidadeCadastro: 'CLIENTE' },
       include: {
         user: true,
         opportunities: {
@@ -620,6 +623,7 @@ export class ClientsService {
     });
 
     const clients = await this.prisma.client.findMany({
+      where: { modalidadeCadastro: 'CLIENTE' },
       select: {
         id: true,
         internalOwnerId: true,
@@ -675,6 +679,7 @@ export class ClientsService {
     return {
       client: {
         id: client.id,
+        modalidadeCadastro: client.modalidadeCadastro,
         document: client.document,
         phone: client.phone,
         companyName: client.companyName,
@@ -752,6 +757,11 @@ export class ClientsService {
     return {
       client: {
         id: client.id,
+        proximaAcao: this.getLeadMetadataString(client.leadCadastro?.metadata, 'nextAction'),
+        fotoUrl: this.getLeadMetadataString(client.leadCadastro?.metadata, 'logoUrl'),
+        responsavel: this.getLeadMetadataString(client.leadCadastro?.metadata, 'responsible'),
+        volumeMensalEstimado: this.getLeadMetadataString(client.leadCadastro?.metadata, 'monthlyEstimatedValue'),
+        modalidadeCadastro: client.modalidadeCadastro,
         document: client.document,
         phone: client.phone,
         companyName: client.companyName,
@@ -831,12 +841,16 @@ export class ClientsService {
     const contactData = this.sanitizeClientContact(dto);
     const hasContacts = client.contacts.length > 0;
 
-    const contact = await this.prisma.clientContact.create({
-      data: {
-        clientId,
-        ...contactData,
-        isPrimary: !hasContacts || contactData.isPrimary,
-      },
+    const contact = await this.prisma.$transaction(async (tx) => {
+      const contact = await tx.clientContact.create({
+        data: {
+          clientId,
+          ...contactData,
+          isPrimary: !hasContacts || contactData.isPrimary,
+        },
+      });
+      await sincronizarContatoLead(tx, clientId, contact);
+      return contact;
     });
 
     await this.prisma.timelineEvent.create({
@@ -876,11 +890,16 @@ export class ClientsService {
     }
 
     const contactData = this.sanitizeClientContact(dto);
-    const contact = await this.prisma.clientContact.update({
-      where: {
-        id: contactId,
-      },
-      data: contactData,
+    const contact = await this.prisma.$transaction(async (tx) => {
+      const contact = await tx.clientContact.update({
+        where: { id: contactId },
+        data: {
+          ...contactData,
+          isPrimary: dto.isPrimary ?? existingContact.isPrimary,
+        },
+      });
+      await sincronizarContatoLead(tx, clientId, contact);
+      return contact;
     });
 
     await this.prisma.timelineEvent.create({
@@ -1251,6 +1270,7 @@ export class ClientsService {
     const [clients, opportunities, quotes, tickets, users, leads] =
       await Promise.all([
         this.prisma.client.findMany({
+          where: { modalidadeCadastro: 'CLIENTE' },
           select: {
             id: true,
             status: true,
@@ -1565,6 +1585,21 @@ export class ClientsService {
         },
       });
 
+      const leadVinculado = await tx.lead.findUnique({ where: { cadastroId: id } });
+      if (leadVinculado) {
+        const metadata = leadVinculado.metadata && typeof leadVinculado.metadata === 'object' && !Array.isArray(leadVinculado.metadata) ? leadVinculado.metadata : {};
+        const principal = updatedClient.contacts.find(contato => contato.isPrimary);
+        await tx.lead.update({ where: { id: leadVinculado.id }, data: {
+          company: updatedClient.companyName,
+          ...(principal?.name ? { name: principal.name } : {}),
+          ...(principal ? { email: principal.email, phone: principal.phone || updatedClient.phone } : { phone: updatedClient.phone }),
+          ...normalizarContatoLead(principal ? principal.email : leadVinculado.email, principal?.phone || updatedClient.phone),
+          notes: updatedClient.notes,
+          metadata: { ...metadata, ...(dto.segment !== undefined ? { segment: dto.segment } : {}) },
+          updatedById: user.sub,
+        } });
+      }
+
       if (changedFields.length > 0) {
         await tx.timelineEvent.create({
           data: {
@@ -1683,6 +1718,16 @@ export class ClientsService {
     dto: RequestClientDeletionDto,
   ) {
     this.ensureInternalUser(user);
+    if (hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL'])) {
+      return this.prisma.$transaction(async (tx) => {
+        const cadastro = await tx.client.findUnique({ where: { id } });
+        if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
+        await excluirCadastroComHistorico(tx, id, user.sub, { motivo: this.sanitize(dto.reason) });
+        return { status: ClientDeletionRequestStatus.APROVADA, clientId: null, clientNameSnapshot: cadastro.companyName, message: 'Cadastro excluído com sucesso.' };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }
+    if (!hasAnyRole(user, ['CONSULTORA']))
+      throw new ForbiddenException('Seu perfil não pode solicitar ou executar a exclusão deste cadastro.');
     const client = await this.getClientOrFail(id);
 
     const pendingRequest = await this.prisma.clientDeletionRequest.findFirst({
@@ -1934,15 +1979,7 @@ export class ClientsService {
         },
       });
 
-      await tx.client.delete({
-        where: { id: targetClientId },
-      });
-
-      if (targetUserId) {
-        await tx.user.delete({
-          where: { id: targetUserId },
-        });
-      }
+      await excluirCadastroComHistorico(tx, targetClientId, user.sub, { motivo: managementResponse });
     });
 
     await this.auditLogsService.create({
@@ -1962,8 +1999,8 @@ export class ClientsService {
     if (targetUserId && targetEmail) {
       await this.auditLogsService.create({
         category: AuditLogCategory.USER,
-        action: AuditLogAction.USER_DELETED,
-        message: `Usuário removido apos aprovação da Gestão: ${targetEmail}.`,
+        action: AuditLogAction.CUSTOM,
+        message: `Acesso ao portal desativado após aprovação da Gestão: ${targetEmail}.`,
         targetType: 'User',
         targetId: targetUserId,
         userId: user.sub,

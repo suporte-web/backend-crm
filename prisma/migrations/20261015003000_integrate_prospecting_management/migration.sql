@@ -1,54 +1,103 @@
+-- Esta migration pode encontrar estruturas da implementação anterior.
+-- Preserva colunas/dados existentes e permite retomar após a falha 42701.
+-- Não marca a migration como aplicada: o histórico deve ser reconciliado pelo Prisma.
 -- AlterEnum
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'CONSULTORA';
 
--- AlterTable
-ALTER TABLE "Client" ADD COLUMN     "prospectedById" TEXT,
-ADD COLUMN     "prospectedByName" TEXT,
-ADD COLUMN     "sourceLeadId" TEXT,
-ADD COLUMN     "sourceProspectId" TEXT;
+-- Estrutura e backfill são atômicos; o enum fica fora da transação.
+BEGIN;
 
 -- AlterTable
-ALTER TABLE "Lead" ADD COLUMN     "convertedProspectId" TEXT,
-ADD COLUMN     "prospectedById" TEXT,
-ADD COLUMN     "prospectedByName" TEXT;
+ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "prospectedById" TEXT,
+ADD COLUMN IF NOT EXISTS "prospectedByName" TEXT,
+ADD COLUMN IF NOT EXISTS "sourceLeadId" TEXT,
+ADD COLUMN IF NOT EXISTS "sourceProspectId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Prospect" ADD COLUMN     "prospectedById" TEXT,
-ADD COLUMN     "prospectedByName" TEXT,
-ADD COLUMN     "sourceLeadId" TEXT;
+ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "convertedProspectId" TEXT,
+ADD COLUMN IF NOT EXISTS "prospectedById" TEXT,
+ADD COLUMN IF NOT EXISTS "prospectedByName" TEXT;
+
+-- AlterTable
+ALTER TABLE "Prospect" ADD COLUMN IF NOT EXISTS "prospectedById" TEXT,
+ADD COLUMN IF NOT EXISTS "prospectedByName" TEXT,
+ADD COLUMN IF NOT EXISTS "sourceLeadId" TEXT;
 
 -- CreateIndex
-CREATE INDEX "Client_prospectedById_createdAt_idx" ON "Client"("prospectedById", "createdAt");
+CREATE INDEX IF NOT EXISTS "Client_prospectedById_createdAt_idx" ON "Client"("prospectedById", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "Client_sourceLeadId_idx" ON "Client"("sourceLeadId");
+CREATE INDEX IF NOT EXISTS "Client_sourceLeadId_idx" ON "Client"("sourceLeadId");
 
 -- CreateIndex
-CREATE INDEX "Client_sourceProspectId_idx" ON "Client"("sourceProspectId");
+CREATE INDEX IF NOT EXISTS "Client_sourceProspectId_idx" ON "Client"("sourceProspectId");
 
 -- CreateIndex
-CREATE INDEX "Lead_prospectedById_createdAt_idx" ON "Lead"("prospectedById", "createdAt");
+CREATE INDEX IF NOT EXISTS "Lead_prospectedById_createdAt_idx" ON "Lead"("prospectedById", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "Lead_convertedProspectId_idx" ON "Lead"("convertedProspectId");
+CREATE INDEX IF NOT EXISTS "Lead_convertedProspectId_idx" ON "Lead"("convertedProspectId");
 
 -- CreateIndex
-CREATE INDEX "Prospect_prospectedById_createdAt_idx" ON "Prospect"("prospectedById", "createdAt");
+CREATE INDEX IF NOT EXISTS "Prospect_prospectedById_createdAt_idx" ON "Prospect"("prospectedById", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "Prospect_sourceLeadId_idx" ON "Prospect"("sourceLeadId");
+CREATE INDEX IF NOT EXISTS "Prospect_sourceLeadId_idx" ON "Prospect"("sourceLeadId");
+
+-- O schema atual permite várias conversões ligadas à mesma origem.
+-- Substitui somente os índices únicos conhecidos do backup; os índices
+-- não únicos acima mantêm as consultas indexadas. Nenhum registro é removido.
+DROP INDEX IF EXISTS "Client_sourceLeadId_key";
+DROP INDEX IF EXISTS "Client_sourceProspectId_key";
+DROP INDEX IF EXISTS "Prospect_sourceLeadId_key";
 
 -- AddForeignKey
-ALTER TABLE "Client" ADD CONSTRAINT "Client_sourceLeadId_fkey" FOREIGN KEY ("sourceLeadId") REFERENCES "Lead"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"Client"'::regclass AND conname = 'Client_sourceLeadId_fkey'
+  ) THEN
+    ALTER TABLE "Client" ADD CONSTRAINT "Client_sourceLeadId_fkey" FOREIGN KEY ("sourceLeadId") REFERENCES "Lead"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$migration$;
 
 -- AddForeignKey
-ALTER TABLE "Client" ADD CONSTRAINT "Client_sourceProspectId_fkey" FOREIGN KEY ("sourceProspectId") REFERENCES "Prospect"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"Client"'::regclass AND conname = 'Client_sourceProspectId_fkey'
+  ) THEN
+    ALTER TABLE "Client" ADD CONSTRAINT "Client_sourceProspectId_fkey" FOREIGN KEY ("sourceProspectId") REFERENCES "Prospect"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$migration$;
 
 -- AddForeignKey
-ALTER TABLE "Lead" ADD CONSTRAINT "Lead_convertedProspectId_fkey" FOREIGN KEY ("convertedProspectId") REFERENCES "Prospect"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"Lead"'::regclass AND conname = 'Lead_convertedProspectId_fkey'
+  ) THEN
+    ALTER TABLE "Lead" ADD CONSTRAINT "Lead_convertedProspectId_fkey" FOREIGN KEY ("convertedProspectId") REFERENCES "Prospect"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$migration$;
 
 -- AddForeignKey
-ALTER TABLE "Prospect" ADD CONSTRAINT "Prospect_sourceLeadId_fkey" FOREIGN KEY ("sourceLeadId") REFERENCES "Lead"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"Prospect"'::regclass AND conname = 'Prospect_sourceLeadId_fkey'
+  ) THEN
+    ALTER TABLE "Prospect" ADD CONSTRAINT "Prospect_sourceLeadId_fkey" FOREIGN KEY ("sourceLeadId") REFERENCES "Lead"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$migration$;
 
 -- Recupera apenas vínculos explícitos já registrados; não compara documentos/contatos.
 UPDATE "Lead" l SET "convertedProspectId" = p.id
@@ -107,3 +156,5 @@ FROM "Lead" l WHERE c."sourceLeadId" = l.id
 UPDATE "Client" c SET "prospectedById" = p."prospectedById", "prospectedByName" = p."prospectedByName"
 FROM "Prospect" p WHERE c."sourceProspectId" = p.id
   AND c."prospectedById" IS NULL AND p."prospectedById" IS NOT NULL;
+
+COMMIT;

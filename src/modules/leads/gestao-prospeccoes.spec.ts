@@ -97,11 +97,11 @@ describe('Gestão de Prospecções', () => {
       where: expect.objectContaining({
         convertidoParaCliente: false,
         convertedProspect: null,
-        convertedClients: { none: {} },
+        convertedClients: { none: { modalidadeCadastro: 'CLIENTE' } },
       }),
     });
     expect(prisma.prospect.count).toHaveBeenCalledWith({
-      where: expect.objectContaining({ convertedClients: { none: {} } }),
+      where: expect.objectContaining({ convertedClients: { none: { modalidadeCadastro: 'CLIENTE' } } }),
     });
   });
   it('não ignora status incompatível com enum Prospect', async () => {

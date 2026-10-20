@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { extensaoPlanilha, mimePlanilhas } from './arquivos-planilhas';
 
 export function validarArquivoRelato(arquivo: Express.Multer.File) {
   const buffer = arquivo.buffer;
@@ -17,10 +18,10 @@ export function validarArquivoRelato(arquivo: Express.Multer.File) {
         : arquivo.mimetype === 'image/jpeg' &&
             buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
           ? 'jpg'
-          : null;
+          : extensaoPlanilha(arquivo);
   if (!extensao || !arquivo.size || arquivo.size > 10 * 1024 * 1024)
     throw new BadRequestException(
-      'Envie anexos PDF, JPG ou PNG de até 10 MB cada.',
+      'Envie anexos PDF, JPG, PNG ou Excel (.xls e .xlsx) de até 10 MB cada.',
     );
   return extensao;
 }
@@ -41,7 +42,10 @@ export async function guardarArquivoRelato(
     id,
     nome,
     arquivo: `${id}.${extensao}`,
-    tipo: arquivo.mimetype,
+    tipo:
+      extensao === 'xls' || extensao === 'xlsx'
+        ? mimePlanilhas[extensao]
+        : arquivo.mimetype,
     tamanho: arquivo.size,
     comentario: comentario?.trim() || null,
   };
@@ -52,7 +56,7 @@ export async function guardarArquivoRelato(
   return metadados;
 }
 export async function lerArquivoRelato(diretorio: string, arquivo: string) {
-  if (!/^[a-f0-9-]{36}\.(pdf|png|jpg)$/.test(arquivo))
+  if (!/^[a-f0-9-]{36}\.(pdf|png|jpg|xls|xlsx)$/.test(arquivo))
     throw new NotFoundException('Anexo não encontrado.');
   return readFile(join(diretorio, arquivo)).catch(() => {
     throw new NotFoundException('Anexo não encontrado.');
