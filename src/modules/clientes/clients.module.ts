@@ -8,5 +8,6 @@ import { AcessoCadastroGuard } from '../cadastros/acesso-cadastro.guard';
   imports: [UsersModule],
   controllers: [ClientsController],
   providers: [ClientsService, AcessoCadastroGuard],
+  exports: [ClientsService],
 })
 export class ClientsModule {}

@@ -16,7 +16,11 @@ describe('Acesso a oportunidades por cadastro', () => {
           client: { modalidadeCadastro: 'LEAD', internalOwnerId: 'outro' },
         }),
       },
-      roleScreenPermission: { findMany: async () => [] },
+      roleScreenPermission: {
+        findMany: async () => [
+          { role: 'CONSULTORA', screenKey: 'opportunities', isEnabled: true },
+        ],
+      },
       $transaction: () => {
         throw new Error('Não deve iniciar uma exclusão sem permissão.');
       },
@@ -25,9 +29,9 @@ describe('Acesso a oportunidades por cadastro', () => {
     await expect(
       servico.excluir(
         {
-          sub: 'comercial',
+          sub: 'consultora',
           email: 'c@example.invalid',
-          role: UserRole.COMERCIAL,
+          role: UserRole.CONSULTORA,
         },
         'o1',
       ),

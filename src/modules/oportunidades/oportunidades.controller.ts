@@ -1,3 +1,5 @@
+import { ClientsService } from '../clientes/clients.service';
+import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
   Body,
@@ -25,10 +27,30 @@ import { OportunidadesService } from './oportunidades.service';
 @ApiTags('Oportunidades')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL)
+@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
 @Controller(['oportunidades', 'opportunities'])
 export class OportunidadesController {
-  constructor(private readonly oportunidadesService: OportunidadesService) {}
+  constructor(
+    private readonly oportunidadesService: OportunidadesService,
+    private readonly clientsService: ClientsService,
+  ) {}
+
+  @Get('clients')
+  listarCadastros(@CurrentUser() user: AuthUser) {
+    return this.oportunidadesService.listarCadastros(user);
+  }
+
+  @Get('clients/:id/detail')
+  async obterDetalhe(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    await this.oportunidadesService.validarDetalhe(user, id);
+    const detalhe = await this.clientsService.getDetail(user, id);
+    if (hasAnyRole(user, ['CONSULTORA'])) {
+      detalhe.client.documents = detalhe.client.documents.filter(
+        (documento) => documento.category === 'OPORTUNIDADE_PROPOSTA',
+      );
+    }
+    return detalhe;
+  }
 
   @Post()
   criar(@CurrentUser() user: AuthUser, @Body() dto: CriarOportunidadeDto) {

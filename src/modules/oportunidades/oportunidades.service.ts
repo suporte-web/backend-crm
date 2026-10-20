@@ -15,6 +15,7 @@ import {
   OpportunityStage as EtapaOportunidade,
   OpportunityStatus as SituacaoOportunidade,
   Prisma,
+  ModalidadeCadastro,
   StatusProposta,
   TimelineEventType,
 } from '@prisma/client';
@@ -32,47 +33,83 @@ export class OportunidadesService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  private validarUsuarioInterno(user: AuthUser) {
-    const perfisPermitidos = ['ADMIN', 'GESTAO', 'COMERCIAL'];
-
-    if (!hasAnyRole(user, perfisPermitidos)) {
+  private async validarUsuarioInterno(user: AuthUser) {
+    const consultora = hasAnyRole(user, ['CONSULTORA']);
+    const perfis = consultora
+      ? ['CONSULTORA']
+      : user.roles?.length
+        ? user.roles
+        : [user.role];
+    const internos = perfis.filter((role) =>
+      ['ADMIN', 'GESTAO', 'COMERCIAL', 'CONSULTORA'].includes(role),
+    );
+    if (!internos.length)
       throw new ForbiddenException(
-        'Você não tem permissão para acessar este recurso.',
+        'Você não tem permissão para acessar Oportunidades/Propostas.',
       );
-    }
+    const permissoes = await this.prisma.roleScreenPermission.findMany({
+      where: {
+        role: { in: internos as import('@prisma/client').UserRole[] },
+        screenKey: 'opportunities',
+      },
+    });
+    if (
+      !internos.some(
+        (role) =>
+          permissoes.find((item) => item.role === role)?.isEnabled ??
+          !consultora,
+      )
+    )
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar Oportunidades/Propostas.',
+      );
   }
 
   private async validarCadastro(
     user: AuthUser,
     cadastro: {
-      modalidadeCadastro: import('@prisma/client').ModalidadeCadastro;
+      modalidadeCadastro: ModalidadeCadastro;
       internalOwnerId: string | null;
     },
   ) {
-    await validarAcessoCadastro(this.prisma, user, cadastro.modalidadeCadastro);
-    const perfis = user.roles?.length ? user.roles : [user.role];
-    const permissoes = await this.prisma.roleScreenPermission.findMany({
-      where: { role: { in: perfis }, screenKey: 'opportunities' },
+    await this.validarUsuarioInterno(user);
+    if (hasAnyRole(user, ['CONSULTORA'])) {
+      if (cadastro.internalOwnerId !== user.sub)
+        throw new ForbiddenException(
+          'Você não tem permissão para acessar oportunidades deste cadastro.',
+        );
+    } else {
+      await validarAcessoCadastro(
+        this.prisma,
+        user,
+        cadastro.modalidadeCadastro,
+      );
+    }
+  }
+
+  async listarCadastros(user: AuthUser) {
+    await this.validarUsuarioInterno(user);
+    const consultora = hasAnyRole(user, ['CONSULTORA']);
+    const tipos = consultora
+      ? [ModalidadeCadastro.CLIENTE, ModalidadeCadastro.LEAD]
+      : await modalidadesPermitidas(this.prisma, user);
+    return this.prisma.client.findMany({
+      where: {
+        modalidadeCadastro: { in: tipos },
+        ...(consultora ? { internalOwnerId: user.sub } : {}),
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+      orderBy: { companyName: 'asc' },
     });
-    if (
-      !perfis.some(
-        (role) =>
-          ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(role) &&
-          (permissoes.find((item) => item.role === role)?.isEnabled ?? true),
-      )
-    ) {
-      throw new ForbiddenException(
-        'Você não tem permissão para acessar Oportunidades/Propostas.',
-      );
-    }
-    if (
-      !hasAnyRole(user, ['ADMIN', 'GESTAO']) &&
-      cadastro.internalOwnerId !== user.sub
-    ) {
-      throw new ForbiddenException(
-        'Você não tem permissão para alterar oportunidades deste cadastro.',
-      );
-    }
+  }
+
+  async validarDetalhe(user: AuthUser, id: string) {
+    await this.validarUsuarioInterno(user);
+    const cadastro = await this.prisma.client.findUnique({ where: { id } });
+    if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
+    await this.validarCadastro(user, cadastro);
   }
 
   private situacaoPorEtapa(stage: EtapaOportunidade): SituacaoOportunidade {
@@ -157,12 +194,12 @@ export class OportunidadesService {
   }
 
   async criar(user: AuthUser, dto: CriarOportunidadeDto) {
-    this.validarUsuarioInterno(user);
+    await this.validarUsuarioInterno(user);
 
     const client = await this.prisma.client.findUnique({
       where: { id: dto.clienteId },
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true, role: true } },
       },
     });
 
@@ -251,9 +288,11 @@ export class OportunidadesService {
       modalidadeCadastro?: string;
     },
   ) {
-    this.validarUsuarioInterno(user);
+    await this.validarUsuarioInterno(user);
 
-    const permitidas = await modalidadesPermitidas(this.prisma, user);
+    const permitidas = hasAnyRole(user, ['CONSULTORA'])
+      ? [ModalidadeCadastro.CLIENTE, ModalidadeCadastro.LEAD]
+      : await modalidadesPermitidas(this.prisma, user);
     if (
       filtros.modalidadeCadastro &&
       !['CLIENTE', 'LEAD'].includes(filtros.modalidadeCadastro)
@@ -291,33 +330,18 @@ export class OportunidadesService {
       where.status = status;
     }
 
-    if (!hasAnyRole(user, ['ADMIN', 'GESTAO'])) {
+    if (hasAnyRole(user, ['CONSULTORA'])) {
       where.client = {
         modalidadeCadastro: { in: tipos },
         internalOwnerId: user.sub,
       };
     }
-    const perfis = user.roles?.length ? user.roles : [user.role];
-    const permissoes = await this.prisma.roleScreenPermission.findMany({
-      where: { role: { in: perfis }, screenKey: 'opportunities' },
-    });
-    if (
-      !perfis.some(
-        (role) =>
-          ['ADMIN', 'GESTAO', 'COMERCIAL'].includes(role) &&
-          (permissoes.find((item) => item.role === role)?.isEnabled ?? true),
-      )
-    )
-      throw new ForbiddenException(
-        'Você não tem permissão para acessar Oportunidades/Propostas.',
-      );
-
     return this.prisma.opportunity.findMany({
       where,
       include: {
         client: {
           include: {
-            user: true,
+            user: { select: { id: true, name: true, email: true, role: true } },
           },
         },
         quote: true,
@@ -333,14 +357,14 @@ export class OportunidadesService {
     id: string,
     dto: AtualizarEtapaOportunidadeDto,
   ) {
-    this.validarUsuarioInterno(user);
+    await this.validarUsuarioInterno(user);
 
     const opportunity = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
         client: {
           include: {
-            user: true,
+            user: { select: { id: true, name: true, email: true, role: true } },
           },
         },
       },
@@ -447,14 +471,14 @@ export class OportunidadesService {
   }
 
   async atualizar(user: AuthUser, id: string, dto: AtualizarOportunidadeDto) {
-    this.validarUsuarioInterno(user);
+    await this.validarUsuarioInterno(user);
 
     const opportunity = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
         client: {
           include: {
-            user: true,
+            user: { select: { id: true, name: true, email: true, role: true } },
           },
         },
       },
@@ -578,7 +602,9 @@ export class OportunidadesService {
           include: {
             client: {
               include: {
-                user: true,
+                user: {
+                  select: { id: true, name: true, email: true, role: true },
+                },
               },
             },
             quote: true,
@@ -621,14 +647,14 @@ export class OportunidadesService {
   }
 
   async excluir(user: AuthUser, id: string) {
-    this.validarUsuarioInterno(user);
+    await this.validarUsuarioInterno(user);
 
     const opportunity = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
         client: {
           include: {
-            user: true,
+            user: { select: { id: true, name: true, email: true, role: true } },
           },
         },
       },
