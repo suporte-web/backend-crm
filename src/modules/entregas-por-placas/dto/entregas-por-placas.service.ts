@@ -564,6 +564,7 @@ private async buscarEventosDiaKmm(data: string) {
       await this.kmmDatabaseService.query<KmmEventoOperacaoRow>(
         query.text,
         query.values,
+        { preferBitmapScan: true },
       );
 
     console.log(

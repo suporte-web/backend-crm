@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { OpportunityStage, UserRole } from '@prisma/client';
-import { OpportunitiesService } from './opportunities.service';
+import { OportunidadesService as OpportunitiesService } from './oportunidades.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuthUser } from '../auth/types/auth-user.type';
 import { PrismaService } from '../../prisma/prisma.service';

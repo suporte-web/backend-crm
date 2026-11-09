@@ -27,7 +27,6 @@ import { PropostasModule } from './modules/propostas/propostas.module';
 import { ChatsModule } from './modules/chats/chats.module';
 import { EntradasModule } from './modules/entradas/entradas.module';
 import { HelpCenterModule } from './modules/help-center/help-center.module';
-import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
 import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entregas-por-placas.module';
 import { SolicitacoesSiteModule } from './modules/solicitacoes-site/solicitacoes-site.module';
 import { SiteInstitucionalModule } from './modules/site-institucional/site-institucional.module';
@@ -62,14 +61,13 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     AtendimentoSacModule,
     VisitasModule,
     HelpCenterModule,
-    ScreenPermissionsModule,
     EntregasPorPlacasModule,
     SolicitacoesSiteModule,
     SiteInstitucionalModule,
     MarketingIntegrationsModule,
     MarketingMetricsModule,
     InformativoModule,
-      
+
   ],
 })
 export class AppModule {}

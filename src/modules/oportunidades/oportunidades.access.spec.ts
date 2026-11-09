@@ -5,8 +5,8 @@ import {
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { OpportunitiesController } from './opportunities.controller';
-import { OpportunitiesService } from './opportunities.service';
+import { OportunidadesController as OpportunitiesController } from './oportunidades.controller';
+import { OportunidadesService as OpportunitiesService } from './oportunidades.service';
 import { ClientsController } from '../clientes/clients.controller';
 import { ClientsService } from '../clientes/clients.service';
 import { GestaoProspeccoesController } from '../leads/gestao-prospeccoes.controller';

@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 
 type QueryValue = string | number | null;
 
@@ -38,17 +38,36 @@ export class KmmDatabaseService implements OnModuleDestroy {
   async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     values: QueryValue[] = [],
+    options?: { preferBitmapScan?: boolean },
   ): Promise<T[]> {
+    let client: PoolClient | undefined;
+    let discardConnection = false;
     try {
-      const result = await this.pool.query<T>(text, values);
+      if (!options?.preferBitmapScan) {
+        const result = await this.pool.query<T>(text, values);
+        return result.rows;
+      }
 
+      // A busca ampla de eventos por dia/placa se beneficia da leitura em blocos.
+      // SET LOCAL vale apenas nesta transacao: nao altera o banco nem outras consultas.
+      client = await this.pool.connect();
+      await client.query('BEGIN READ ONLY');
+      await client.query('SET LOCAL enable_indexscan = off');
+      const result = await client.query<T>(text, values);
+      await client.query('COMMIT');
       return result.rows;
     } catch (error) {
+      if (client) {
+        try { await client.query('ROLLBACK'); }
+        catch { discardConnection = true; }
+      }
       console.error('Erro ao consultar banco KMM:', error);
-
       throw new InternalServerErrorException(
         'Nao foi possivel consultar o banco KMM.',
       );
+    } finally {
+      if (discardConnection) client?.release(true);
+      else client?.release();
     }
   }
 
