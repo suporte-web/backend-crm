@@ -148,6 +148,7 @@ type RotaKmm = {
 @Injectable()
 export class EntregasPorPlacasService {
   private readonly logger = new Logger(EntregasPorPlacasService.name);
+  private readonly monitoramentosEmAndamento = new Map<string, ReturnType<EntregasPorPlacasService['executarMonitoramento']>>();
 
   constructor(
     private readonly postgresDeliveriesService: PostgresDeliveriesService,
@@ -182,7 +183,18 @@ export class EntregasPorPlacasService {
     }
   }
 
-async buscarMonitoramento(
+buscarMonitoramento(dto: ConsultarMonitoramentoEntregasPorPlacasDto) {
+  const key = JSON.stringify({ data: this.resolverDataMonitoramento(dto.data), placa: dto.placa, motorista: dto.motorista });
+  const emAndamento = this.monitoramentosEmAndamento.get(key);
+  if (emAndamento) return emAndamento;
+  const consulta = this.executarMonitoramento(dto).finally(() => {
+    this.monitoramentosEmAndamento.delete(key);
+  });
+  this.monitoramentosEmAndamento.set(key, consulta);
+  return consulta;
+}
+
+private async executarMonitoramento(
   dto: ConsultarMonitoramentoEntregasPorPlacasDto,
 ) {
   const inicio = Date.now();

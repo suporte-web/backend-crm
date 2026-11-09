@@ -8,12 +8,12 @@ jest.mock('pg', () => ({ Pool: jest.fn() }));
 describe('KmmDatabaseService - plano isolado de monitoramento', () => {
   const rows = [{ romaneio: '1', controle_evo_id: '2' }];
   let service: KmmDatabaseService;
-  let pool: { query: jest.Mock; connect: jest.Mock; end: jest.Mock };
-  let client: { query: jest.Mock; release: jest.Mock };
+  let pool: { query: jest.Mock; connect: jest.Mock; end: jest.Mock; on: jest.Mock };
+  let client: { query: jest.Mock; release: jest.Mock; on: jest.Mock; removeListener: jest.Mock };
   let log: jest.SpyInstance;
   beforeEach(() => {
-    client = { query: jest.fn().mockResolvedValue({ rows }), release: jest.fn() };
-    pool = { query: jest.fn().mockResolvedValue({ rows }), connect: jest.fn().mockResolvedValue(client), end: jest.fn() };
+    client = { query: jest.fn().mockResolvedValue({ rows }), release: jest.fn(), on: jest.fn(), removeListener: jest.fn() };
+    pool = { query: jest.fn().mockResolvedValue({ rows }), connect: jest.fn().mockResolvedValue(client), end: jest.fn(), on: jest.fn() };
     (Pool as unknown as jest.Mock).mockImplementation(() => pool);
     service = new KmmDatabaseService(new ConfigService({ KMM_DB_HOST: 'host-test', KMM_DB_PORT: '5432', KMM_DB_NAME: 'base-test', KMM_DB_USER: 'usuario-test', KMM_DB_PASSWORD: 'senha-ficticia' }));
     log = jest.spyOn(console, 'error').mockImplementation(() => {});
