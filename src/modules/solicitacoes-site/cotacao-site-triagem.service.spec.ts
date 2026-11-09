@@ -1,3 +1,5 @@
+import { CotacaoSiteWorkflowService } from './cotacao-site-workflow.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SolicitacoesSiteService } from './solicitacoes-site.service';
 import { garantirCadastroLead } from '../../common/cadastros';
@@ -14,13 +16,16 @@ describe('Triagem de cotação do site', () => {
   let request: any;
   let lead: any;
   beforeEach(() => {
-    request = { id: 'request', tipo: 'COTACAO', status: 'NOVO', departamento: 'MARKETING', nome: 'Contato', empresa: 'Empresa', email: 'contato@test.local', solucao: 'Armazenagem', responsavelId: null };
+    request = { id: 'request', tipo: 'COTACAO', status: 'NOVO', departamento: 'MARKETING', nome: 'Contato', empresa: 'Empresa', email: 'contato@test.local', solucao: 'Armazenagem', responsavelId: null, etapaCotacao:'LEAD', leadId:'lead', prospectId:null, clientId:null };
     lead = { id: 'lead', cadastroId: 'cadastro', metadata: { solicitacaoSiteId: 'request', triagemSite: { etapa: 'LEAD' } }, timeline: [] };
+    let prospect: Record<string, unknown> | null = null;
+    const hydrate=()=>({...request,lead,prospect});
     tx = {
+      prospect: { findFirst:jest.fn(async()=>prospect), create:jest.fn(async({data})=>{prospect={id:'prospect',...data};return prospect;}) },
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'request' }]),
       solicitacaoSite: {
-        findUnique: jest.fn(async () => request),
-        update: jest.fn(async ({ data }) => Object.assign(request, data)),
+        findUnique: jest.fn(async () => hydrate()),
+        update: jest.fn(async ({ data }) => {Object.assign(request, data);return hydrate();}),
       },
       lead: {
         findFirst: jest.fn(async () => lead),
@@ -31,14 +36,14 @@ describe('Triagem de cotação do site', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       client: { update: jest.fn().mockResolvedValue({ id: 'cadastro' }) },
-      opportunity: { create: jest.fn().mockResolvedValue({ id: 'opportunity' }) },
+      opportunity: { create: jest.fn(async ({data})=>({id:'opportunity',...data})) },
       leadTimelineEvent: { create: jest.fn().mockResolvedValue({}) },
       timelineEvent: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
     const prisma = { ...tx, $transaction: jest.fn(async (work) => work(tx)) };
     notifications = { notifyUsers: jest.fn().mockResolvedValue(undefined) };
-    service = new CotacaoSiteTriagemService(prisma as any, notifications);
+    service = new CotacaoSiteTriagemService(prisma, notifications, new CotacaoSiteWorkflowService(prisma as unknown as PrismaService, notifications));
   });
 
   it('encaminha como oportunidade NOVO/OPEN, atribui o cadastro e notifica somente após a decisão', async () => {
@@ -46,9 +51,9 @@ describe('Triagem de cotação do site', () => {
     expect(tx.$queryRaw).toHaveBeenCalled();
     expect(tx.opportunity.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ clientId: 'cadastro', stage: 'NOVO', status: 'OPEN' }) }));
     expect(tx.client.update).toHaveBeenCalledWith({ where: { id: 'cadastro' }, data: { internalOwnerId: 'comercial' } });
-    expect(result.solicitacao.etapaCotacao).toBe('OPORTUNIDADE');
+    expect(result.solicitacao.etapaCotacao).toBe('PROSPECT');
     expect(result.solicitacao.oportunidadeId).toBe('opportunity');
-    expect(notifications.notifyUsers).toHaveBeenCalledWith(['comercial'], expect.objectContaining({ link: '/oportunidades/cadastro/cadastro' }), tx);
+    expect(notifications.notifyUsers).toHaveBeenCalledWith(['comercial'], expect.objectContaining({ link: '/oportunidades/cadastro/cadastro' }), tx, { email: false });
   });
 
   it('repetir encaminhamento devolve a mesma oportunidade sem criar ou notificar novamente', async () => {
@@ -86,6 +91,11 @@ describe('Triagem de cotação do site', () => {
     expect(tx.opportunity.create).not.toHaveBeenCalled();
   });
 
+  it('não reprova Prospect legado mesmo sem oportunidade em metadata', async () => {
+    request.etapaCotacao = 'PROSPECT'; request.prospectId = 'prospect-legado';
+    await expect(service.reprovar(marketing, 'request', { motivo: 'Teste' })).rejects.toThrow(BadRequestException);
+  });
+
   it('não reprova uma cotação que já foi encaminhada', async () => {
     await service.encaminhar(marketing, 'request', { responsavelId: 'comercial' });
     await expect(service.reprovar(marketing, 'request', { motivo: 'Teste' })).rejects.toThrow(BadRequestException);
@@ -96,7 +106,7 @@ describe('Triagem de cotação do site', () => {
 describe('Entrada pública de cotação', () => {
   it.each(['COTACAO', 'FORNECEDOR'])('registra %s sem gerar oportunidade ou notificar o Comercial na entrada', async (tipo) => {
     const tx: any = {
-      solicitacaoSite: { create: jest.fn().mockResolvedValue({ id: 'request', tipo }) },
+      solicitacaoSite: { create: jest.fn().mockResolvedValue({ id: 'request', tipo }), update:jest.fn(async({data})=>({id:'request',tipo,...data})) },
       lead: { create: jest.fn().mockResolvedValue({ id: 'lead', name: 'Contato' }) },
       opportunity: { create: jest.fn() },
     };

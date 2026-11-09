@@ -1,3 +1,5 @@
+import { garantirCadastroLead } from '../../common/cadastros';
+import { CotacaoSiteWorkflowService } from './cotacao-site-workflow.service';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,10 +16,22 @@ function objeto(value: unknown): Prisma.JsonObject {
 
 @Injectable()
 export class CotacaoSiteTriagemService {
-  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService, private readonly workflow: CotacaoSiteWorkflowService) {}
+
+
+  private async transaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { return await this.prisma.$transaction(work, { timeout: 15000, isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); }
+      catch (error: unknown) {
+        const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+        if (attempt === 2 || !['P2034', 'P2002'].includes(code)) throw error;
+      }
+    }
+    throw new Error('Transação não concluída.');
+  }
 
   private autorizar(user: AuthUser) {
-    if (!hasAnyRole(user, TRIAGEM)) throw new ForbiddenException('Somente Marketing, Gestão ou Admin pode decidir a triagem do site.');
+    if (hasAnyRole(user, ['CONSULTORA']) || !hasAnyRole(user, TRIAGEM)) throw new ForbiddenException('Somente Marketing, Gestão ou Admin pode decidir a triagem do site.');
   }
 
   async responsaveis(user: AuthUser) {
@@ -31,15 +45,15 @@ export class CotacaoSiteTriagemService {
   async enriquecer(solicitacao: Solicitacao, tx: Prisma.TransactionClient = this.prisma) {
     if (solicitacao.tipo !== 'COTACAO') return { ...solicitacao, etapaCotacao: null, leadId: null, cadastroId: null, oportunidadeId: null, motivoReprovacao: null, lead: null, responsavel: null };
     const lead = await tx.lead.findFirst({
-      where: { source: 'site', metadata: { path: ['solicitacaoSiteId'], equals: solicitacao.id } },
+      where: solicitacao.leadId ? { id: solicitacao.leadId } : { source: 'site', metadata: { path: ['solicitacaoSiteId'], equals: solicitacao.id } },
       include: { timeline: { orderBy: { createdAt: 'desc' }, take: 50, include: { createdBy: { select: { id: true, name: true } } } } },
     });
     const triagem = objeto(objeto(lead?.metadata).triagemSite);
     const oportunidadeId = typeof triagem.oportunidadeId === 'string' ? triagem.oportunidadeId : null;
     return {
       ...solicitacao,
-      etapaCotacao: oportunidadeId ? 'OPORTUNIDADE' : solicitacao.status === 'REPROVADO' ? 'REPROVADO' : 'LEAD',
-      leadId: lead?.id ?? null,
+      etapaCotacao: solicitacao.status === 'REPROVADO' ? 'REPROVADO' : solicitacao.etapaCotacao ?? (solicitacao.clientId ? 'CLIENTE' : solicitacao.prospectId ? 'PROSPECT' : oportunidadeId ? 'OPORTUNIDADE' : 'LEAD'),
+      leadId: solicitacao.leadId ?? lead?.id ?? null,
       cadastroId: lead?.cadastroId ?? null,
       oportunidadeId,
       motivoReprovacao: typeof triagem.motivoReprovacao === 'string' ? triagem.motivoReprovacao : null,
@@ -49,8 +63,9 @@ export class CotacaoSiteTriagemService {
   }
 
   podeVisualizar(user: AuthUser, solicitacao: Awaited<ReturnType<CotacaoSiteTriagemService['enriquecer']>>) {
+    if (hasAnyRole(user, ['CONSULTORA'])) return false;
     return solicitacao.tipo !== 'COTACAO' || hasAnyRole(user, TRIAGEM) ||
-      (hasAnyRole(user, ['COMERCIAL']) && solicitacao.etapaCotacao === 'OPORTUNIDADE' && solicitacao.responsavelId === user.sub);
+      (hasAnyRole(user, ['COMERCIAL']) && ['OPORTUNIDADE', 'PROSPECT', 'CLIENTE'].includes(solicitacao.etapaCotacao ?? '') && solicitacao.responsavelId === user.sub);
   }
 
   private async carregar(tx: Prisma.TransactionClient, id: string) {
@@ -66,49 +81,52 @@ export class CotacaoSiteTriagemService {
 
   async encaminhar(user: AuthUser, id: string, dto: EncaminharCotacaoSiteDto) {
     this.autorizar(user);
-    return this.prisma.$transaction(async (tx) => {
+    return this.transaction(async (tx) => {
       const request = await this.carregar(tx, id);
-      if (request.oportunidadeId) return { sucesso: true, solicitacao: request };
+      if (request.etapaCotacao === 'CLIENTE') throw new BadRequestException('Esta cotação já foi convertida em Cliente.');
+      if (request.oportunidadeId && request.prospectId && request.responsavelId === dto.responsavelId) return { sucesso: true, solicitacao: request };
       if (request.status === 'REPROVADO') throw new BadRequestException('Uma cotação reprovada não pode ser encaminhada.');
       const owner = await tx.user.findUnique({ where: { id: dto.responsavelId } });
       if (!owner?.isActive || !hasAnyRole(owner, ['COMERCIAL'])) throw new BadRequestException('Selecione um responsável Comercial ativo.');
-      if (!request.cadastroId) throw new BadRequestException('O cadastro vinculado ao lead não foi localizado.');
-      await tx.client.update({ where: { id: request.cadastroId }, data: { internalOwnerId: owner.id } });
-      const opportunity = await tx.opportunity.create({ data: {
-        clientId: request.cadastroId,
+      const cadastroId = request.cadastroId ?? (await garantirCadastroLead(tx, request.lead!)).id;
+      const qualified = await this.workflow.direcionarNaTransacao(tx, user, id, dto, false);
+      await tx.client.update({ where: { id: cadastroId }, data: { internalOwnerId: owner.id } });
+      const opportunity = request.oportunidadeId ? await tx.opportunity.findUnique({ where: { id: request.oportunidadeId } }) : await tx.opportunity.create({ data: {
+        clientId: cadastroId,
         title: `Cotação do site - ${request.empresa?.trim() || request.nome}${request.solucao ? ` - ${request.solucao}` : ''}`,
         stage: 'NOVO', status: 'OPEN',
       } });
+      if (!opportunity || opportunity.clientId !== cadastroId) throw new BadRequestException('Oportunidade incompatível com o cadastro da cotação.');
       await tx.lead.update({ where: { id: request.lead!.id }, data: {
         updatedById: user.sub,
         metadata: { ...objeto(request.lead!.metadata), triagemSite: {
-          etapa: 'OPORTUNIDADE', oportunidadeId: opportunity.id, responsavelId: owner.id,
+          etapa: 'PROSPECT', oportunidadeId: opportunity.id, responsavelId: owner.id,
           decididoPorId: user.sub, decididoEm: new Date().toISOString(),
         } },
       } });
-      const updated = await tx.solicitacaoSite.update({ where: { id }, data: { status: 'EM_ATENDIMENTO', departamento: 'COMERCIAL', responsavelId: owner.id } });
+      const updated = qualified.solicitacao;
       await tx.leadTimelineEvent.create({ data: {
         leadId: request.lead!.id, type: 'UPDATED', title: 'Marketing encaminhou a cotação ao Comercial',
         description: `Oportunidade criada para ${owner.name}.`, createdById: user.sub,
         metadata: { solicitacaoSiteId: id, oportunidadeId: opportunity.id, responsavelId: owner.id },
       } });
-      await tx.timelineEvent.create({ data: {
-        clientId: request.cadastroId, type: 'OPPORTUNITY_CREATED', title: 'Oportunidade criada a partir de cotação do site',
+      if (!request.oportunidadeId) await tx.timelineEvent.create({ data: {
+        clientId: cadastroId, type: 'OPPORTUNITY_CREATED', title: 'Oportunidade criada a partir de cotação do site',
         description: `Cotação qualificada pelo Marketing e encaminhada para ${owner.name}.`, createdById: user.sub,
         metadata: { solicitacaoSiteId: id, leadId: request.lead!.id, opportunityId: opportunity.id, stage: 'NOVO' },
       } });
-      await tx.auditLog.create({ data: {
+      if (!request.oportunidadeId) await tx.auditLog.create({ data: {
         category: 'CLIENT', action: 'OPPORTUNITY_CREATED', userId: user.sub, targetType: 'Opportunity', targetId: opportunity.id,
         message: 'Cotação do site aprovada pelo Marketing e enviada ao Comercial.',
-        details: { solicitacaoSiteId: id, leadId: request.lead!.id, clientId: request.cadastroId, responsavelId: owner.id },
+        details: { solicitacaoSiteId: id, leadId: request.lead!.id, clientId: cadastroId, responsavelId: owner.id },
       } });
       await this.notifications.notifyUsers([owner.id], {
         title: 'Nova oportunidade do site', message: `${request.empresa?.trim() || request.nome}: cotação qualificada pelo Marketing.`,
-        link: `/oportunidades/cadastro/${request.cadastroId}`, actorId: user.sub,
+        link: `/oportunidades/cadastro/${cadastroId}`, actorId: user.sub,
         metadata: { solicitacaoSiteId: id, leadId: request.lead!.id, opportunityId: opportunity.id },
-      }, tx);
+      }, tx, { email: false });
       return { sucesso: true, solicitacao: await this.enriquecer(updated, tx) };
-    }, { timeout: 15000 });
+    });
   }
 
   async reprovar(user: AuthUser, id: string, dto: ReprovarCotacaoSiteDto) {
@@ -117,7 +135,7 @@ export class CotacaoSiteTriagemService {
     if (!motivo) throw new BadRequestException('Informe o motivo da reprovação.');
     return this.prisma.$transaction(async (tx) => {
       const request = await this.carregar(tx, id);
-      if (request.oportunidadeId) throw new BadRequestException('Esta cotação já foi encaminhada ao Comercial.');
+      if (request.oportunidadeId || request.prospectId || request.clientId || ['PROSPECT', 'CLIENTE'].includes(request.etapaCotacao ?? '')) throw new BadRequestException('Esta cotação já foi encaminhada ao Comercial.');
       if (request.status === 'REPROVADO') return { sucesso: true, solicitacao: request };
       await tx.lead.update({ where: { id: request.lead!.id }, data: {
         status: 'perdido', updatedById: user.sub,

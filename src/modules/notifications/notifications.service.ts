@@ -120,6 +120,7 @@ export class NotificationsService {
     userIds: Array<string | null | undefined>,
     input: TicketNotificationInput,
     tx?: Prisma.TransactionClient,
+    options: { email?: boolean } = {},
   ) {
     const client = this.getClient(tx);
     const recipients = this.normalizeRecipients(userIds);
@@ -146,7 +147,7 @@ export class NotificationsService {
       ? 'webhook_configured_without_recipients'
       : 'registered_without_provider';
 
-    if (process.env.EMAIL_WEBHOOK_URL && recipientUsers.length > 0) {
+    if (options.email !== false && process.env.EMAIL_WEBHOOK_URL && recipientUsers.length > 0) {
       try {
         const response = await fetch(process.env.EMAIL_WEBHOOK_URL, {
           method: 'POST',

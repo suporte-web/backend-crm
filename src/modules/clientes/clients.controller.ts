@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ForbiddenException,
+  PayloadTooLargeException,
   Body,
   Controller,
   Get,
@@ -16,6 +18,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { extname, join } from 'path';
+import { unlink } from 'fs/promises';
 import { ClientsService } from './clients.service';
 import { AcessoCadastroGuard } from '../cadastros/acesso-cadastro.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -33,6 +36,8 @@ import { UpdateClientDto } from './dto/update-client.dto';
 import { DeleteClientDocumentDto } from './dto/delete-client-document.dto';
 import { Delete } from '@nestjs/common';
 import { UpdateOpportunityStatusDto } from './dto/update-oportunidade-status.dto';
+import { ConsultoraProposalUploadGuard } from '../../common/consultora-proposal-upload.guard';
+import { isConsultora } from '../../common/opportunity-access';
 
 const { diskStorage } = require('multer');
 
@@ -187,6 +192,13 @@ export class ClientsController {
   }
 
   @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
+  @Get(':id/opportunities/detail')
+  getOpportunityDetail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.clientsService.getOpportunityDetail(user, id);
+  }
+
+  @UseGuards(RolesGuard)
   @Roles(
     UserRole.ADMIN,
     UserRole.GESTAO,
@@ -247,8 +259,9 @@ export class ClientsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
   @Post(':id/documents')
+  @UseGuards(ConsultoraProposalUploadGuard)
   @UseInterceptors(clientDocumentFileInterceptor)
-  uploadDocument(
+  async uploadDocument(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @UploadedFiles()
@@ -268,23 +281,17 @@ export class ClientsController {
       throw new BadRequestException('Arquivo não enviado.');
     }
 
-    if (files.length === 1) {
-      return this.clientsService.createDocument(
-        user,
-        id,
-        files[0],
-        description,
-        category,
-      );
+    try {
+      if (files.length === 1) {
+        return await this.clientsService.createDocument(user, id, files[0], description, category);
+      }
+      return await this.clientsService.createDocuments(user, id, files, description, category);
+    } catch (error) {
+      if (error instanceof PayloadTooLargeException || (isConsultora(user) && error instanceof ForbiddenException)) {
+        await Promise.allSettled(files.map(file => unlink(join(process.cwd(), 'uploads', 'client-documents', file.filename))));
+      }
+      throw error;
     }
-
-    return this.clientsService.createDocuments(
-      user,
-      id,
-      files,
-      description,
-      category,
-    );
   }
 
   @UseGuards(RolesGuard)
@@ -380,14 +387,17 @@ export class ClientsController {
 
   @Patch(':clientId/opportunities/:opportunityId/status')
   updateOpportunityStatus(
+    @CurrentUser() user: AuthUser,
     @Param('clientId') clientId: string,
     @Param('opportunityId') opportunityId: string,
     @Body() dto: UpdateOpportunityStatusDto,
   ) {
     return this.clientsService.updateOpportunityStatus(
+      user,
       clientId,
       opportunityId,
       dto.status,
+      dto,
     );
   }
 }

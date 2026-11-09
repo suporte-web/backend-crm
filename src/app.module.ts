@@ -1,6 +1,7 @@
 import { VisitasModule } from './modules/visitas/visitas.module';
 import { AtendimentoSacModule } from './modules/atendimento-sac/atendimento-sac.module';
 import { Module } from '@nestjs/common';
+import { CnpjModule } from './modules/cnpj/cnpj.module';
 import { MarketingMetricsModule } from './marketing-metrics/marketing-metrics.module';
 import { InformativoModule } from './modules/informativo/informativo.module';
 import { ConfigModule } from '@nestjs/config';
@@ -36,6 +37,7 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CnpjModule,
     PrismaModule,
     AuthModule,
     UsersModule,

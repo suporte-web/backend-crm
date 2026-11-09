@@ -1,7 +1,10 @@
+import { consultaValorPropostaComercial, valorPropostaComercial } from '../../common/valor-proposta-comercial';
+import { MOTIVOS_PERDA, resolverPerda, historicoPerda, descricaoPerda } from './motivos-perda';
 import {
   modalidadesPermitidas,
   validarAcessoCadastro,
 } from '../../common/permissoes-cadastros';
+import { NotificationsService } from '../notifications/notifications.service';
 import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
@@ -18,6 +21,7 @@ import {
   ModalidadeCadastro,
   StatusProposta,
   TimelineEventType,
+  UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -31,6 +35,7 @@ export class OportunidadesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async validarUsuarioInterno(user: AuthUser) {
@@ -85,6 +90,11 @@ export class OportunidadesService {
         cadastro.modalidadeCadastro,
       );
     }
+  }
+
+  async listarMotivosPerda(user: AuthUser) {
+    await this.validarUsuarioInterno(user);
+    return MOTIVOS_PERDA;
   }
 
   async listarCadastros(user: AuthUser) {
@@ -224,6 +234,7 @@ export class OportunidadesService {
     }
 
     const stage = dto.etapa ?? EtapaOportunidade.NOVO;
+    const perda = resolverPerda(this.situacaoPorEtapa(stage), dto);
 
     const oportunidadeCriada = await this.prisma.$transaction(async (tx) => {
       const opportunity = await tx.opportunity.create({
@@ -235,6 +246,7 @@ export class OportunidadesService {
             dto.valor !== undefined ? new Prisma.Decimal(dto.valor) : undefined,
           stage,
           status: this.situacaoPorEtapa(stage),
+          ...perda,
           preContract: dto.preContrato ?? false,
           preContractNotes: dto.observacoesPreContrato,
           expectedCloseDate: dto.previsaoFechamento
@@ -250,15 +262,45 @@ export class OportunidadesService {
           title: 'Oportunidade criada',
           description: `A oportunidade "${dto.titulo}" foi registrada para ${
             client.companyName ?? client.user?.name ?? 'Cliente sem nome'
-          }.`,
+          }.` + descricaoPerda(perda),
           createdById: user.sub,
           metadata: {
             opportunityId: opportunity.id,
             stage,
+            ...historicoPerda(null, perda),
           },
         },
       });
 
+      if (
+        hasAnyRole(user, ['CONSULTORA']) &&
+        (stage === EtapaOportunidade.PROPOSTA || dto.preContrato)
+      ) {
+        const actor = await tx.user.findUnique({
+          where: { id: user.sub },
+          select: { name: true },
+        });
+        const recipients = await this.notificationsService.getUserIdsByRoles(
+          [UserRole.COMERCIAL],
+          tx,
+        );
+        await this.notificationsService.notifyUsers(
+          recipients,
+          {
+            title: 'Nova proposta de consultora',
+            message: `${actor?.name ?? 'Consultora'} cadastrou a proposta "${dto.titulo}" para ${client.companyName ?? client.user?.name ?? 'o cadastro'}.`,
+            link: `/oportunidades/cadastro/${client.id}/propostas/${opportunity.id}`,
+            actorId: user.sub,
+            metadata: {
+              opportunityId: opportunity.id,
+              clientId: client.id,
+              consultoraId: user.sub,
+            },
+          },
+          tx,
+          { email: false },
+        );
+      }
       return opportunity;
     });
 
@@ -336,7 +378,7 @@ export class OportunidadesService {
         internalOwnerId: user.sub,
       };
     }
-    return this.prisma.opportunity.findMany({
+    const oportunidades = await this.prisma.opportunity.findMany({
       where,
       include: {
         client: {
@@ -345,11 +387,16 @@ export class OportunidadesService {
           },
         },
         quote: true,
+        propostas: consultaValorPropostaComercial,
       },
       orderBy: {
         updatedAt: 'desc',
       },
     });
+    return oportunidades.map(({ propostas, ...oportunidade }) => ({
+      ...oportunidade,
+      valorPropostaComercial: valorPropostaComercial(propostas),
+    }));
   }
 
   async atualizarEtapa(
@@ -375,11 +422,7 @@ export class OportunidadesService {
     }
     await this.validarCadastro(user, opportunity.client);
 
-    if (dto.etapa === EtapaOportunidade.PERDIDO && !dto.motivoPerda?.trim()) {
-      throw new BadRequestException(
-        'Informe o motivo da perda ao marcar a oportunidade como perdida.',
-      );
-    }
+    const perda = resolverPerda(this.situacaoPorEtapa(dto.etapa), dto, opportunity);
 
     const valorNegociado =
       dto.etapa === EtapaOportunidade.GANHO
@@ -420,10 +463,7 @@ export class OportunidadesService {
             stage: dto.etapa,
             status: proximaSituacao,
             ...(valorNegociado ? { value: valorNegociado } : {}),
-            lostReason:
-              dto.etapa === EtapaOportunidade.PERDIDO
-                ? (dto.motivoPerda?.trim() ?? null)
-                : null,
+            ...perda,
           },
         });
 
@@ -432,16 +472,13 @@ export class OportunidadesService {
             clientId: opportunity.clientId,
             type: tipoEvento,
             title: tituloEvento,
-            description: descricaoEvento,
+            description: descricaoEvento + descricaoPerda(perda),
             createdById: user.sub,
             metadata: {
               opportunityId: opportunity.id,
               from: opportunity.stage,
               to: dto.etapa,
-              lostReason:
-                dto.etapa === EtapaOportunidade.PERDIDO
-                  ? (dto.motivoPerda?.trim() ?? null)
-                  : null,
+              ...historicoPerda(opportunity, perda),
             },
           },
         });
@@ -460,10 +497,7 @@ export class OportunidadesService {
       details: {
         from: opportunity.stage,
         to: dto.etapa,
-        lostReason:
-          dto.etapa === EtapaOportunidade.PERDIDO
-            ? (dto.motivoPerda?.trim() ?? null)
-            : null,
+        ...historicoPerda(opportunity, perda),
       },
     });
 
@@ -511,20 +545,7 @@ export class OportunidadesService {
     }
 
     const proximaEtapa = dto.etapa ?? opportunity.stage;
-    const proximoMotivoPerda =
-      proximaEtapa === EtapaOportunidade.PERDIDO
-        ? (this.normalizarTexto(dto.motivoPerda) ??
-          opportunity.lostReason ??
-          null)
-        : null;
-
-    if (proximaEtapa === EtapaOportunidade.PERDIDO) {
-      if (!proximoMotivoPerda) {
-        throw new BadRequestException(
-          'Informe o motivo da perda ao marcar a oportunidade como perdida.',
-        );
-      }
-    }
+    const perda = resolverPerda(dto.etapa !== undefined ? this.situacaoPorEtapa(proximaEtapa) : opportunity.status, dto, opportunity);
 
     const camposAlterados = [
       proximoTitulo !== undefined && proximoTitulo !== opportunity.title
@@ -555,8 +576,11 @@ export class OportunidadesService {
         ? 'observações do pré-contrato'
         : null,
       dto.motivoPerda !== undefined &&
-      this.normalizarTexto(dto.motivoPerda) !== opportunity.lostReason
+      perda.motivoPerda !== opportunity.motivoPerda
         ? 'motivo da perda'
+        : null,
+      dto.observacaoPerda !== undefined && perda.observacaoPerda !== opportunity.observacaoPerda
+        ? 'observações da perda'
         : null,
     ].filter(Boolean);
 
@@ -589,9 +613,7 @@ export class OportunidadesService {
       ...(dto.observacoesPreContrato !== undefined
         ? { preContractNotes: this.normalizarTexto(dto.observacoesPreContrato) }
         : {}),
-      ...(dto.etapa !== undefined || dto.motivoPerda !== undefined
-        ? { lostReason: proximoMotivoPerda }
-        : {}),
+      ...perda,
     };
 
     const oportunidadeAtualizada = await this.prisma.$transaction(
@@ -617,11 +639,14 @@ export class OportunidadesService {
               clientId: opportunity.clientId,
               type: TimelineEventType.NOTE_ADDED,
               title: 'Oportunidade editada',
-              description: `Campos atualizados: ${camposAlterados.join(', ')}.`,
+              description: `Campos atualizados: ${camposAlterados.join(', ')}.` + descricaoPerda(perda),
               createdById: user.sub,
               metadata: {
                 opportunityId: id,
                 camposAlterados,
+                from: opportunity.stage,
+                to: proximaEtapa,
+                ...historicoPerda(opportunity, perda),
               },
             },
           });
@@ -640,6 +665,7 @@ export class OportunidadesService {
       userId: user.sub,
       details: {
         camposAlterados,
+        ...historicoPerda(opportunity, perda),
       },
     });
 

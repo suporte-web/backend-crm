@@ -1,4 +1,5 @@
 model User {
+  solicitacoesSiteResponsavel SolicitacaoSite[] @relation("SolicitacaoSiteResponsavel")
   visitasResponsavel VisitaCliente[] @relation("VisitaResponsavel")
   visitasCriadas VisitaCliente[] @relation("VisitaCriador")
   visitasParticipante VisitaParticipante[] @relation("VisitaParticipanteUsuario")

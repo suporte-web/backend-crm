@@ -1,4 +1,5 @@
 model Client {
+  solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
   modalidadeCadastro     ModalidadeCadastro @default(CLIENTE) @map("registrationType")
   leadCadastro     Lead? @relation("CadastroLead")
   id                   String    @id @default(uuid())

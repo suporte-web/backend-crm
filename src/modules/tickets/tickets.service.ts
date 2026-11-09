@@ -1,3 +1,5 @@
+import { registrarGanhoOportunidade } from '../oportunidades/ganho-oportunidade';
+import { assertSiteLeadAccess } from '../solicitacoes-site/site-workflow-access';
 import { getUserRoles, hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
@@ -673,6 +675,7 @@ export class TicketsService {
         })
       : null;
 
+    await assertSiteLeadAccess(this.prisma, user, lead);
     if (dto.leadId && !lead) {
       throw new BadRequestException('Lead invalido para este ticket.');
     }
@@ -884,6 +887,10 @@ export class TicketsService {
     }
 
     if ((ticket.formPayload as Record<string, unknown> | null)?.canal === 'RECLAMACOES_ELOGIOS') throw new ForbiddenException('Abra esta ocorrência no módulo Atendimento SAC.');
+    if (ticket.leadId) {
+      const lead = await this.prisma.lead.findUnique({ where: { id: ticket.leadId }, include: { siteRequest: true } });
+      await assertSiteLeadAccess(this.prisma, user, lead);
+    }
     this.assertTicketAccess(user, ticket);
     await this.notificationsService.markTicketNotificationsRead(user.sub, id);
 
@@ -1682,14 +1689,7 @@ export class TicketsService {
           );
         }
 
-        await tx.opportunity.update({
-          where: { id: ticket.opportunityId },
-          data: {
-            value: negotiatedValue,
-            stage: OpportunityStage.GANHO,
-            status: OpportunityStatus.WON,
-          },
-        });
+        await registrarGanhoOportunidade(tx, ticket.opportunityId, user.sub, negotiatedValue);
       }
 
       const updated = await tx.ticket.update({

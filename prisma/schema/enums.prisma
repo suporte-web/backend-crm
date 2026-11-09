@@ -4,10 +4,10 @@ enum UserRole {
   ADMIN
   GESTAO
   COMERCIAL
+  CONSULTORA
   OPERACAO
   MARKETING
   CLIENTE
-  CONSULTORA
 }
 
 enum QuoteStatus {
@@ -293,4 +293,11 @@ enum MarketingIntegrationStatus {
   CONECTADO
   ERRO
   EXPIRADO
+}
+
+
+enum CotacaoSiteEtapa {
+  LEAD
+  PROSPECT
+  CLIENTE
 }

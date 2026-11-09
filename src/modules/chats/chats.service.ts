@@ -1,3 +1,4 @@
+import { assertSiteLeadAccess } from '../solicitacoes-site/site-workflow-access';
 import {
   BadRequestException,
   ForbiddenException,
@@ -403,6 +404,10 @@ export class ChatsService {
         },
       });
 
+      if (ticket?.leadId) {
+        const lead = await tx.lead.findUnique({ where: { id: ticket.leadId }, include: { siteRequest: true } });
+        await assertSiteLeadAccess(tx, user, lead);
+      }
       if (!ticket) {
         throw new NotFoundException('Ticket não encontrado.');
       }
@@ -565,6 +570,7 @@ export class ChatsService {
       where: { id: entityId },
     });
 
+    await assertSiteLeadAccess(tx, user, lead);
     if (!lead) {
       throw new NotFoundException('Lead não encontrado.');
     }

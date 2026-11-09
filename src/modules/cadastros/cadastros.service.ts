@@ -119,7 +119,7 @@ export class CadastrosService {
       ? permitidas.filter((item) => item === tipo)
       : permitidas;
     const q = busca?.trim();
-    return this.prisma.client.findMany({
+    const cadastros = await this.prisma.client.findMany({
       where: {
         modalidadeCadastro: { in: tipos },
         ...(hasAnyRole(user, ['CONSULTORA'])
@@ -153,10 +153,24 @@ export class CadastrosService {
         user: { select: { id: true, name: true, email: true, role: true } },
         contacts: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
         leadCadastro: {
-          select: { id: true, source: true, status: true, email: true },
+          select: { id: true, source: true, status: true, email: true, metadata: true },
         },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+    return cadastros.map((cadastro) => {
+      const { leadCadastro, ...dadosCadastro } = cadastro;
+      const metadata = leadCadastro?.metadata;
+      const responsavel = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+        && typeof metadata.responsible === 'string' ? metadata.responsible.trim() || null : null;
+      return {
+        ...dadosCadastro,
+        responsavel,
+        leadCadastro: leadCadastro ? {
+          id: leadCadastro.id, source: leadCadastro.source,
+          status: leadCadastro.status, email: leadCadastro.email,
+        } : null,
+      };
     });
   }
 

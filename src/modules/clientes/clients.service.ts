@@ -1,12 +1,16 @@
+import { consultaValorPropostaComercial, valorPropostaComercial } from '../../common/valor-proposta-comercial';
+import { resolverPerda, historicoPerda, descricaoPerda, type DadosPerda } from '../oportunidades/motivos-perda';
 import { hasAnyRole } from '../../common/user-roles';
 import { excluirCadastroComHistorico } from '../../common/exclusao-cadastros';
 import { normalizarContatoLead, sincronizarContatoLead } from '../../common/cadastros';
+import { assertOpportunityAccess, assertOpportunityOwner, isConsultora } from '../../common/opportunity-access';
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import {
   AuditLogAction,
@@ -227,6 +231,7 @@ export class ClientsService {
           },
         },
         opportunities: {
+          include: { propostas: consultaValorPropostaComercial },
           orderBy: {
             updatedAt: 'desc',
           },
@@ -271,7 +276,13 @@ export class ClientsService {
       throw new NotFoundException('Cliente não encontrado.');
     }
 
-    return client;
+    return {
+      ...client,
+      opportunities: (client.opportunities ?? []).map(({ propostas, ...oportunidade }) => ({
+        ...oportunidade,
+        valorPropostaComercial: valorPropostaComercial(propostas),
+      })),
+    };
   }
 
   private buildQuoteTimelineEvents(
@@ -411,11 +422,7 @@ export class ClientsService {
 
     const normalizedDocument = this.normalizeDocument(dto.document);
 
-    if (!normalizedDocument) {
-      throw new BadRequestException('Informe o CPF ou CNPJ do cliente.');
-    }
-
-    const existingClient = await this.prisma.client.findFirst({
+    const existingClient = normalizedDocument ? await this.prisma.client.findFirst({
       where: {
         document: normalizedDocument,
       },
@@ -426,7 +433,7 @@ export class ClientsService {
         tradeName: true,
         document: true,
       },
-    });
+    }) : null;
 
     if (existingClient) {
       const clientName =
@@ -459,7 +466,7 @@ export class ClientsService {
           name: displayName,
           role: UserRole.CLIENTE,
           isActive: false,
-          document: normalizedDocument,
+          document: normalizedDocument ?? undefined,
           phone: this.sanitize(dto.phone) ?? undefined,
           companyName:
             this.sanitize(dto.companyName) ??
@@ -607,9 +614,10 @@ export class ClientsService {
 
     const internalUsers = await this.prisma.user.findMany({
       where: {
-        role: {
-          in: ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING'],
-        },
+        OR: [
+          { role: { in: ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING', 'CONSULTORA'] } },
+          { roles: { hasSome: ['ADMIN', 'GESTAO', 'COMERCIAL', 'MARKETING', 'CONSULTORA'] } },
+        ],
       },
       select: {
         id: true,
@@ -745,8 +753,26 @@ export class ClientsService {
 
   async getDetail(user: AuthUser, id: string) {
     this.ensureInternalUser(user);
-
     const client = await this.getClientOrFail(id);
+    return this.buildClientDetail(client);
+  }
+
+  private async getOpportunityClient(user: AuthUser, id: string) {
+    await assertOpportunityAccess(this.prisma, user);
+    const client = await this.getClientOrFail(id);
+    assertOpportunityOwner(user, client);
+    return client;
+  }
+
+  async getOpportunityDetail(user: AuthUser, id: string) {
+    const detail = this.buildClientDetail(await this.getOpportunityClient(user, id));
+    if (isConsultora(user)) {
+      detail.client.documents = detail.client.documents.filter(document => document.category === 'OPORTUNIDADE_PROPOSTA');
+    }
+    return detail;
+  }
+
+  private buildClientDetail(client: Awaited<ReturnType<ClientsService['getClientOrFail']>>) {
     const openOpportunities = client.opportunities.filter(
       (opportunity) => opportunity.status === OpportunityStatus.OPEN,
     );
@@ -979,8 +1005,24 @@ export class ClientsService {
     description?: string,
     category?: string,
   ) {
-    this.ensureInternalUser(user);
-    await this.getClientOrFail(id);
+    if (isConsultora(user)) {
+      await this.getOpportunityClient(user, id);
+      if (category !== 'OPORTUNIDADE_PROPOSTA') {
+        throw new ForbiddenException('Você pode anexar somente documentos de propostas.');
+      }
+    } else {
+      this.ensureInternalUser(user);
+      await this.getClientOrFail(id);
+    }
+
+    if (this.sanitize(category) === 'OPORTUNIDADE_PROPOSTA') {
+      const oversized = files.find(file => file.size > 20 * 1024 * 1024);
+      if (oversized) {
+        throw new PayloadTooLargeException(
+          `O arquivo "${oversized.originalname}" ultrapassa o limite de 20 MB. Reduza o tamanho do arquivo e tente novamente.`,
+        );
+      }
+    }
 
     if (files.length !== 1) {
       if (!files.length) {
@@ -1072,8 +1114,12 @@ export class ClientsService {
   }
 
   async getDocumentDownload(user: AuthUser, id: string, documentId: string) {
-    this.ensureInternalUser(user);
-    await this.getClientOrFail(id);
+    if (isConsultora(user)) {
+      await this.getOpportunityClient(user, id);
+    } else {
+      this.ensureInternalUser(user);
+      await this.getClientOrFail(id);
+    }
 
     const document = await this.prisma.clientDocument.findFirst({
       where: {
@@ -1084,6 +1130,9 @@ export class ClientsService {
 
     if (!document) {
       throw new NotFoundException('Documento não encontrado.');
+    }
+    if (isConsultora(user) && document.category !== 'OPORTUNIDADE_PROPOSTA') {
+      throw new ForbiddenException('Você pode acessar somente documentos de propostas.');
     }
 
     const filePath = join(
@@ -1110,10 +1159,12 @@ export class ClientsService {
     documentId: string,
     dto: DeleteClientDocumentDto,
   ) {
-    this.ensureInternalUser(user);
-
-    // Confirma que o cliente existe.
-    await this.getClientOrFail(clientId);
+    if (isConsultora(user)) {
+      await this.getOpportunityClient(user, clientId);
+    } else {
+      this.ensureInternalUser(user);
+      await this.getClientOrFail(clientId);
+    }
 
     const justification = this.sanitize(dto.justification);
 
@@ -1133,6 +1184,9 @@ export class ClientsService {
 
     if (!document) {
       throw new NotFoundException('Documento não encontrado.');
+    }
+    if (isConsultora(user) && document.category !== 'OPORTUNIDADE_PROPOSTA') {
+      throw new ForbiddenException('Você pode excluir somente documentos de propostas.');
     }
 
     const filePath = join(
@@ -2036,10 +2090,13 @@ export class ClientsService {
   }
 
   async updateOpportunityStatus(
+    user: AuthUser,
     clientId: string,
     opportunityId: string,
     status: 'OPEN' | 'WON' | 'LOST',
+    dadosPerda: DadosPerda = {},
   ) {
+    await this.getOpportunityClient(user, clientId);
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
         id: opportunityId,
@@ -2053,13 +2110,19 @@ export class ClientsService {
       );
     }
 
-    return this.prisma.opportunity.update({
-      where: {
-        id: opportunityId,
-      },
-      data: {
-        status,
-      },
+    const perda = resolverPerda(status, dadosPerda, opportunity);
+    const stage = status === 'LOST' ? 'PERDIDO' : status === 'WON' ? 'GANHO'
+      : ['GANHO', 'PERDIDO'].includes(opportunity.stage) ? 'NEGOCIACAO' : opportunity.stage;
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.opportunity.update({ where: { id: opportunityId }, data: { status, stage, ...perda } });
+      await tx.timelineEvent.create({ data: {
+        clientId, createdById: user.sub,
+        type: status === 'LOST' ? TimelineEventType.OPPORTUNITY_LOST : status === 'WON' ? TimelineEventType.OPPORTUNITY_WON : TimelineEventType.STAGE_CHANGED,
+        title: status === 'LOST' ? 'Oportunidade perdida' : status === 'WON' ? 'Oportunidade ganha' : 'Oportunidade aberta',
+        description: 'Status da oportunidade "' + opportunity.title + '" atualizado.' + descricaoPerda(perda),
+        metadata: { opportunityId, previousStatus: opportunity.status, status, from: opportunity.stage, to: stage, ...historicoPerda(opportunity, perda) },
+      } });
+      return updated;
     });
   }
 }

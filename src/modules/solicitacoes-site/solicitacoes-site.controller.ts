@@ -1,3 +1,5 @@
+import { CotacaoSiteWorkflowService } from './cotacao-site-workflow.service';
+import { AtualizarCotacaoSiteDto, ConverterCotacaoSiteClienteDto } from './dto/cotacao-site-actions.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { CotacaoSiteTriagemService } from './cotacao-site-triagem.service';
@@ -8,6 +10,7 @@ import {
   Get,
   Param,
   Post,
+  Patch,
   Query,
   Res,
   UploadedFiles,
@@ -45,6 +48,7 @@ export class SolicitacoesSiteController {
   constructor(
     private readonly solicitacoesSiteService: SolicitacoesSiteService,
     private readonly triagem: CotacaoSiteTriagemService,
+    private readonly workflow: CotacaoSiteWorkflowService,
   ) {}
 
   @Post()
@@ -123,6 +127,20 @@ export class SolicitacoesSiteController {
     return this.triagem.encaminhar(user, id, dto);
   }
 
+  @Patch(':id/prospect')
+  @UseGuards(JwtAuthGuard)
+  async atualizarProspect(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: AtualizarCotacaoSiteDto) {
+    const result = await this.workflow.atualizar(user, id, dto);
+    return { ...result, solicitacao: await this.triagem.enriquecer(result.solicitacao) };
+  }
+
+  @Post(':id/converter-cliente')
+  @UseGuards(JwtAuthGuard)
+  async converterCliente(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ConverterCotacaoSiteClienteDto) {
+    const result = await this.workflow.converterCliente(user, id, dto);
+    return { ...result, solicitacao: await this.triagem.enriquecer(result.solicitacao) };
+  }
+
   @Post(':id/reprovar')
   @UseGuards(JwtAuthGuard)
   reprovar(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ReprovarCotacaoSiteDto) {
@@ -143,9 +161,10 @@ export class SolicitacoesSiteController {
   async baixarAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
+    @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {
-    const anexo = await this.solicitacoesSiteService.buscarAnexo(id, anexoId);
+    const anexo = await this.solicitacoesSiteService.buscarAnexo(id, anexoId, user);
 
     const caminhoArquivo = join(diretorioAnexos, anexo.nomeArquivo);
 

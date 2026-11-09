@@ -1,3 +1,4 @@
+import { DadosPerdaDto } from './dados-perda.dto';
 import { CampoCompativel } from './campo-compativel.decorator';
 import {
   IsBoolean,
@@ -10,7 +11,7 @@ import {
 } from 'class-validator';
 import { OpportunityStage as EtapaOportunidade } from '@prisma/client';
 
-export class AtualizarOportunidadeDto {
+export class AtualizarOportunidadeDto extends DadosPerdaDto {
   @IsOptional()
   @IsUUID('all', { message: 'Informe um identificador válido.' })
   @CampoCompativel('cotacaoId', 'quoteId')
@@ -48,8 +49,4 @@ export class AtualizarOportunidadeDto {
   @CampoCompativel('observacoesPreContrato', 'preContractNotes')
   observacoesPreContrato?: string | null;
 
-  @IsOptional()
-  @IsString({ message: 'Informe um texto válido.' })
-  @CampoCompativel('motivoPerda', 'lostReason')
-  motivoPerda?: string | null;
 }
