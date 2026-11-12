@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { ModalidadeCadastro, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getUserRoles, hasAnyRole } from './user-roles';
+import { responsavelMcg } from './acesso-consultora';
 
 type Usuario = { role: string; roles?: string[] };
 
@@ -47,12 +48,14 @@ export async function validarAutoriaCadastro(
     prospectedById: string | null;
     internalOwnerId: string | null;
   },
+  permitirLeituraMcg = false,
 ) {
   if (!hasAnyRole(user, ['CONSULTORA'])) return;
   const lead = await prisma.lead.findUnique({
     where: { cadastroId: cadastro.id },
-    select: { createdById: true },
+    select: { createdById: true, ...(permitirLeituraMcg ? { metadata: true } : {}) },
   });
+  if (permitirLeituraMcg && responsavelMcg(lead?.metadata)) return;
   if (
     cadastro.prospectedById !== user.sub &&
     cadastro.internalOwnerId !== user.sub &&

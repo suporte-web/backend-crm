@@ -59,7 +59,7 @@ export class CadastrosController {
     @Param('id') id: string,
     @Body() dto: UpdateLeadDto,
   ) {
-    const lead = await this.cadastros.dadosLead(user, id);
+    const lead = await this.cadastros.dadosLead(user, id, false);
     if (!lead)
       throw new NotFoundException(
         'Este cadastro não possui um lead vinculado.',
@@ -73,7 +73,7 @@ export class CadastrosController {
     @Param('id') id: string,
     @Body() dto: CreateLeadObservacaoDto,
   ) {
-    const lead = await this.cadastros.dadosLead(user, id);
+    const lead = await this.cadastros.dadosLead(user, id, false);
     if (!lead)
       throw new NotFoundException(
         'Este cadastro não possui um lead vinculado.',

@@ -3,6 +3,7 @@ import {
   validarAcessoCadastro,
 } from '../../common/permissoes-cadastros';
 import { hasAnyRole } from '../../common/user-roles';
+import { cadastroMcg, oportunidadesDaConsultora } from '../../common/acesso-consultora';
 import {
   BadRequestException,
   ForbiddenException,
@@ -68,13 +69,18 @@ export class OportunidadesService {
   private async validarCadastro(
     user: AuthUser,
     cadastro: {
+      id: string;
       modalidadeCadastro: ModalidadeCadastro;
       internalOwnerId: string | null;
     },
   ) {
     await this.validarUsuarioInterno(user);
     if (hasAnyRole(user, ['CONSULTORA'])) {
-      if (cadastro.internalOwnerId !== user.sub)
+      const permitido = await this.prisma.client.findFirst({
+        where: { id: cadastro.id, ...cadastroMcg() },
+        select: { id: true },
+      });
+      if (!permitido)
         throw new ForbiddenException(
           'Você não tem permissão para acessar oportunidades deste cadastro.',
         );
@@ -96,7 +102,7 @@ export class OportunidadesService {
     return this.prisma.client.findMany({
       where: {
         modalidadeCadastro: { in: tipos },
-        ...(consultora ? { internalOwnerId: user.sub } : {}),
+        ...(consultora ? cadastroMcg() : {}),
       },
       include: {
         user: { select: { id: true, name: true, email: true, role: true } },
@@ -110,6 +116,15 @@ export class OportunidadesService {
     const cadastro = await this.prisma.client.findUnique({ where: { id } });
     if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
     await this.validarCadastro(user, cadastro);
+  }
+
+  private async validarAutoriaOportunidade(user: AuthUser, id: string, clientId: string) {
+    if (!hasAnyRole(user, ['CONSULTORA'])) return;
+    const evento = await this.prisma.timelineEvent.findFirst({
+      where: { clientId, type: 'OPPORTUNITY_CREATED', createdById: user.sub, metadata: { path: ['opportunityId'], equals: id } },
+      select: { id: true },
+    });
+    if (!evento) throw new ForbiddenException('Você não tem permissão para acessar esta oportunidade.');
   }
 
   private situacaoPorEtapa(stage: EtapaOportunidade): SituacaoOportunidade {
@@ -333,8 +348,9 @@ export class OportunidadesService {
     if (hasAnyRole(user, ['CONSULTORA'])) {
       where.client = {
         modalidadeCadastro: { in: tipos },
-        internalOwnerId: user.sub,
+        ...cadastroMcg(),
       };
+      where.id = { in: await oportunidadesDaConsultora(this.prisma, user.sub, filtros.clienteId) };
     }
     return this.prisma.opportunity.findMany({
       where,
@@ -374,6 +390,7 @@ export class OportunidadesService {
       throw new NotFoundException('Oportunidade não encontrada.');
     }
     await this.validarCadastro(user, opportunity.client);
+    await this.validarAutoriaOportunidade(user, opportunity.id, opportunity.clientId);
 
     if (dto.etapa === EtapaOportunidade.PERDIDO && !dto.motivoPerda?.trim()) {
       throw new BadRequestException(
@@ -488,6 +505,7 @@ export class OportunidadesService {
       throw new NotFoundException('Oportunidade não encontrada.');
     }
     await this.validarCadastro(user, opportunity.client);
+    await this.validarAutoriaOportunidade(user, opportunity.id, opportunity.clientId);
 
     const proximoTitulo =
       dto.titulo !== undefined ? this.normalizarTexto(dto.titulo) : undefined;
@@ -665,6 +683,7 @@ export class OportunidadesService {
     }
 
     await this.validarCadastro(user, opportunity.client);
+    await this.validarAutoriaOportunidade(user, opportunity.id, opportunity.clientId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.timelineEvent.create({

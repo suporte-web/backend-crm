@@ -18,12 +18,14 @@ describe('Rotas locais de Oportunidades/Propostas', () => {
       companyName: 'Minha empresa',
       internalOwnerId: 'consultora',
       modalidadeCadastro: 'LEAD',
+      leadCadastro: { metadata: { responsible: 'MCG' } },
     },
     {
       id: 'c2',
       companyName: 'Outra empresa',
       internalOwnerId: 'outra',
       modalidadeCadastro: 'CLIENTE',
+      leadCadastro: { metadata: { responsible: 'OUTRO' } },
     },
   ];
   const prisma = {
@@ -38,6 +40,7 @@ describe('Rotas locais de Oportunidades/Propostas', () => {
             })),
     },
     client: {
+      findFirst: async ({ where }: any) => cadastros.find(c => c.id === where.id && c.leadCadastro.metadata.responsible === where.leadCadastro.metadata.equals),
       findUnique: async ({ where }: any) =>
         cadastros.find((c) => c.id === where.id),
       findMany: async ({ where }: any) =>
@@ -45,6 +48,7 @@ describe('Rotas locais de Oportunidades/Propostas', () => {
           (c) =>
             (!where.internalOwnerId ||
               c.internalOwnerId === where.internalOwnerId) &&
+            (!where.leadCadastro || c.leadCadastro.metadata.responsible === where.leadCadastro.metadata.equals) &&
             (!where.modalidadeCadastro ||
               where.modalidadeCadastro.in.includes(c.modalidadeCadastro)),
         ),
@@ -54,10 +58,13 @@ describe('Rotas locais de Oportunidades/Propostas', () => {
         cadastros
           .filter(
             (c) =>
-              !where.client.internalOwnerId ||
-              c.internalOwnerId === where.client.internalOwnerId,
+              (!where.client.leadCadastro || c.leadCadastro.metadata.responsible === where.client.leadCadastro.metadata.equals) &&
+              (!where.id || where.id.in.includes('op-' + c.id)),
           )
           .map((client) => ({ id: 'op-' + client.id, client })),
+    },
+    timelineEvent: {
+      findMany: async () => [{ metadata: { opportunityId: 'op-c1' } }],
     },
   };
   beforeAll(async () => {

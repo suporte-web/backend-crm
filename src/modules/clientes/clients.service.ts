@@ -1,4 +1,5 @@
 import { hasAnyRole } from '../../common/user-roles';
+import { documentoVisivelConsultora, idOportunidade, responsavelMcg } from '../../common/acesso-consultora';
 import { excluirCadastroComHistorico } from '../../common/exclusao-cadastros';
 import { normalizarContatoLead, sincronizarContatoLead } from '../../common/cadastros';
 import {
@@ -652,13 +653,38 @@ export class ClientsService {
 
   async findOne(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
-    return this.getClientOrFail(id);
+    return this.filtrarOportunidadesConsultora(user, await this.getClientOrFail(id));
+  }
+
+  private filtrarOportunidadesConsultora(
+    user: { sub: string; role: string; roles?: string[] },
+    client: Awaited<ReturnType<ClientsService['getClientOrFail']>>,
+  ) {
+    if (!hasAnyRole(user, ['CONSULTORA'])) return client;
+    const ids = new Set(client.timelineEvents
+      .filter(evento => evento.type === 'OPPORTUNITY_CREATED' && evento.createdById === user.sub)
+      .map(evento => idOportunidade(evento.metadata)).filter((id): id is string => !!id));
+    const mcg = responsavelMcg(client.leadCadastro?.metadata);
+    const documents = client.documents.filter(item => documentoVisivelConsultora(item, user.sub));
+    const documentosVisiveis = new Set(documents.map(item => item.id));
+    return {
+      ...client,
+      opportunities: client.opportunities.filter(item => mcg && ids.has(item.id)),
+      timelineEvents: client.timelineEvents.filter(evento => {
+        const metadata = evento.metadata;
+        const documento = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata.documentId : undefined;
+        if (typeof documento === 'string' && !documentosVisiveis.has(documento)) return false;
+        const id = idOportunidade(evento.metadata);
+        return id ? mcg && ids.has(id) : !evento.type.startsWith('OPPORTUNITY_');
+      }),
+      documents,
+    };
   }
 
   async getSummary(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
 
-    const client = await this.getClientOrFail(id);
+    const client = this.filtrarOportunidadesConsultora(user, await this.getClientOrFail(id));
     const totalQuotes = client.quotes.length;
     const totalOpportunities = client.opportunities.length;
     const openOpportunities = client.opportunities.filter(
@@ -746,7 +772,7 @@ export class ClientsService {
   async getDetail(user: AuthUser, id: string) {
     this.ensureInternalUser(user);
 
-    const client = await this.getClientOrFail(id);
+    const client = this.filtrarOportunidadesConsultora(user, await this.getClientOrFail(id));
     const openOpportunities = client.opportunities.filter(
       (opportunity) => opportunity.status === OpportunityStatus.OPEN,
     );
@@ -827,7 +853,7 @@ export class ClientsService {
 
   async getTimeline(user: { sub: string; role: string; roles?: string[] }, id: string) {
     this.ensureInternalUser(user);
-    const client = await this.getClientOrFail(id);
+    const client = this.filtrarOportunidadesConsultora(user, await this.getClientOrFail(id));
     return this.buildCombinedTimeline(client);
   }
 
@@ -1084,6 +1110,10 @@ export class ClientsService {
 
     if (!document) {
       throw new NotFoundException('Documento não encontrado.');
+    }
+
+    if (hasAnyRole(user, ['CONSULTORA']) && !documentoVisivelConsultora(document, user.sub)) {
+      throw new ForbiddenException('Você não tem permissão para acessar este documento.');
     }
 
     const filePath = join(
@@ -1655,6 +1685,15 @@ export class ClientsService {
       );
     }
 
+    if (hasAnyRole(user, ['CONSULTORA'])) {
+      const visivel = this.filtrarOportunidadesConsultora(user, existingClient);
+      const ids = new Set(visivel.opportunities.map(item => item.id));
+      return {
+        ...updatedClient,
+        opportunities: updatedClient.opportunities.filter(item => ids.has(item.id)),
+        documents: updatedClient.documents.filter(item => documentoVisivelConsultora(item, user.sub)),
+      };
+    }
     return updatedClient;
   }
 

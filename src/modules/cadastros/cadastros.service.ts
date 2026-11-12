@@ -17,6 +17,7 @@ import {
   validarAutoriaCadastro,
 } from '../../common/permissoes-cadastros';
 import { hasAnyRole } from '../../common/user-roles';
+import { cadastroMcg } from '../../common/acesso-consultora';
 import { capturarProspeccao } from '../../common/prospeccao';
 import { validarFotoCadastro } from '../../common/foto-cadastro';
 import type { AuthUser } from '../auth/types/auth-user.type';
@@ -30,7 +31,7 @@ export class CadastrosService {
     if (!hasAnyRole(user, ['ADMIN', 'GESTAO', 'COMERCIAL', 'CONSULTORA']))
       throw new ForbiddenException('Seu perfil não pode alterar a foto do cadastro.');
     const foto = validarFotoCadastro(fotoUrl);
-    await this.obter(user, id);
+    await this.obter(user, id, false);
     return this.prisma.$transaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Client" WHERE id = ${id} FOR UPDATE`);
       const cadastro = await tx.client.findUnique({ where: { id } });
@@ -91,7 +92,7 @@ export class CadastrosService {
       throw new ForbiddenException('Seu perfil não pode alterar a etapa do funil.');
     if (!(ETAPAS_FUNIL_COMERCIAL as readonly string[]).includes(dto.etapa))
       throw new BadRequestException('Selecione uma etapa válida do funil comercial.');
-    await this.obter(user, id);
+    await this.obter(user, id, false);
     return this.prisma.$transaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Client" WHERE id = ${id} FOR UPDATE`);
       const cadastro = await tx.client.findUnique({ where: { id } });
@@ -130,6 +131,7 @@ export class CadastrosService {
                     { prospectedById: user.sub },
                     { internalOwnerId: user.sub },
                     { leadCadastro: { createdById: user.sub } },
+                    cadastroMcg(),
                   ],
                 },
               ],
@@ -160,11 +162,11 @@ export class CadastrosService {
     });
   }
 
-  async obter(user: AuthUser, id: string) {
+  async obter(user: AuthUser, id: string, permitirLeituraMcg = true) {
     const cadastro = await this.prisma.client.findUnique({ where: { id } });
     if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
     await validarAcessoCadastro(this.prisma, user, cadastro.modalidadeCadastro);
-    await validarAutoriaCadastro(this.prisma, user, cadastro);
+    await validarAutoriaCadastro(this.prisma, user, cadastro, permitirLeituraMcg);
     return cadastro;
   }
 
@@ -186,8 +188,8 @@ export class CadastrosService {
     return { id: cadastro.id, modalidadeCadastro: cadastro.modalidadeCadastro };
   }
 
-  async dadosLead(user: AuthUser, id: string) {
-    await this.obter(user, id);
+  async dadosLead(user: AuthUser, id: string, permitirLeituraMcg = true) {
+    await this.obter(user, id, permitirLeituraMcg);
     return this.prisma.lead.findUnique({
       where: { cadastroId: id },
       include: {
@@ -380,7 +382,7 @@ export class CadastrosService {
     id: string,
     dto: AlterarModalidadeDto,
   ) {
-    await this.obter(user, id);
+    await this.obter(user, id, false);
     await validarAcessoCadastro(this.prisma, user, dto.modalidadeCadastro);
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw(

@@ -9,6 +9,7 @@ import { ForbiddenException } from '@nestjs/common';
 describe('Acesso a oportunidades por cadastro', () => {
   it('impede excluir por ID direto a oportunidade de outro responsável', async () => {
     const prisma = {
+      client: { findFirst: async () => null },
       opportunity: {
         findUnique: async () => ({
           id: 'o1',
