@@ -1,4 +1,5 @@
 model Prospect {
+  solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteProspect")
   id                  String                     @id @default(uuid())
   nomeRazaoSocial     String
   nomeContato         String?

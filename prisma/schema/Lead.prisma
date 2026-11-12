@@ -1,4 +1,5 @@
 model Lead {
+  siteRequest SolicitacaoSite? @relation("SolicitacaoSiteLead")
   cadastroId    String? @unique(map: "Lead_registrationId_key") @map("registrationId")
   cadastro      Client? @relation("CadastroLead", fields: [cadastroId], references: [id], onDelete: SetNull, map: "Lead_registrationId_fkey")
   id                String                @id @default(uuid())

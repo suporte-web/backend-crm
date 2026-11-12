@@ -35,6 +35,11 @@ export class OportunidadesController {
     private readonly clientsService: ClientsService,
   ) {}
 
+  @Get('motivos-perda')
+  listarMotivosPerda(@CurrentUser() user: AuthUser) {
+    return this.oportunidadesService.listarMotivosPerda(user);
+  }
+
   @Get('clients')
   listarCadastros(@CurrentUser() user: AuthUser) {
     return this.oportunidadesService.listarCadastros(user);

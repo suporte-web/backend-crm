@@ -1,3 +1,4 @@
+import { siteRequestScope, siteWorkflowInclude } from './site-workflow-access';
 import { CotacaoSiteTriagemService } from './cotacao-site-triagem.service';
 import type { AuthUser } from '../auth/types/auth-user.type';
 import { ForbiddenException } from '@nestjs/common';
@@ -87,7 +88,7 @@ export class SolicitacoesSiteService {
 
   async criar(dto: CriarSolicitacaoSiteDto) {
     const resultado = await this.prisma.$transaction(async (tx) => {
-      const solicitacao = await tx.solicitacaoSite.create({
+      let solicitacao = await tx.solicitacaoSite.create({
         data: {
           tipo: dto.tipo,
           departamento: dto.tipo === 'COTACAO' ? 'MARKETING' : undefined,
@@ -134,6 +135,9 @@ export class SolicitacoesSiteService {
         solicitacao.id,
       );
 
+      solicitacao = await tx.solicitacaoSite.update({
+        where: { id: solicitacao.id }, data: { leadId: lead.id, etapaCotacao: 'LEAD' },
+      });
       return {
         solicitacao,
         lead,
@@ -203,7 +207,8 @@ export class SolicitacoesSiteService {
     };
   }
 
-  async buscarAnexo(solicitacaoId: string, anexoId: string) {
+  async buscarAnexo(solicitacaoId: string, anexoId: string, user: AuthUser) {
+    await this.buscarPorId(solicitacaoId, user);
     const anexo = await this.prisma.anexoSolicitacaoSite.findFirst({
       where: {
         id: anexoId,
@@ -219,10 +224,12 @@ export class SolicitacoesSiteService {
   }
 
   async listar(filtros: ListarSolicitacoesSiteDto, user: AuthUser) {
+    const scope = siteRequestScope(user);
     const { tipo, excluirTipo, status, departamento, busca } = filtros;
 
     const solicitacoes = await this.prisma.solicitacaoSite.findMany({
       where: {
+        AND: [scope],
         ...(tipo
           ? {
               tipo,
@@ -281,6 +288,7 @@ export class SolicitacoesSiteService {
           : {}),
       },
 
+      include: siteWorkflowInclude,
       orderBy: {
         criadoEm: 'desc',
       },
@@ -294,6 +302,7 @@ export class SolicitacoesSiteService {
   }
 
   async buscarPorId(id: string, user: AuthUser) {
+    siteRequestScope(user);
     const solicitacao = await this.prisma.solicitacaoSite.findUnique({
       where: {
         id,

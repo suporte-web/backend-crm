@@ -1,3 +1,4 @@
+import { DadosPerdaDto } from './dados-perda.dto';
 import { CampoCompativel } from './campo-compativel.decorator';
 import {
   IsBoolean,
@@ -10,7 +11,7 @@ import {
 } from 'class-validator';
 import { OpportunityStage as EtapaOportunidade } from '@prisma/client';
 
-export class CriarOportunidadeDto {
+export class CriarOportunidadeDto extends DadosPerdaDto {
   @IsUUID('all', { message: 'Informe um identificador válido.' })
   @CampoCompativel('clienteId', 'clientId')
   clienteId!: string;

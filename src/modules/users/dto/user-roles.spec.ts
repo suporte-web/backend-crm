@@ -4,6 +4,12 @@ import { validate } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
 import { UpdateUserDto } from './update-user.dto';
 describe('User profile validation', () => {
+  it('accepts Consultora when creating and editing users', async () => {
+    const create = plainToInstance(CreateUserDto, { name: 'Maria', email: 'maria@example.test', role: 'CONSULTORA', password: 'Test-password-123' });
+    const update = plainToInstance(UpdateUserDto, { role: 'CONSULTORA' });
+    expect(await validate(create)).toEqual([]);
+    expect(await validate(update)).toEqual([]);
+  });
   it('accepts multiple profiles when creating a user', async () => {
     const dto = plainToInstance(CreateUserDto, { name: 'Maria', email: 'maria@example.com', roles: ['ADMIN', 'ATENDIMENTO', 'GESTAO'] });
     expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);

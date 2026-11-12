@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { setupSwagger } from './config/swagger';
+import { blockPrivateClientUploads } from './common/private-client-uploads';
 
 function parseOrigins(value?: string): string[] {
   return (
@@ -71,8 +72,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.use('/uploads', express.static(uploadsDir));
-  app.use('/api/uploads', express.static(uploadsDir));
+  app.use('/uploads', blockPrivateClientUploads, express.static(uploadsDir));
+  app.use('/api/uploads', blockPrivateClientUploads, express.static(uploadsDir));
 
   app.setGlobalPrefix('api');
 

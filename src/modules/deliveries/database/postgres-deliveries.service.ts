@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   InternalServerErrorException,
   OnModuleDestroy,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { Pool, QueryResultRow } from 'pg';
 @Injectable()
 export class PostgresDeliveriesService implements OnModuleDestroy {
   private readonly pool: Pool;
+  private readonly logger = new Logger(PostgresDeliveriesService.name);
 
   constructor(private readonly configService: ConfigService) {
     // A conexao usa apenas variaveis de ambiente,
@@ -19,6 +21,10 @@ export class PostgresDeliveriesService implements OnModuleDestroy {
       database: this.getRequiredConfig('DB_NAME'),
       user: this.getRequiredConfig('DB_USER'),
       password: this.getRequiredConfig('DB_PASSWORD'),
+    });
+    // O pg ja descarta o cliente ocioso quebrado; o listener impede erro sem tratamento.
+    this.pool.on('error', (error: Error) => {
+      this.logger.error('Conexao ociosa com entregas/SSW encerrada.', error.stack);
     });
   }
 

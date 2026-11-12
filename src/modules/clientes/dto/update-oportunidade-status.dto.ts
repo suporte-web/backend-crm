@@ -1,3 +1,4 @@
+import { DadosPerdaDto } from '../../oportunidades/dto/dados-perda.dto';
 import { IsEnum } from "class-validator";
 
 export enum OpportunityStatusDto {
@@ -6,7 +7,7 @@ export enum OpportunityStatusDto {
   LOST = "LOST",
 }
 
-export class UpdateOpportunityStatusDto {
+export class UpdateOpportunityStatusDto extends DadosPerdaDto {
   @IsEnum(OpportunityStatusDto, {
     message: "O status deve ser OPEN, WON ou LOST.",
   })

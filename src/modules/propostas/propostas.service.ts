@@ -1,3 +1,4 @@
+import { registrarGanhoOportunidade } from '../oportunidades/ganho-oportunidade';
 import { hasAnyRole } from '../../common/user-roles';
 import {
   BadRequestException,
@@ -1568,14 +1569,7 @@ export class PropostasService {
         proposta.opportunityId &&
         approvedNegotiatedValue
       ) {
-        await tx.opportunity.update({
-          where: { id: proposta.opportunityId },
-          data: {
-            value: approvedNegotiatedValue,
-            stage: OpportunityStage.GANHO,
-            status: OpportunityStatus.WON,
-          },
-        });
+        await registrarGanhoOportunidade(tx, proposta.opportunityId, user.sub, approvedNegotiatedValue);
       }
 
       const updatedTicket = await tx.ticket.update({

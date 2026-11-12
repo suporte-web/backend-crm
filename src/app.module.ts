@@ -1,6 +1,7 @@
 import { VisitasModule } from './modules/visitas/visitas.module';
 import { AtendimentoSacModule } from './modules/atendimento-sac/atendimento-sac.module';
 import { Module } from '@nestjs/common';
+import { CnpjModule } from './modules/cnpj/cnpj.module';
 import { MarketingMetricsModule } from './marketing-metrics/marketing-metrics.module';
 import { InformativoModule } from './modules/informativo/informativo.module';
 import { ConfigModule } from '@nestjs/config';
@@ -26,7 +27,6 @@ import { PropostasModule } from './modules/propostas/propostas.module';
 import { ChatsModule } from './modules/chats/chats.module';
 import { EntradasModule } from './modules/entradas/entradas.module';
 import { HelpCenterModule } from './modules/help-center/help-center.module';
-import { ScreenPermissionsModule } from './modules/screen-permissions/screen-permissions.module'; 
 import { EntregasPorPlacasModule } from './modules/entregas-por-placas/dto/entregas-por-placas.module';
 import { SolicitacoesSiteModule } from './modules/solicitacoes-site/solicitacoes-site.module';
 import { SiteInstitucionalModule } from './modules/site-institucional/site-institucional.module';
@@ -36,6 +36,7 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CnpjModule,
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -60,14 +61,13 @@ import { MarketingIntegrationsModule } from './marketing-integrations/marketing-
     AtendimentoSacModule,
     VisitasModule,
     HelpCenterModule,
-    ScreenPermissionsModule,
     EntregasPorPlacasModule,
     SolicitacoesSiteModule,
     SiteInstitucionalModule,
     MarketingIntegrationsModule,
     MarketingMetricsModule,
     InformativoModule,
-      
+
   ],
 })
 export class AppModule {}

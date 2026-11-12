@@ -1,3 +1,4 @@
+import { assertSiteLeadAccess, siteLeadScope } from '../solicitacoes-site/site-workflow-access';
 import { garantirCadastroLead, removerCadastroLead } from '../../common/cadastros';
 import { hasAnyRole } from '../../common/user-roles';
 import { desvincularSolicitacoesSite } from '../../common/solicitacoes-site-vinculos';
@@ -768,6 +769,7 @@ export class LeadsService {
     this.ensureInternalUser(user);
 
 const where: Prisma.LeadWhereInput = {
+  ...siteLeadScope(user),
   convertidoParaCliente:
     filters.convertidoParaCliente ?? false,
 };
@@ -821,13 +823,13 @@ const where: Prisma.LeadWhereInput = {
   const [ativos, convertidos] = await Promise.all([
     this.prisma.lead.count({
       where: {
-        convertidoParaCliente: false,
+        ...siteLeadScope(user), convertidoParaCliente: false,
       },
     }),
 
     this.prisma.lead.count({
       where: {
-        convertidoParaCliente: true,
+        ...siteLeadScope(user), convertidoParaCliente: true,
       },
     }),
   ]);
@@ -895,6 +897,7 @@ async findOne(user: AuthUser, id: string) {
       },
     },
   });
+    await assertSiteLeadAccess(this.prisma, user, lead, false);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -925,10 +928,12 @@ async findOne(user: AuthUser, id: string) {
       id: leadId,
     },
     select: {
+      source: true, metadata: true, siteRequest: { select: { tipo: true, responsavelId: true, etapaCotacao: true } },
       id: true,
       status: true,
     },
   });
+  await assertSiteLeadAccess(this.prisma, user, lead);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -980,9 +985,11 @@ async listarObservacoes(
       id: leadId,
     },
     select: {
+      source: true, metadata: true, siteRequest: { select: { tipo: true, responsavelId: true, etapaCotacao: true } },
       id: true,
     },
   });
+  await assertSiteLeadAccess(this.prisma, user, lead);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -1067,6 +1074,7 @@ async listarObservacoes(
           chats: { include: { messages: true, participants: true } },
         },
       });
+    await assertSiteLeadAccess(tx, user, lead, true);
       if (!lead) throw new NotFoundException('Lead não encontrado.');
       const snapshot = JSON.stringify(lead);
       await tx.leadDeletionRequest.updateMany({
@@ -1099,6 +1107,7 @@ async listarObservacoes(
     const lead = await this.prisma.lead.findUnique({
       where: { id: leadId },
     });
+    await assertSiteLeadAccess(this.prisma, user, lead, true);
 
     if (!lead) {
       throw new NotFoundException('Lead não encontrado.');
@@ -1251,6 +1260,7 @@ async convertToClient(
       id: leadId,
     },
   });
+    await assertSiteLeadAccess(this.prisma, user, lead, true);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -1499,6 +1509,7 @@ async convertToClient(
     const lead = await this.prisma.lead.findUnique({
       where: { id: leadId },
     });
+    await assertSiteLeadAccess(this.prisma, user, lead, true);
 
     if (!lead) {
       throw new NotFoundException('Lead não encontrado.');
@@ -1574,6 +1585,7 @@ async convertToClient(
     const lead = await this.prisma.lead.findUnique({
       where: { id: leadId },
     });
+    await assertSiteLeadAccess(this.prisma, user, lead, true);
 
     if (!lead) {
       throw new NotFoundException('Lead nÃ£o encontrado.');

@@ -1,5 +1,6 @@
 /* Os bancos em memória preservam a interface assíncrona do Prisma. */
 /* eslint-disable @typescript-eslint/require-await */
+import { NotificationsService } from '../notifications/notifications.service';
 import { OportunidadesService } from './oportunidades.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -26,7 +27,7 @@ describe('Acesso a oportunidades por cadastro', () => {
         throw new Error('Não deve iniciar uma exclusão sem permissão.');
       },
     } as unknown as PrismaService;
-    const servico = new OportunidadesService(prisma, {} as AuditLogsService);
+    const servico = new OportunidadesService(prisma, {} as AuditLogsService, {} as NotificationsService);
     await expect(
       servico.excluir(
         {

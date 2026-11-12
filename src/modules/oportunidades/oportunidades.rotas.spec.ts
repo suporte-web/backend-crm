@@ -1,6 +1,7 @@
 import { ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { NotificationsService } from '../notifications/notifications.service';
 import { OportunidadesController } from './oportunidades.controller';
 import { OportunidadesService } from './oportunidades.service';
 import { ClientsService } from '../clientes/clients.service';
@@ -71,6 +72,7 @@ describe('Rotas locais de Oportunidades/Propostas', () => {
     const module = await Test.createTestingModule({
       controllers: [OportunidadesController],
       providers: [
+        { provide: NotificationsService, useValue: {} },
         OportunidadesService,
         RolesGuard,
         { provide: PrismaService, useValue: prisma },

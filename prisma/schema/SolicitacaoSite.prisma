@@ -37,6 +37,14 @@ model SolicitacaoSite {
   aceiteComunicacoes Boolean @default(false)
 
   // Controle interno do CRM
+  etapaCotacao      CotacaoSiteEtapa?
+  leadId            String? @unique
+  prospectId        String?
+  clientId          String?
+  lead              Lead? @relation("SolicitacaoSiteLead", fields: [leadId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  prospect          Prospect? @relation("SolicitacaoSiteProspect", fields: [prospectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  client            Client? @relation("SolicitacaoSiteClient", fields: [clientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  responsavel       User? @relation("SolicitacaoSiteResponsavel", fields: [responsavelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   responsavelId     String?
   observacaoInterna String?
 
@@ -47,6 +55,9 @@ model SolicitacaoSite {
   // Anexos
   anexos AnexoSolicitacaoSite[]
 
+  @@index([etapaCotacao, responsavelId])
+  @@index([prospectId])
+  @@index([clientId])
   @@index([tipo])
   @@index([departamento])
   @@index([status])

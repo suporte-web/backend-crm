@@ -6,7 +6,9 @@ model Opportunity {
   stage             OpportunityStage  @default(NOVO)
   status            OpportunityStatus @default(OPEN)
   expectedCloseDate DateTime?
-  lostReason        String?
+  lostReason        String? // Texto legado/rótulo para compatibilidade
+  motivoPerda    String?
+  observacaoPerda   String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   quoteId           String?

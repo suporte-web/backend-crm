@@ -15,5 +15,8 @@ export function normalizeUserRoles(roles: UserRole[]): UserRole[] {
   if (roles.includes('CLIENTE') && roles.some((role) => role !== 'CLIENTE')) {
     throw new BadRequestException('O perfil Cliente não pode ser combinado com perfis internos.');
   }
+  if (roles.includes('CONSULTORA') && roles.some((role) => role !== 'CONSULTORA')) {
+    throw new BadRequestException('O perfil Consultora não pode ser combinado com outros perfis.');
+  }
   return priority.filter((role) => roles.includes(role));
 }

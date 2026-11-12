@@ -1,6 +1,7 @@
 import { OportunidadesService } from './oportunidades.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '@prisma/client';
 
 describe('Oportunidades MCG por autoria', () => {
@@ -55,6 +56,10 @@ describe('Oportunidades MCG por autoria', () => {
       service: new OportunidadesService(
         db as unknown as PrismaService,
         audit as unknown as AuditLogsService,
+        {
+          getUserIdsByRoles: jest.fn().mockResolvedValue(['comercial']),
+          notifyUsers: jest.fn().mockResolvedValue(undefined),
+        } as unknown as NotificationsService,
       ),
     };
   }

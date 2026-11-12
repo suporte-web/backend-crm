@@ -1,3 +1,4 @@
+import { CotacaoSiteWorkflowService } from './cotacao-site-workflow.service';
 import { CotacaoSiteTriagemService } from './cotacao-site-triagem.service';
 import { Module } from '@nestjs/common';
 
@@ -9,6 +10,7 @@ import { SolicitacoesSiteService } from './solicitacoes-site.service';
     SolicitacoesSiteController,
   ],
   providers: [
+    CotacaoSiteWorkflowService,
     CotacaoSiteTriagemService,
     SolicitacoesSiteService,
   ],

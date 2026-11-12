@@ -14,6 +14,7 @@ describe('Detalhes de cadastro com oportunidades de autores diferentes', () => {
   function setup(responsible = 'MCG') {
     const client = {
       id: 'c1',
+      internalOwnerId: user.sub,
       leadCadastro: { metadata: { responsible } },
       quotes: [],
       contacts: [],
@@ -62,6 +63,14 @@ describe('Detalhes de cadastro com oportunidades de autores diferentes', () => {
       ],
     };
     const db = {
+      roleScreenPermission: {
+        findUnique: jest.fn(async ({ where }) =>
+          where.role_screenKey.role === UserRole.CONSULTORA &&
+          where.role_screenKey.screenKey === 'opportunities'
+            ? { isEnabled: true }
+            : null,
+        ),
+      },
       client: { findUnique: jest.fn().mockResolvedValue(client) },
       clientDocument: {
         findFirst: jest

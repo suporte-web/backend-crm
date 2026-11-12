@@ -277,6 +277,7 @@ describe('TicketsService segmented access', () => {
       expect.objectContaining({
         where: {
           AND: [
+            { atendimentoSac: { is: null } },
             expect.objectContaining({
               OR: expect.arrayContaining([{ requesterId: 'gestao-user' }]),
             }),
@@ -301,8 +302,13 @@ describe('TicketsService segmented access', () => {
       client: { userId: 'client-user' },
     };
     const notifyUsers = jest.fn();
+    const findLead = jest.fn().mockResolvedValue({
+      id: 'lead-1', source: 'manual', siteRequest: null,
+    });
+    const createMessageInTransaction = jest.fn();
     const service = createTicketsService({
       prisma: {
+        lead: { findUnique: findLead },
         ticket: {
           findUnique: jest.fn().mockResolvedValue(ticket),
         },
@@ -322,7 +328,7 @@ describe('TicketsService segmented access', () => {
       },
       chats: {
         ensureTicketChat: jest.fn().mockResolvedValue({ id: 'chat-1' }),
-        createMessageInTransaction: jest.fn(),
+        createMessageInTransaction,
       },
     });
 
@@ -330,6 +336,14 @@ describe('TicketsService segmented access', () => {
       { sub: 'gestao-user', role: UserRole.GESTAO, email: 'g@x.test' },
       'ticket-1',
       { message: 'Ajustar lead', isInternal: true },
+    );
+
+    expect(findLead).toHaveBeenCalledWith({
+      where: { id: 'lead-1' }, include: { siteRequest: true },
+    });
+    expect(createMessageInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ visibility: ChatMessageVisibility.GESTAO_COMERCIAL }),
     );
 
     expect(notifyUsers).not.toHaveBeenCalledWith(
