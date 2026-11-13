@@ -1,3 +1,5 @@
+import { ProfilePhotoController } from './profile-photo.controller';
+import { ProfilePhotoService } from './profile-photo.service';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -21,7 +23,7 @@ import { MailModule } from '../mail/mail.module';
       }),
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [AuthController, ProfilePhotoController],
+  providers: [AuthService, JwtStrategy, ProfilePhotoService],
 })
 export class AuthModule {}

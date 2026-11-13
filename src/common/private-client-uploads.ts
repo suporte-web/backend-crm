@@ -16,6 +16,8 @@ export function blockPrivateClientUploads(
     return;
   }
   if (
+    pathname === '/profile-photos' ||
+    pathname.startsWith('/profile-photos/') ||
     pathname === '/client-documents' ||
     pathname.startsWith('/client-documents/')
   ) {
@@ -23,7 +25,7 @@ export function blockPrivateClientUploads(
       .status(403)
       .json({
         message:
-          'Use a rota autenticada para acessar os documentos do cadastro.',
+          'Use a rota autenticada para acessar este arquivo privado.',
       });
     return;
   }
