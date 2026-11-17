@@ -495,6 +495,8 @@ model Chat {
 
 // ----- Cliente.prisma -----
 model Client {
+  empresaConsultoraId String?
+  empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
   modalidadeCadastro     ModalidadeCadastro @default(CLIENTE) @map("registrationType")
   leadCadastro     Lead? @relation("CadastroLead")
@@ -551,6 +553,7 @@ model Client {
 
   @@index([internalOwnerId])
   @@index([responsavelId, createdAt])
+  @@index([empresaConsultoraId, createdAt])
   @@index([prospectedById, createdAt])
   @@index([sourceLeadId])
   @@index([sourceProspectId])
@@ -693,6 +696,18 @@ model ChatMessageRecipient {
 
   @@unique([messageId, userId])
   @@index([userId])
+}
+
+// ----- EmpresaConsultora.prisma -----
+model EmpresaConsultora {
+  id        String   @id @default(uuid())
+  nome      String
+  cnpj      String?  @unique
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usuarios  User[]
+  cadastros Client[]
 }
 
 // ----- EventoLinhaDoTempo.prisma -----
@@ -1507,6 +1522,8 @@ model Ticket {
 
 // ----- Usuario.prisma -----
 model User {
+  empresaConsultoraId String?
+  empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   cadastrosResponsavelComercial Client[] @relation("ResponsavelComercialCadastro")
   solicitacoesSiteResponsavel SolicitacaoSite[] @relation("SolicitacaoSiteResponsavel")
   visitasResponsavel VisitaCliente[] @relation("VisitaResponsavel")
@@ -1564,6 +1581,7 @@ model User {
   ticketHistoryEvents             TicketHistory[]         @relation("TicketHistoryActor")
   ticketMessages                  TicketMessage[]         @relation("TicketMessageAuthor")
   createdTimelineEvents           TimelineEvent[]         @relation("TimelineEventAuthor")
+  @@index([empresaConsultoraId])
 }
 
 model PasswordResetToken {

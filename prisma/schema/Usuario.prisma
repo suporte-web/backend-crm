@@ -1,4 +1,6 @@
 model User {
+  empresaConsultoraId String?
+  empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   cadastrosResponsavelComercial Client[] @relation("ResponsavelComercialCadastro")
   solicitacoesSiteResponsavel SolicitacaoSite[] @relation("SolicitacaoSiteResponsavel")
   visitasResponsavel VisitaCliente[] @relation("VisitaResponsavel")
@@ -56,6 +58,7 @@ model User {
   ticketHistoryEvents             TicketHistory[]         @relation("TicketHistoryActor")
   ticketMessages                  TicketMessage[]         @relation("TicketMessageAuthor")
   createdTimelineEvents           TimelineEvent[]         @relation("TimelineEventAuthor")
+  @@index([empresaConsultoraId])
 }
 
 model PasswordResetToken {

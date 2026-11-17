@@ -42,9 +42,9 @@ describe('Responsável preenchido no cadastro', () => {
 
   it('preserva as restrições de autoria da consultora', async () => {
     const { service, findMany } = preparar({ responsible: 'Maria' });
-    await service.listar({ ...usuario, role: UserRole.CONSULTORA });
+    await service.listar({ ...usuario, role: UserRole.CONSULTORA, empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true });
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ responsavelId: usuario.sub }),
+      where: expect.objectContaining({ empresaConsultoraId: 'empresa-a' }),
     }));
   });
 });

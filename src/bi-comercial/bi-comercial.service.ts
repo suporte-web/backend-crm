@@ -5,6 +5,7 @@ import { getUserRoles, hasAnyRole } from '../common/user-roles';
 import { modalidadesPermitidas } from '../common/permissoes-cadastros';
 import { listarResponsaveisComerciais, perfisResponsavelComercial } from '../cadastros/responsavel-comercial';
 import { ConsultarBiComercialDto } from './dtos/consultar-bi-comercial.dto';
+import { filtroEmpresaConsultora, empresaConsultoraDoUsuario } from '../common/empresa-consultora-access';
 
 @Injectable()
 export class BiComercialService {
@@ -17,12 +18,20 @@ export class BiComercialService {
     const permissoes = await this.prisma.roleScreenPermission.findMany({ where: { role: { in: roles }, screenKey: { in: ['commercialBi', 'opportunities'] } } });
     const permite = (chave: string, padrao: boolean) => roles.some(role => permissoes.find(item => item.role === role && item.screenKey === chave)?.isEnabled ?? padrao);
     if (!permite('commercialBi', true)) throw new ForbiddenException('O BI Comercial está desabilitado para seu perfil.');
-    if ((filtros.responsavelId && filtros.semResponsavel) || (consultora && (filtros.semResponsavel || (filtros.responsavelId && filtros.responsavelId !== user.sub)))) {
-      throw new ForbiddenException('Consultoras podem visualizar apenas o próprio BI Comercial.');
+    if (filtros.responsavelId && filtros.semResponsavel) {
+      throw new ForbiddenException('Selecione um responsável ou os cadastros sem responsável.');
     }
-    const responsavelId = consultora ? user.sub : filtros.responsavelId;
+    const escopo = filtroEmpresaConsultora(user);
+    if (consultora && filtros.responsavelId) {
+      const selecionado = await this.prisma.user.findFirst({ where: {
+        id: filtros.responsavelId, empresaConsultoraId: empresaConsultoraDoUsuario(user),
+        OR: [{ role: 'CONSULTORA' }, { roles: { has: 'CONSULTORA' } }],
+      }, select: { id: true } });
+      if (!selecionado) throw new ForbiddenException('Este consultor não pertence à sua empresa.');
+    }
+    const responsavelId = filtros.responsavelId;
     const modalidades = await modalidadesPermitidas(this.prisma, user);
-    const where = { modalidadeCadastro: { in: modalidades }, ...(responsavelId ? { responsavelId } : filtros.semResponsavel ? { responsavelId: null } : {}) };
+    const where = { ...escopo, modalidadeCadastro: { in: modalidades }, ...(responsavelId ? { responsavelId } : filtros.semResponsavel ? { responsavelId: null } : {}) };
     const podeOportunidades = permite('opportunities', !consultora);
     const [cadastros, oportunidades, responsaveis] = await Promise.all([
       this.prisma.client.findMany({ where, select: {
@@ -37,7 +46,7 @@ export class BiComercialService {
       listarResponsaveisComerciais(this.prisma, user),
     ]);
     return {
-      responsavelFixo: consultora, responsavelId: responsavelId ?? null, responsaveis,
+      responsavelFixo: false, empresaConsultoraId: consultora ? empresaConsultoraDoUsuario(user) : null, responsavelId: responsavelId ?? null, responsaveis,
       oportunidades,
       avisos: podeOportunidades ? [] : ['Os indicadores de oportunidades dependem da permissão de acesso a oportunidades.'],
       cadastros: cadastros.map(cadastro => {

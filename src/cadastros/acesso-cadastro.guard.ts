@@ -41,7 +41,7 @@ export class AcessoCadastroGuard implements CanActivate {
           'Oportunidade não encontrada neste cadastro.',
         );
       if (
-        !hasAnyRole(req.user, ['ADMIN', 'GESTAO']) &&
+        !hasAnyRole(req.user, ['ADMIN', 'GESTAO', 'CONSULTORA']) &&
         cadastro.internalOwnerId !== req.user.sub
       )
         throw new ForbiddenException(

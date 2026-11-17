@@ -255,6 +255,8 @@ export class UsersService {
           email: true,
           role: true,
           roles: true,
+          empresaConsultoraId: true,
+          empresaConsultora: { select: { id: true, nome: true, ativa: true } },
           isActive: true,
           mustChangePassword: true,
           createdAt: true,
@@ -310,6 +312,8 @@ export class UsersService {
         email: true,
         role: true,
         roles: true,
+        empresaConsultoraId: true,
+        empresaConsultora: { select: { id: true, nome: true, ativa: true } },
         isActive: true,
         mustChangePassword: true,
         createdAt: true,
@@ -503,7 +507,7 @@ export class UsersService {
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: { clientProfile: true },
+      include: { clientProfile: true, empresaConsultora: { select: { id: true, nome: true, ativa: true } } },
     });
   }
 

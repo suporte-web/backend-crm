@@ -1,4 +1,6 @@
 model Client {
+  empresaConsultoraId String?
+  empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
   modalidadeCadastro     ModalidadeCadastro @default(CLIENTE) @map("registrationType")
   leadCadastro     Lead? @relation("CadastroLead")
@@ -55,6 +57,7 @@ model Client {
 
   @@index([internalOwnerId])
   @@index([responsavelId, createdAt])
+  @@index([empresaConsultoraId, createdAt])
   @@index([prospectedById, createdAt])
   @@index([sourceLeadId])
   @@index([sourceProspectId])

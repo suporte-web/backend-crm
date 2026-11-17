@@ -788,6 +788,7 @@ export class ClientsService {
         proximaAcao: this.getLeadMetadataString(client.leadCadastro?.metadata, 'nextAction'),
         fotoUrl: this.getLeadMetadataString(client.leadCadastro?.metadata, 'logoUrl'),
           responsavelId: client.responsavelId,
+          empresaConsultoraId: client.empresaConsultoraId,
           responsavel: client.responsavel?.name ?? this.getLeadMetadataString(client.leadCadastro?.metadata, 'responsible'),
         volumeMensalEstimado: this.getLeadMetadataString(client.leadCadastro?.metadata, 'monthlyEstimatedValue'),
         modalidadeCadastro: client.modalidadeCadastro,

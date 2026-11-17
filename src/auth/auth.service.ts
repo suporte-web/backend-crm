@@ -106,6 +106,8 @@ export class AuthService {
         email: user.email,
         role: user.role,
         roles: getUserRoles(user),
+        empresaConsultoraId: user.empresaConsultoraId,
+        empresaConsultora: user.empresaConsultora,
         mustChangePassword: user.mustChangePassword,
         clientProfile: user.clientProfile ?? null,
         screenPermissions,

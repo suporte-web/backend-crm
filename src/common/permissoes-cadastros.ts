@@ -2,11 +2,12 @@ import { ForbiddenException } from '@nestjs/common';
 import { ModalidadeCadastro, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getUserRoles, hasAnyRole } from './user-roles';
+import { filtroEmpresaConsultora, validarEmpresaCadastro, type UsuarioEmpresaConsultora } from './empresa-consultora-access';
 
 type Usuario = { role: string; roles?: string[] };
 
-export function filtroResponsavelCadastro(user: Usuario & { sub: string }) {
-  return hasAnyRole(user, ['CONSULTORA']) ? { responsavelId: user.sub } : {};
+export function filtroResponsavelCadastro(user: UsuarioEmpresaConsultora) {
+  return filtroEmpresaConsultora(user);
 }
 
 export async function modalidadesPermitidas(
@@ -45,20 +46,16 @@ export async function modalidadesPermitidas(
 
 export async function validarAutoriaCadastro(
   _prisma: PrismaService,
-  user: Usuario & { sub: string },
+  user: UsuarioEmpresaConsultora,
   cadastro: {
     id: string;
     prospectedById: string | null;
     internalOwnerId: string | null;
     responsavelId?: string | null;
+    empresaConsultoraId?: string | null;
   },
 ) {
-  if (!hasAnyRole(user, ['CONSULTORA'])) return;
-  // Autoria e prospecção são históricas; acesso acompanha o responsável atual.
-  if (cadastro.responsavelId !== user.sub)
-    throw new ForbiddenException(
-      'Você não tem permissão para acessar o cadastro de outra pessoa.',
-    );
+  validarEmpresaCadastro(user, cadastro);
 }
 
 export async function validarAcessoCadastro(

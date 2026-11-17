@@ -4,13 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BiComercialService } from './bi-comercial.service';
 
 describe('Escopo do BI Comercial', () => {
-  const consultora = { sub: 'consultora-a', email: 'teste@example.test', role: UserRole.CONSULTORA };
+  const consultora = { sub: 'consultora-a', email: 'teste@example.test', role: UserRole.CONSULTORA, empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true };
   function preparar(permissoes: unknown[] = []) {
     const prisma = {
       roleScreenPermission: { findMany: jest.fn().mockResolvedValue(permissoes) },
       client: { findMany: jest.fn().mockResolvedValue([{ id: 'cadastro', responsavelId: consultora.sub, responsavel: { id: consultora.sub, name: 'Nome atual' }, leadCadastro: { id: 'lead', metadata: { responsible: 'Nome antigo', nextAction: 'Contato', segredo: 'não expor' } } }]) },
       opportunity: { findMany: jest.fn().mockResolvedValue([]) },
-      user: { findMany: jest.fn().mockResolvedValue([{ id: consultora.sub, name: 'Nome atual' }]) },
+      user: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([{ id: consultora.sub, name: 'Nome atual' }]) },
     };
     return { prisma, service: new BiComercialService(prisma as unknown as PrismaService) };
   }
@@ -18,24 +18,38 @@ describe('Escopo do BI Comercial', () => {
   it('força o ID da consultora e não utiliza criador, prospectador ou nome como autorização', async () => {
     const { prisma, service } = preparar([{ role: 'CONSULTORA', screenKey: 'opportunities', isEnabled: true }]);
     const result = await service.consultar(consultora);
-    expect(prisma.client.findMany.mock.calls[0][0].where).toEqual({ modalidadeCadastro: { in: ['CLIENTE', 'LEAD'] }, responsavelId: consultora.sub });
-    expect(prisma.opportunity.findMany.mock.calls[0][0].where.client.responsavelId).toBe(consultora.sub);
-    expect(prisma.user.findMany.mock.calls[0][0].where).toEqual({ id: consultora.sub, isActive: true });
+    expect(prisma.client.findMany.mock.calls[0][0].where).toEqual({ modalidadeCadastro: { in: ['CLIENTE', 'LEAD'] }, empresaConsultoraId: 'empresa-a' });
+    expect(prisma.opportunity.findMany.mock.calls[0][0].where.client.empresaConsultoraId).toBe('empresa-a');
+    expect(prisma.user.findMany.mock.calls[0][0].where).toEqual(expect.objectContaining({ empresaConsultoraId: 'empresa-a', isActive: true }));
     expect(result.cadastros[0].responsavel).toBe('Nome atual');
     expect(result.cadastros[0].leadCadastro?.metadata).toEqual({ nextAction: 'Contato', responsible: 'Nome atual' });
-    expect(result.responsavelFixo).toBe(true);
+    expect(result.responsavelFixo).toBe(false);
   });
 
-  it.each([{ responsavelId: 'outra-pessoa' }, { semResponsavel: 'true' as const }])('rejeita tentativa de contornar o escopo: %j', async filtros => {
+  it.each([{ responsavelId: 'outra-pessoa' }, { responsavelId: 'outra-pessoa', semResponsavel: 'true' as const }])('rejeita tentativa de contornar o escopo: %j', async filtros => {
     const { prisma, service } = preparar();
     await expect(service.consultar(consultora, filtros)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.client.findMany).not.toHaveBeenCalled();
   });
 
-  it('perfil combinado com Consultora continua restrito ao próprio ID', async () => {
+  it('perfil combinado com Consultora continua restrito à própria empresa', async () => {
     const { prisma, service } = preparar();
     await service.consultar({ ...consultora, roles: [UserRole.ADMIN, UserRole.CONSULTORA] });
-    expect(prisma.client.findMany.mock.calls[0][0].where.responsavelId).toBe(consultora.sub);
+    expect(prisma.client.findMany.mock.calls[0][0].where.empresaConsultoraId).toBe('empresa-a');
+  });
+
+  it('filtra um colega mantendo obrigatoriamente o limite da empresa', async () => {
+    const { prisma, service } = preparar();
+    prisma.user.findFirst.mockResolvedValue({ id: 'colega' } as never);
+    await service.consultar(consultora, { responsavelId: 'colega' });
+    expect(prisma.client.findMany.mock.calls[0][0].where).toMatchObject({ empresaConsultoraId: 'empresa-a', responsavelId: 'colega' });
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ empresaConsultoraId: 'empresa-a', id: 'colega' }) }));
+  });
+
+  it('inclui cadastros sem responsável apenas dentro da própria empresa', async () => {
+    const { prisma, service } = preparar();
+    await service.consultar(consultora, { semResponsavel: 'true' });
+    expect(prisma.client.findMany.mock.calls[0][0].where).toMatchObject({ empresaConsultoraId: 'empresa-a', responsavelId: null });
   });
 
   it('respeita bloqueio explícito do BI e o acesso às oportunidades', async () => {

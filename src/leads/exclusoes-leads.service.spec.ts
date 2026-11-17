@@ -15,6 +15,8 @@ const consultora: AuthUser = {
   sub: 'autora',
   email: 'c@crm.test',
   role: UserRole.CONSULTORA,
+  empresaConsultoraId: 'empresa-a',
+  empresaConsultoraAtiva: true,
 };
 const comercial: AuthUser = {
   sub: 'gestor',
@@ -55,6 +57,7 @@ describe('Solicitações próprias de exclusão de Leads', () => {
   });
   let prisma: Record<
     | 'lead'
+    | 'client'
     | 'leadDeletionRequest'
     | 'auditLog'
     | 'leadTimelineEvent'
@@ -68,6 +71,7 @@ describe('Solicitações próprias de exclusão de Leads', () => {
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       lead: delegate(),
+      client: delegate(),
       leadDeletionRequest: delegate(),
       auditLog: delegate(),
       leadTimelineEvent: delegate(),
@@ -80,6 +84,7 @@ describe('Solicitações próprias de exclusão de Leads', () => {
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
     prisma.lead.findFirst.mockResolvedValue(lead);
+    prisma.client.findFirst.mockResolvedValue({ id: 'cadastro' });
     prisma.lead.findUnique.mockResolvedValue(lead);
     prisma.leadDeletionRequest.create.mockResolvedValue(pending);
     prisma.leadDeletionRequest.findUnique.mockResolvedValue(pending);
@@ -91,13 +96,14 @@ describe('Solicitações próprias de exclusão de Leads', () => {
     }).compile();
     service = module.get(ExclusoesLeadsService);
   });
-  it('Consulta a autoria no banco usando o ID autenticado e registra o histórico', async () => {
+  it('confere a empresa no banco e registra o usuário que solicitou a exclusão', async () => {
     await service.solicitar(consultora, 'l1', { reason: 'Duplicado' });
     expect(prisma.lead.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'l1', createdById: consultora.sub },
+        where: { id: 'l1' },
       }),
     );
+    expect(prisma.client.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ empresaConsultoraId: 'empresa-a' }) }));
     expect(prisma.leadDeletionRequest.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         requestedById: 'autora',
@@ -117,6 +123,11 @@ describe('Solicitações próprias de exclusão de Leads', () => {
     await expect(
       service.solicitar(consultora, 'de-outro', { reason: 'Duplicado' }),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.leadDeletionRequest.create).not.toHaveBeenCalled();
+  });
+  it('não solicita exclusão de lead de outra empresa, mesmo que seja a autora', async () => {
+    prisma.client.findFirst.mockResolvedValue(null);
+    await expect(service.solicitar(consultora, 'l1', { reason: 'Duplicado' })).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.leadDeletionRequest.create).not.toHaveBeenCalled();
   });
   it('reutiliza solicitação pendente sem duplicar registros ou histórico', async () => {

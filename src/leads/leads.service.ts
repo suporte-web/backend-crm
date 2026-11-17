@@ -1,3 +1,4 @@
+import { validarEmpresaLead } from '../common/empresa-consultora-access';
 import { assertSiteLeadAccess, siteLeadScope } from '../solicitacoes-site/site-workflow-access';
 import { garantirCadastroLead, removerCadastroLead } from '../common/cadastros';
 import { hasAnyRole } from '../common/user-roles';
@@ -898,11 +899,11 @@ async findOne(user: AuthUser, id: string) {
     },
   });
     await assertSiteLeadAccess(this.prisma, user, lead, false);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
   }
-  if (hasAnyRole(user, ['CONSULTORA']) && lead.createdById !== user.sub && lead.prospectedById !== user.sub) throw new ForbiddenException('Você não tem permissão para acessar este lead.');
 
   return lead;
 }
@@ -934,6 +935,7 @@ async findOne(user: AuthUser, id: string) {
     },
   });
   await assertSiteLeadAccess(this.prisma, user, lead);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -990,6 +992,7 @@ async listarObservacoes(
     },
   });
   await assertSiteLeadAccess(this.prisma, user, lead);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -1075,6 +1078,7 @@ async listarObservacoes(
         },
       });
     await assertSiteLeadAccess(tx, user, lead, true);
+    if (lead) await validarEmpresaLead(tx, user, lead.id);
       if (!lead) throw new NotFoundException('Lead não encontrado.');
       const snapshot = JSON.stringify(lead);
       await tx.leadDeletionRequest.updateMany({
@@ -1108,6 +1112,7 @@ async listarObservacoes(
       where: { id: leadId },
     });
     await assertSiteLeadAccess(this.prisma, user, lead, true);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
     if (!lead) {
       throw new NotFoundException('Lead não encontrado.');
@@ -1261,6 +1266,7 @@ async convertToClient(
     },
   });
     await assertSiteLeadAccess(this.prisma, user, lead, true);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
   if (!lead) {
     throw new NotFoundException('Lead não encontrado.');
@@ -1510,6 +1516,7 @@ async convertToClient(
       where: { id: leadId },
     });
     await assertSiteLeadAccess(this.prisma, user, lead, true);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
     if (!lead) {
       throw new NotFoundException('Lead não encontrado.');
@@ -1586,6 +1593,7 @@ async convertToClient(
       where: { id: leadId },
     });
     await assertSiteLeadAccess(this.prisma, user, lead, true);
+    if (lead) await validarEmpresaLead(this.prisma, user, lead.id);
 
     if (!lead) {
       throw new NotFoundException('Lead nÃ£o encontrado.');

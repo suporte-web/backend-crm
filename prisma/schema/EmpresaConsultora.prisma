@@ -1,0 +1,10 @@
+model EmpresaConsultora {
+  id        String   @id @default(uuid())
+  nome      String
+  cnpj      String?  @unique
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usuarios  User[]
+  cadastros Client[]
+}

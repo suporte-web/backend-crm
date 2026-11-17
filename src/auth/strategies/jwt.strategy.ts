@@ -38,6 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       roles: getUserRoles(user),
+      empresaConsultoraId: user.empresaConsultoraId,
+      empresaConsultoraAtiva: user.empresaConsultora?.ativa === true,
     };
   }
 }

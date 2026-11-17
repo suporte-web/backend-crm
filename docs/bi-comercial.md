@@ -1,5 +1,9 @@
 # BI Comercial por responsável
 
+> O acesso de CONSULTORA agora é compartilhado por empresa, conforme
+> [Empresas consultoras](empresas-consultoras.md). O responsável individual
+> continua sendo um filtro, e não o limite de acesso.
+
 ## Modelo
 
 `Client.responsavelId` referencia `User.id` pela relação `ResponsavelComercialCadastro`.
@@ -8,13 +12,13 @@ O nome é obtido da relação a cada consulta. `internalOwnerId`, `createdById` 
 Excluir um usuário desvincula o responsável (`ON DELETE SET NULL`), preservando o cadastro.
 
 O texto antigo `Lead.metadata.responsible` é conservado para consulta e migração,
-mas nunca identifica o usuário autorizado. Cadastros sem `responsavelId` não aparecem
-no BI de uma consultora, mesmo quando ela é criadora ou prospectadora.
+mas nunca identifica o usuário autorizado. Cadastros sem responsável individual
+aparecem quando vinculados à empresa ativa da consultora.
 
 A mesma regra vale para a listagem de Cadastros, seus detalhes e os acessos
 relacionados a cadastros em Oportunidades. Para Consultora, somente
-`responsavelId = usuário autenticado` libera o registro; vínculos históricos e
-cadastros sem responsável não liberam acesso. Os demais perfis mantêm suas
+`empresaConsultoraId = empresa ativa do usuário autenticado` libera o registro;
+vínculos históricos e cadastros sem empresa não liberam acesso. Os demais perfis mantêm suas
 permissões e consultas atuais, sem esse filtro obrigatório.
 
 ## Acesso e consulta
@@ -23,8 +27,9 @@ permissões e consultas atuais, sem esse filtro obrigatório.
 A permissão de tela `commercialBi` pode bloquear o acesso explicitamente.
 Consultora tem essa tela disponível por padrão, sempre com o escopo restrito.
 
-- Consultora: escopo obrigatório `responsavelId = usuário autenticado`. Outro ID ou
-  `semResponsavel=true` resulta em 403. A lista de responsáveis contém apenas ela.
+- Consultora: escopo obrigatório por empresa ativa. Pode omitir o responsável,
+  selecionar um consultor da empresa ou usar `semResponsavel=true`. IDs de
+  consultores de outra empresa resultam em 403. A lista contém colegas ativos.
 - Demais perfis permitidos: podem omitir o filtro, enviar `responsavelId=<uuid>` ou
   `semResponsavel=true`. Os dois filtros não devem ser combinados.
 - As modalidades Cliente/Lead e as oportunidades continuam respeitando suas
@@ -34,17 +39,18 @@ Consultora tem essa tela disponível por padrão, sempre com o escopo restrito.
 
 O frontend usa `stores/bi-comercial/service.ts`. Os cálculos dos indicadores e os
 filtros de período continuam no frontend, aplicados exclusivamente ao recorte
-autorizado pelo backend. O filtro de responsável das consultoras fica travado.
+autorizado pelo backend. O filtro de responsável permite selecionar colegas da empresa.
 
 ## Atribuição
 
 Os formulários de Cadastros e Acompanhamento Comercial enviam `responsavelId`.
 O backend valida existência, atividade e perfil comercial do usuário escolhido.
-Consultoras não podem transferir a responsabilidade ou remover o vínculo.
-Novos cadastros criados pelo fluxo de Cadastros por consultoras são vinculados a elas.
+Consultoras podem selecionar responsáveis da mesma empresa, sem transferir a
+carteira entre empresas ou remover o responsável individual. Novos cadastros
+recebem a empresa validada do responsável selecionado.
 
 `GET /cadastros/responsaveis` fornece as opções do seletor sem expor e-mails.
-Para consultoras retorna apenas o próprio usuário. Um cadastro sem responsável
+Para consultoras retorna os consultores ativos da mesma empresa. Um cadastro sem responsável
 pode ser atribuído pela gestão; seu texto antigo não é convertido em autorização.
 
 ## Migração e levantamento

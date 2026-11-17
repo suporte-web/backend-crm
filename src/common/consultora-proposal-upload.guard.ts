@@ -24,7 +24,7 @@ export class ConsultoraProposalUploadGuard implements CanActivate {
     await assertOpportunityAccess(this.prisma, request.user);
     const client = await this.prisma.client.findUnique({
       where: { id: request.params.id },
-      select: { internalOwnerId: true, responsavelId: true },
+      select: { internalOwnerId: true, responsavelId: true, empresaConsultoraId: true },
     });
     if (!client) throw new NotFoundException('Cadastro não encontrado.');
     assertOpportunityOwner(request.user, client);

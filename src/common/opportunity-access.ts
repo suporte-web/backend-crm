@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/types/auth-user.type';
 import { hasAnyRole } from './user-roles';
+import { validarEmpresaCadastro } from './empresa-consultora-access';
 
 export function isConsultora(user: AuthUser) {
   return hasAnyRole(user, ['CONSULTORA']);
@@ -29,11 +30,7 @@ export async function assertOpportunityAccess(
 
 export function assertOpportunityOwner(
   user: AuthUser,
-  client: { internalOwnerId: string | null; responsavelId?: string | null },
+  client: { internalOwnerId: string | null; responsavelId?: string | null; empresaConsultoraId?: string | null },
 ) {
-  if (isConsultora(user) && client.responsavelId !== user.sub) {
-    throw new ForbiddenException(
-      'Este cadastro não está sob sua responsabilidade.',
-    );
-  }
+  validarEmpresaCadastro(user, client);
 }

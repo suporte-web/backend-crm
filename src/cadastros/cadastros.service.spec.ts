@@ -122,8 +122,8 @@ describe('Modalidade do cadastro', () => {
     const db = banco();
     db.cadastro.internalOwnerId = 'outra-pessoa';
     await expect(
-      db.service.obter({ ...usuario, role: UserRole.CONSULTORA }, 'cadastro-1'),
-    ).rejects.toThrow('outra pessoa');
+      db.service.obter({ ...usuario, role: UserRole.CONSULTORA, empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true }, 'cadastro-1'),
+    ).rejects.toThrow('sua empresa consultora');
   });
 
   it('cria lead com contato real e dados normalizados para ser encontrado pelos outros canais', async () => {

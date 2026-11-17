@@ -6,6 +6,7 @@ import {
 } from '../common/permissoes-cadastros';
 import { NotificationsService } from '../notifications/notifications.service';
 import { hasAnyRole } from '../common/user-roles';
+import { filtroEmpresaConsultora, validarEmpresaCadastro } from '../common/empresa-consultora-access';
 import {
   BadRequestException,
   ForbiddenException,
@@ -76,14 +77,12 @@ export class OportunidadesService {
       modalidadeCadastro: ModalidadeCadastro;
       internalOwnerId: string | null;
       responsavelId?: string | null;
+      empresaConsultoraId?: string | null;
     },
   ) {
     await this.validarUsuarioInterno(user);
     if (hasAnyRole(user, ['CONSULTORA'])) {
-      if (cadastro.responsavelId !== user.sub)
-        throw new ForbiddenException(
-          'Você não tem permissão para acessar oportunidades deste cadastro.',
-        );
+      validarEmpresaCadastro(user, cadastro);
     } else {
       await validarAcessoCadastro(
         this.prisma,
@@ -107,7 +106,7 @@ export class OportunidadesService {
     return this.prisma.client.findMany({
       where: {
         modalidadeCadastro: { in: tipos },
-        ...(consultora ? { responsavelId: user.sub } : {}),
+        ...filtroEmpresaConsultora(user),
       },
       include: {
         user: { select: { id: true, name: true, email: true, role: true } },
@@ -376,7 +375,7 @@ export class OportunidadesService {
     if (hasAnyRole(user, ['CONSULTORA'])) {
       where.client = {
         modalidadeCadastro: { in: tipos },
-        responsavelId: user.sub,
+        ...filtroEmpresaConsultora(user),
       };
     }
     const oportunidades = await this.prisma.opportunity.findMany({

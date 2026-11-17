@@ -25,6 +25,7 @@ describe('Autorização HTTP de oportunidades e prospecções', () => {
     id: `00000000-0000-4000-8000-00000000000${i}`,
     companyName: `Empresa ${i}`, modalidadeCadastro: 'CLIENTE', prospectedById: owner, prospectedByName: owner,
     internalOwnerId: owner, responsavelId: owner,
+    empresaConsultoraId: owner === 'c1' ? 'empresa-a' : 'empresa-b',
     quotes: [],
     opportunities: [],
     timelineEvents: [],
@@ -58,8 +59,8 @@ describe('Autorização HTTP de oportunidades e prospecções', () => {
         findMany: async ({ where }: any) =>
           clientes.filter(
             (c) =>
-              !where.responsavelId ||
-              c.responsavelId === where.responsavelId,
+              !where.empresaConsultoraId ||
+              c.empresaConsultoraId === where.empresaConsultoraId,
           ),
       },
       opportunity: {
@@ -67,8 +68,8 @@ describe('Autorização HTTP de oportunidades e prospecções', () => {
           clientes
             .filter(
               (c) =>
-                !where.client?.responsavelId ||
-                c.responsavelId === where.client.responsavelId,
+                !where.client?.empresaConsultoraId ||
+                c.empresaConsultoraId === where.client.empresaConsultoraId,
             )
             .map((client) => {
               const user = {
@@ -141,6 +142,7 @@ describe('Autorização HTTP de oportunidades e prospecções', () => {
             sub: 'c1',
             role: req.headers['x-test-role'] ?? 'CONSULTORA',
             email: 'test@example.invalid',
+            empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true,
           };
           return true;
         },

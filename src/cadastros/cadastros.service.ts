@@ -18,6 +18,7 @@ import {
   filtroResponsavelCadastro,
 } from '../common/permissoes-cadastros';
 import { hasAnyRole } from '../common/user-roles';
+import { filtroEmpresaConsultora, validarEmpresaCadastro } from '../common/empresa-consultora-access';
 import { capturarProspeccao } from '../common/prospeccao';
 import { validarFotoCadastro } from '../common/foto-cadastro';
 import { listarResponsaveisComerciais, resolverResponsavelComercial } from './responsavel-comercial';
@@ -42,6 +43,7 @@ export class CadastrosService {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Client" WHERE id = ${id} FOR UPDATE`);
       const cadastro = await tx.client.findUnique({ where: { id } });
       if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
+      validarEmpresaCadastro(user, cadastro);
       const lead = await this.garantirLeadFunil(tx, cadastro, user, cadastro.modalidadeCadastro === 'CLIENTE' ? 'venda_efetivada' : 'entrada_leads');
       const anteriores = lead.metadata && typeof lead.metadata === 'object' && !Array.isArray(lead.metadata) ? lead.metadata : {};
       await tx.lead.update({ where: { id: lead.id }, data: { metadata: { ...anteriores, logoUrl: foto }, updatedById: user.sub } });
@@ -103,9 +105,10 @@ export class CadastrosService {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Client" WHERE id = ${id} FOR UPDATE`);
       const cadastro = await tx.client.findUnique({ where: { id } });
       if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
+      validarEmpresaCadastro(user, cadastro);
       const lead = await this.garantirLeadFunil(tx, cadastro, user, dto.etapa);
       const comerciais = this.dadosComerciais(dto);
-      const responsavel = await resolverResponsavelComercial(tx, user, dto.responsavelId, cadastro.responsavelId);
+      const responsavel = await resolverResponsavelComercial(tx, user, dto.responsavelId, cadastro.responsavelId, cadastro.empresaConsultoraId);
       if (responsavel) {
         await tx.client.update({ where: { id }, data: { responsavelId: responsavel.id } });
         comerciais.responsible = responsavel.name;
@@ -187,7 +190,7 @@ export class CadastrosService {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead não encontrado.');
     if (hasAnyRole(user, ['CONSULTORA']) && !lead.cadastroId) {
-      const vinculado = await this.prisma.client.findFirst({ where: { sourceLeadId: lead.id, responsavelId: user.sub } });
+      const vinculado = await this.prisma.client.findFirst({ where: { sourceLeadId: lead.id, ...filtroEmpresaConsultora(user) } });
       if (!vinculado) throw new ForbiddenException('Este lead não possui um cadastro sob sua responsabilidade.');
       const cadastro = await this.obter(user, vinculado.id);
       return { id: cadastro.id, modalidadeCadastro: cadastro.modalidadeCadastro };
@@ -254,10 +257,12 @@ export class CadastrosService {
       return await this.prisma.$transaction(async (tx) => {
         const origem = await capturarProspeccao(tx, user);
         const vinculo = await resolverResponsavelComercial(tx, user, responsavelId ?? (hasAnyRole(user, ['CONSULTORA']) ? user.sub : undefined));
+        const empresaConsultoraId = vinculo?.empresaConsultoraId ?? null;
         const nomeResponsavel = vinculo?.name ?? responsavel;
         const dados = {
           ...campos,
           ...(vinculo ? { responsavelId: vinculo.id } : {}),
+          empresaConsultoraId,
           companyName: nome,
           document: documento,
           registrationDate: data,
@@ -408,6 +413,7 @@ export class CadastrosService {
       );
       const cadastro = await tx.client.findUnique({ where: { id } });
       if (!cadastro) throw new NotFoundException('Cadastro não encontrado.');
+      validarEmpresaCadastro(user, cadastro);
       if (cadastro.modalidadeCadastro === dto.modalidadeCadastro)
         return cadastro;
       const documento =

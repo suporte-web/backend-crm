@@ -1,30 +1,40 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
-import { resolverResponsavelComercial } from './responsavel-comercial';
+import { listarResponsaveisComerciais, resolverResponsavelComercial } from './responsavel-comercial';
 
-describe('Atribuição do responsável comercial', () => {
-  const actor = { sub: 'a', email: 'a@example.test', role: UserRole.CONSULTORA };
-  const user = jest.fn();
-  const prisma = { user: { findUnique: user } } as unknown as Pick<Prisma.TransactionClient, 'user'>;
-  beforeEach(() => user.mockReset());
-  it('consultora não transfere nem remove responsabilidade', async () => {
-    await expect(resolverResponsavelComercial(prisma, actor, 'b', 'a')).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(resolverResponsavelComercial(prisma, actor, null, 'a')).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(resolverResponsavelComercial(prisma, actor, 'a', 'b')).rejects.toBeInstanceOf(ForbiddenException);
-    expect(user).not.toHaveBeenCalled();
+describe('Responsável individual dentro da empresa consultora', () => {
+  const actor = { sub: 'a', email: 'a@example.test', role: UserRole.CONSULTORA, empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true };
+  const colega = { id: 'b', name: 'Colega', isActive: true, role: 'CONSULTORA', empresaConsultoraId: 'empresa-a', empresaConsultora: { ativa: true } };
+  const findUnique = jest.fn(), findMany = jest.fn();
+  const prisma = { user: { findUnique, findMany } } as never;
+  beforeEach(() => { findUnique.mockReset().mockResolvedValue(colega); findMany.mockReset().mockResolvedValue([]); });
+  it('permite atribuir a um colega da mesma empresa', async () => {
+    expect(await resolverResponsavelComercial(prisma, actor, 'b', 'a', 'empresa-a')).toEqual({ id: 'b', name: 'Colega', empresaConsultoraId: 'empresa-a' });
   });
-  it('não usa texto ou criador para inferir uma atribuição ausente', async () => {
+  it('permite editar mantendo o colega responsável', async () => {
+    await expect(resolverResponsavelComercial(prisma, actor, 'b', 'b', 'empresa-a')).resolves.toBeDefined();
+  });
+  it.each(['empresa-b', null])('impede atribuição fora da empresa: %s', async empresaConsultoraId => {
+    findUnique.mockResolvedValue({ ...colega, empresaConsultoraId });
+    await expect(resolverResponsavelComercial(prisma, actor, 'b', 'a', 'empresa-a')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('não permite remover responsável nem usar conta sem empresa ativa', async () => {
+    await expect(resolverResponsavelComercial(prisma, actor, null, 'a', 'empresa-a')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(resolverResponsavelComercial(prisma, { ...actor, empresaConsultoraAtiva: false }, 'b')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('omissão não altera o vínculo', async () => {
     expect(await resolverResponsavelComercial(prisma, actor, undefined)).toBeUndefined();
-    expect(user).not.toHaveBeenCalled();
+    expect(findUnique).not.toHaveBeenCalled();
   });
-  it('valida existência, perfil e atividade do usuário de destino', async () => {
-    const admin = { ...actor, role: UserRole.ADMIN };
-    for (const value of [null, { id: 'b', isActive: false, role: 'CONSULTORA' }, { id: 'b', isActive: true, role: 'CLIENTE' }]) {
-      user.mockResolvedValue(value);
-      await expect(resolverResponsavelComercial(prisma, admin, 'b')).rejects.toBeInstanceOf(BadRequestException);
-    }
-    user.mockResolvedValue({ id: 'b', name: 'Nome do banco', isActive: true, role: 'CONSULTORA' });
-    expect(await resolverResponsavelComercial(prisma, admin, 'b')).toEqual({ id: 'b', name: 'Nome do banco' });
+  it('gestão também deve transferir a empresa explicitamente antes de mudar o responsável para outra carteira', async () => {
+    await expect(resolverResponsavelComercial(prisma, { ...actor, role: UserRole.ADMIN }, 'b', 'a', 'empresa-b')).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it.each([null, { ...colega, isActive: false }, { ...colega, role: 'CLIENTE' }])('valida existência, atividade e perfil: %j', async destino => {
+    findUnique.mockResolvedValue(destino);
+    await expect(resolverResponsavelComercial(prisma, { ...actor, role: UserRole.ADMIN }, 'b')).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('as opções das consultoras contêm somente colegas ativos da mesma empresa', async () => {
+    await listarResponsaveisComerciais(prisma, actor);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ empresaConsultoraId: 'empresa-a', isActive: true }) }));
   });
 });

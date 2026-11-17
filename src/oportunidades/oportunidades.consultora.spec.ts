@@ -9,7 +9,7 @@ describe('Oportunidades da Consultora', () => {
   const consultora: AuthUser = {
     sub: 'consultora-1',
     role: UserRole.CONSULTORA,
-    email: 'c@example.test',
+    email: 'c@example.test', empresaConsultoraId: 'empresa-a', empresaConsultoraAtiva: true,
   };
   const comercial: AuthUser = {
     sub: 'comercial',
@@ -17,8 +17,8 @@ describe('Oportunidades da Consultora', () => {
     email: 'v@example.test',
   };
   const clientes = [
-    { id: 'meu', modalidadeCadastro: 'CLIENTE', internalOwnerId: consultora.sub, responsavelId: consultora.sub, companyName: 'Empresa A' },
-    { id: 'outro', modalidadeCadastro: 'CLIENTE', internalOwnerId: 'consultora-2', responsavelId: 'consultora-2', companyName: 'Empresa B' },
+    { id: 'meu', modalidadeCadastro: 'CLIENTE', internalOwnerId: consultora.sub, responsavelId: consultora.sub, empresaConsultoraId: 'empresa-a', companyName: 'Empresa A' },
+    { id: 'outro', modalidadeCadastro: 'CLIENTE', internalOwnerId: 'consultora-2', responsavelId: 'consultora-2', empresaConsultoraId: 'empresa-b', companyName: 'Empresa B' },
   ];
   let habilitada: boolean | undefined;
   let oportunidades: Array<Record<string, any>>;
@@ -79,8 +79,8 @@ describe('Oportunidades da Consultora', () => {
         findMany: async ({ where = {} }: any) =>
           clientes.filter(
             (c) =>
-              !where.responsavelId ||
-              c.responsavelId === where.responsavelId,
+              !where.empresaConsultoraId ||
+              c.empresaConsultoraId === where.empresaConsultoraId,
           ),
       },
       opportunity: {
@@ -88,8 +88,8 @@ describe('Oportunidades da Consultora', () => {
           oportunidades.filter(
             (o) =>
               (!where.clientId || o.clientId === where.clientId) &&
-              (!where.client?.responsavelId ||
-                o.client.responsavelId === where.client.responsavelId),
+              (!where.client?.empresaConsultoraId ||
+                o.client.empresaConsultoraId === where.client.empresaConsultoraId),
           ),
         findUnique: async ({ where }: any) =>
           oportunidades.find((o) => o.id === where.id),

@@ -1,5 +1,6 @@
 import { VisitasModule } from './visitas/visitas.module';
 import { BiComercialModule } from './bi-comercial/bi-comercial.module';
+import { EmpresasConsultorasModule } from './empresas-consultoras/empresas-consultoras.module';
 import { AtendimentoSacModule } from './atendimento-sac/atendimento-sac.module';
 import { Module } from '@nestjs/common';
 import { CnpjModule } from './cnpj/cnpj.module';
@@ -37,6 +38,7 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
+    EmpresasConsultorasModule,
     ConfigModule.forRoot({ isGlobal: true }),
     CnpjModule,
     PrismaModule,

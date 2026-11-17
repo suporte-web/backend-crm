@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { hasAnyRole } from '../common/user-roles';
+import { validarEmpresaLead } from '../common/empresa-consultora-access';
 import { removerCadastroLead } from '../common/cadastros';
 import { desvincularSolicitacoesSite } from '../common/solicitacoes-site-vinculos';
 import { PrismaService } from '../prisma/prisma.service';
@@ -68,9 +69,9 @@ export class ExclusoesLeadsService {
     try {
       return await this.prisma.$transaction(
         async (tx) => {
-          // A autoria é verificada com o ID autenticado, nunca com IDs do corpo.
+          await validarEmpresaLead(tx, user, id);
           const lead = await tx.lead.findFirst({
-            where: { id, createdById: user.sub },
+            where: { id },
             include: journey,
           });
           if (!lead) throw new NotFoundException('Lead não encontrado.');

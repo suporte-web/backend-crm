@@ -5,4 +5,6 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   roles?: UserRole[];
+  empresaConsultoraId?: string | null;
+  empresaConsultoraAtiva?: boolean;
 }
