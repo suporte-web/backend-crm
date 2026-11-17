@@ -1,4 +1,4 @@
-import { metricsRange } from './dto/metrics-period.dto';
+import { metricsRange } from './dtos/metrics-period.dto';
 import { MarketingMetricsService } from './marketing-metrics.service';
 import type { GoogleAnalyticsService } from '../marketing-integrations/google-analytics.service';
 import type {

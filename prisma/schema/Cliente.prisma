@@ -9,6 +9,8 @@ model Client {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   internalOwnerId      String?
+  responsavelId        String?
+  responsavel          User? @relation("ResponsavelComercialCadastro", fields: [responsavelId], references: [id], onDelete: SetNull)
   notes                String?
   segment              String?
   status               String?
@@ -52,6 +54,7 @@ model Client {
   trackings        Tracking[]
 
   @@index([internalOwnerId])
+  @@index([responsavelId, createdAt])
   @@index([prospectedById, createdAt])
   @@index([sourceLeadId])
   @@index([sourceProspectId])

@@ -12,13 +12,13 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { CurrentUser } from '../modules/auth/decorators/current-user.decorator';
-import { Roles } from '../modules/auth/decorators/roles.decorator';
-import { UserRole } from '../modules/auth/enums/user-role.enum';
-import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../modules/auth/guards/roles.guard';
-import type { AuthUser } from '../modules/auth/types/auth-user.type';
-import { SelectPropertyDto } from './dto/select-property.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthUser } from '../auth/types/auth-user.type';
+import { SelectPropertyDto } from './dtos/select-property.dto';
 import { GoogleAnalyticsService } from './google-analytics.service';
 import { GoogleAnalyticsProvider } from './providers/google-analytics.provider';
 

@@ -10,7 +10,7 @@ import {
   assertOpportunityOwner,
   isConsultora,
 } from './opportunity-access';
-import { AuthUser } from '../modules/auth/types/auth-user.type';
+import { AuthUser } from '../auth/types/auth-user.type';
 
 @Injectable()
 export class ConsultoraProposalUploadGuard implements CanActivate {
@@ -24,7 +24,7 @@ export class ConsultoraProposalUploadGuard implements CanActivate {
     await assertOpportunityAccess(this.prisma, request.user);
     const client = await this.prisma.client.findUnique({
       where: { id: request.params.id },
-      select: { internalOwnerId: true },
+      select: { internalOwnerId: true, responsavelId: true },
     });
     if (!client) throw new NotFoundException('Cadastro não encontrado.');
     assertOpportunityOwner(request.user, client);

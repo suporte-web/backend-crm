@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import type { Prisma } from '@prisma/client';
-import type { AuthUser } from '../modules/auth/types/auth-user.type';
+import type { AuthUser } from '../auth/types/auth-user.type';
 import { hasAnyRole } from './user-roles';
 
 export class FiltrosProspeccaoDto {

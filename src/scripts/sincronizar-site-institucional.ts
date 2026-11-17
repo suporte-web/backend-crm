@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from '../app.module';
-import { SiteInstitucionalService } from '../modules/site-institucional/site-institucional.service';
+import { SiteInstitucionalService } from '../site-institucional/site-institucional.service';
 
 async function main() {
   const app =

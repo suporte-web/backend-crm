@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
-import { AtendimentoSacService } from '../modules/atendimento-sac/atendimento-sac.service';
+import { AtendimentoSacService } from '../atendimento-sac/atendimento-sac.service';
 async function importar() {
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],

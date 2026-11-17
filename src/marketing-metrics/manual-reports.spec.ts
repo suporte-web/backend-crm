@@ -7,7 +7,7 @@ import {
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { Server } from 'node:http';
-import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManualReportsController } from './manual-reports.controller';
 import { ManualReportsService } from './manual-reports.service';

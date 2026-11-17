@@ -5,6 +5,10 @@ import { getUserRoles, hasAnyRole } from './user-roles';
 
 type Usuario = { role: string; roles?: string[] };
 
+export function filtroResponsavelCadastro(user: Usuario & { sub: string }) {
+  return hasAnyRole(user, ['CONSULTORA']) ? { responsavelId: user.sub } : {};
+}
+
 export async function modalidadesPermitidas(
   prisma: PrismaService,
   user: Usuario,
@@ -40,24 +44,18 @@ export async function modalidadesPermitidas(
 }
 
 export async function validarAutoriaCadastro(
-  prisma: PrismaService,
+  _prisma: PrismaService,
   user: Usuario & { sub: string },
   cadastro: {
     id: string;
     prospectedById: string | null;
     internalOwnerId: string | null;
+    responsavelId?: string | null;
   },
 ) {
   if (!hasAnyRole(user, ['CONSULTORA'])) return;
-  const lead = await prisma.lead.findUnique({
-    where: { cadastroId: cadastro.id },
-    select: { createdById: true },
-  });
-  if (
-    cadastro.prospectedById !== user.sub &&
-    cadastro.internalOwnerId !== user.sub &&
-    lead?.createdById !== user.sub
-  )
+  // Autoria e prospecção são históricas; acesso acompanha o responsável atual.
+  if (cadastro.responsavelId !== user.sub)
     throw new ForbiddenException(
       'Você não tem permissão para acessar o cadastro de outra pessoa.',
     );

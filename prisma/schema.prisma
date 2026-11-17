@@ -1,0 +1,1740 @@
+// ==========================================
+// ⚠️  AUTO-GERADO. NÃO EDITE ESTE ARQUIVO.
+// Fonte: prisma/schema/*.prisma
+// ==========================================
+
+// ----- 00-generator.prisma -----
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----- 01-datasource.prisma -----
+datasource db {
+  provider = "postgresql"
+}
+
+// ----- 10-enums.prisma -----
+enum UserRole {
+  LIDER_ATENDIMENTO
+  ATENDIMENTO
+  ADMIN
+  GESTAO
+  COMERCIAL
+  CONSULTORA
+  OPERACAO
+  MARKETING
+  CLIENTE
+}
+
+enum QuoteStatus {
+  RECEIVED
+  IN_ANALYSIS
+  ANSWERED
+  APPROVED
+  REJECTED
+}
+
+enum TicketStatus {
+  NOVO
+  EM_ANDAMENTO
+  AGUARDANDO_CLIENTE
+  FECHADO
+  NEW
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  CLOSED
+  ABERTO
+  AGUARDANDO_COMERCIAL
+  AGUARDANDO_GESTAO
+  RESPONDIDO
+  APROVADO_CLIENTE
+  APROVADO_GESTAO
+  AJUSTE_SOLICITADO
+  REPROVADO
+  CANCELADO
+  CONVERTIDO_EM_PROSPECT
+  COTACAO_CRIADA
+  FINALIZADO
+  PERDIDO
+  TRANSFERIDO
+}
+
+enum TicketType {
+  COTACAO
+  LEAD
+  PRE_NEGOCIACAO
+  APROVACAO_GESTAO
+  AJUSTE_CLIENTE
+  AJUSTE_GESTAO
+  SUPORTE
+  DOCUMENTACAO
+  OPERACIONAL
+  FORNECEDOR
+  AGREGADO
+  FINANCEIRO
+  FISCAL
+  JURIDICO
+  MARKETING
+  FROTA
+}
+
+enum EntradaOrigem {
+  VISITA
+  SITE
+  PORTAL
+  MANUAL
+}
+
+enum TicketPriority {
+  BAIXA
+  NORMAL
+  ALTA
+  URGENTE
+}
+
+enum ProspectStatusCadastral {
+  PROSPECT
+  AGUARDANDO_CADASTRO
+  EM_VALIDACAO
+  ATIVO
+  REPROVADO
+  INATIVO
+}
+
+enum ProspectPortalAccessStatus {
+  SEM_ACESSO
+  CONVITE_ENVIADO
+  ATIVO
+  BLOQUEADO
+}
+
+enum TicketHistoryEventType {
+  CREATED
+  STATUS_CHANGED
+  MESSAGE_SENT
+  INTERNAL_NOTE
+  NOTIFICATION_SENT
+  EMAIL_SENT
+  PRE_PROPOSAL_SENT
+  APPROVAL_SENT
+  APPROVED
+  REJECTED
+  ADJUSTMENT_REQUESTED
+  CLOSED
+}
+
+enum StatusProposta {
+  RASCUNHO
+  ENVIADA_AO_CLIENTE
+  APROVADA_PELO_CLIENTE
+  RECUSADA_PELO_CLIENTE
+  AJUSTE_SOLICITADO_PELO_CLIENTE
+  ENVIADA_PARA_GESTAO
+  APROVADA_PELA_GESTAO
+  RECUSADA_PELA_GESTAO
+  AJUSTE_SOLICITADO_PELA_GESTAO
+  CANCELADA
+  EXPIRADA
+}
+
+enum StatusLogEmail {
+  PENDENTE
+  ENVIADO
+  FALHOU
+  IGNORADO
+}
+
+enum ShipmentStatus {
+  RECEIVED
+  PREPARING
+  COLLECTED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  ISSUE
+}
+
+enum TimelineEventType {
+  LEAD_CREATED
+  LEAD_UPDATED
+  OPPORTUNITY_CREATED
+  STAGE_CHANGED
+  NOTE_ADDED
+  OPPORTUNITY_WON
+  OPPORTUNITY_LOST
+}
+
+enum OpportunityStage {
+  NOVO
+  QUALIFICADO
+  PROPOSTA
+  NEGOCIACAO
+  GANHO
+  PERDIDO
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum LeadTimelineEventType {
+  CREATED_MANUAL
+  IMPORTED_CSV
+  UPDATED
+  WHATSAPP_CREATED
+  WHATSAPP_INTERACTION
+  NOTE_ADDED
+}
+
+enum LeadImportJobStatus {
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum LeadImportRowStatus {
+  IMPORTED
+  SKIPPED
+  FAILED
+}
+
+enum MessageSenderType {
+  CLIENTE
+  INTERNO
+  AI
+  CLIENT
+  AGENT
+}
+
+enum ChatEntityType {
+  LEAD
+  CLIENTE
+  COTACAO
+  PROPOSTA
+  TICKET
+}
+
+enum ChatMessageVisibility {
+  PUBLICA_CLIENTE
+  INTERNA
+  GESTAO_COMERCIAL
+  PRIVADA_USUARIOS
+}
+
+enum ContentType {
+  NOTICIA
+  INFORMACAO
+  VLOG
+}
+
+enum AuditLogCategory {
+  ACCESS
+  AUTH
+  USER
+  CLIENT
+  QUOTE
+  TICKET
+  TRACKING
+  SYSTEM
+  CHAT
+}
+
+enum AuditLogLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum AuditLogAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  SESSION_VALIDATED
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  USER_STATUS_CHANGED
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  QUOTE_CREATED
+  QUOTE_STATUS_CHANGED
+  QUOTE_RESPONDED
+  TICKET_CREATED
+  TICKET_STATUS_CHANGED
+  TRACKING_QUERIED
+  TRACKING_UPDATED
+  CUSTOM
+  TICKET_RESPONDED
+  OPPORTUNITY_CREATED
+  OPPORTUNITY_STAGE_CHANGED
+  SUPPLIER_INVITED
+  QUOTE_DELETED
+  CHAT_CREATED
+  CHAT_PARTICIPANTS_CHANGED
+  CHAT_MESSAGE_SENT
+  CHAT_MESSAGE_UPDATED
+  CHAT_MESSAGE_DELETED
+  CHAT_MESSAGE_VISIBILITY_CHANGED
+  PROPOSAL_SENT
+  PROPOSAL_REJECTED
+}
+
+enum SupplierInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ClientDeletionRequestStatus {
+  PENDENTE
+  APROVADA
+  RECUSADA
+  CANCELADA
+}
+
+enum MarketingProvider {
+  GOOGLE_ANALYTICS
+  GOOGLE_ADS
+  META
+  LINKEDIN
+}
+
+enum MarketingIntegrationStatus {
+  NAO_CONFIGURADO
+  CONECTANDO
+  CONECTADO
+  ERRO
+  EXPIRADO
+}
+
+
+enum CotacaoSiteEtapa {
+  LEAD
+  PROSPECT
+  CLIENTE
+}
+
+// ----- ArtigoCentralAjuda.prisma -----
+model HelpCenterArticle {
+  id          String   @id @default(uuid())
+  title       String
+  questions   String[]
+  answer      String
+  category    String
+  tags        String[]
+  active      Boolean  @default(true)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User?    @relation("HelpCenterArticleCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User?    @relation("HelpCenterArticleUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([active, category])
+  @@index([createdAt])
+}
+
+// ----- AtendimentoSac.prisma -----
+enum StatusAtendimentoSac {
+  NOVO
+  ATRIBUIDO
+  EM_ATENDIMENTO
+  CLASSIFICADO
+  AGUARDANDO_ACAO
+  EM_TRATATIVA
+  AGUARDANDO_AVALIACAO
+  CONCLUIDO
+  REABERTO
+}
+enum TipoTarefaSac {
+  TRIAGEM
+  ATENDIMENTO
+  CLASSIFICACAO
+  ACAO_CORRETIVA
+  AVALIACAO_SOLUCAO
+  REGISTRO_RNC
+  CONCLUSAO
+}
+enum StatusTarefaSac {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+model AtendimentoSac {
+  visita VisitaCliente?
+  id String @id @default(uuid())
+  numero Int @unique @default(autoincrement())
+  protocolo String? @unique
+  ticketOrigemId String @unique
+  ticketOrigem Ticket @relation(fields: [ticketOrigemId], references: [id], onDelete: Restrict)
+  relatoOriginal Json
+  tipo String
+  nome String
+  email String?
+  telefone String?
+  empresa String?
+  cidade String?
+  estado String?
+  status StatusAtendimentoSac @default(NOVO)
+  atendenteId String?
+  atendente User? @relation("SacAtendente", fields: [atendenteId], references: [id])
+  responsavelAcaoId String?
+  responsavelAcao User? @relation("SacAcao", fields: [responsavelAcaoId], references: [id])
+  area String?
+  tipoReclamacao String?
+  documento String?
+  motivo String?
+  observacoesClassificacao String?
+  planoAcao Json?
+  rnc Json?
+  prazo DateTime?
+  criadoEm DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  concluidoEm DateTime?
+  concluidoPorId String?
+  concluidoPor User? @relation("SacConclusao", fields: [concluidoPorId], references: [id])
+  historico AtendimentoSacHistorico[]
+  tarefas AtendimentoSacTarefa[]
+  anexos AtendimentoSacAnexo[]
+  @@index([status, criadoEm])
+  @@index([atendenteId, status])
+  @@index([responsavelAcaoId, status])
+  @@index([area])
+}
+model AtendimentoSacHistorico {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  tipo String
+  descricao String
+  usuarioId String?
+  usuario User? @relation("SacHistoricoUsuario", fields: [usuarioId], references: [id])
+  criadoEm DateTime @default(now())
+  statusAnterior StatusAtendimentoSac?
+  statusNovo StatusAtendimentoSac?
+  tarefaId String?
+  tarefa AtendimentoSacTarefa? @relation(fields: [tarefaId], references: [id])
+  dados Json?
+  @@index([atendimentoId, criadoEm])
+}
+model AtendimentoSacTarefa {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  titulo String
+  tipo TipoTarefaSac
+  responsavelId String?
+  responsavel User? @relation("SacTarefaResponsavel", fields: [responsavelId], references: [id])
+  perfilResponsavel UserRole?
+  criadorId String?
+  criador User? @relation("SacTarefaCriador", fields: [criadorId], references: [id])
+  criadoEm DateTime @default(now())
+  prazo DateTime?
+  iniciadoEm DateTime?
+  concluidoEm DateTime?
+  status StatusTarefaSac @default(PENDENTE)
+  observacao String?
+  historico AtendimentoSacHistorico[]
+  anexos AtendimentoSacAnexo[]
+  @@index([responsavelId, status])
+  @@index([atendimentoId, tipo])
+}
+model AtendimentoSacAnexo {
+  id String @id @default(uuid())
+  atendimentoId String
+  atendimento AtendimentoSac @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  etapa String
+  criadoEm DateTime @default(now())
+  usuarioId String?
+  usuario User? @relation("SacAnexoUsuario", fields: [usuarioId], references: [id])
+  tarefaId String?
+  tarefa AtendimentoSacTarefa? @relation(fields: [tarefaId], references: [id])
+  @@index([atendimentoId, etapa])
+}
+
+// ----- Chat.prisma -----
+model Chat {
+  id           String            @id @default(uuid())
+  entityType   ChatEntityType
+  entityId     String
+  title        String?
+  leadId       String?
+  clientId     String?
+  quoteId      String?
+  propostaId   String?
+  ticketId     String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  client       Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead         Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  proposta     Proposta?         @relation(fields: [propostaId], references: [id], onDelete: Cascade)
+  quote        Quote?            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  ticket       Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+  participants ChatParticipant[]
+
+  @@unique([entityType, entityId])
+  @@index([clientId])
+  @@index([leadId])
+  @@index([quoteId])
+  @@index([propostaId])
+  @@index([ticketId])
+  @@index([entityType, createdAt])
+}
+
+// ----- Cliente.prisma -----
+model Client {
+  solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
+  modalidadeCadastro     ModalidadeCadastro @default(CLIENTE) @map("registrationType")
+  leadCadastro     Lead? @relation("CadastroLead")
+  id                   String    @id @default(uuid())
+  document             String?   @unique
+  phone                String?
+  companyName          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  internalOwnerId      String?
+  responsavelId        String?
+  responsavel          User? @relation("ResponsavelComercialCadastro", fields: [responsavelId], references: [id], onDelete: SetNull)
+  notes                String?
+  segment              String?
+  status               String?
+  legalName            String?
+  tradeName            String?
+  cnae                 String?
+  stateRegistration    String?
+  businessActivity     String?
+  taxRegime            String?
+  address              String?
+  city                 String?
+  bankDetails          String?
+  modality             String?
+  registrationDate     DateTime?
+  paymentMethod        String?
+  paymentTerm          String?
+  contractValidity     String?
+  priceAdjustment      String?
+  invoiceContactName   String?
+  invoiceContactEmail  String?
+  invoiceContactPhone  String?
+  commercialTermsNotes String?
+  userId               String?   @unique
+  prospectedById       String?
+  prospectedByName     String?
+  sourceLeadId         String?
+  sourceLead           Lead? @relation("ClientSourceLead", fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  sourceProspectId     String?
+  sourceProspect       Prospect? @relation("ClientSourceProspect", fields: [sourceProspectId], references: [id], onDelete: SetNull)
+
+  chats            Chat[]
+  user             User?                   @relation("ClientLoginUser", fields: [userId], references: [id])
+  contacts         ClientContact[]
+  deletionRequests ClientDeletionRequest[]
+  documents        ClientDocument[]
+  opportunities    Opportunity[]
+  propostas        Proposta[]
+  quotes           Quote[]
+  tickets          Ticket[]
+  timelineEvents   TimelineEvent[]
+  trackings        Tracking[]
+
+  @@index([internalOwnerId])
+  @@index([responsavelId, createdAt])
+  @@index([prospectedById, createdAt])
+  @@index([sourceLeadId])
+  @@index([sourceProspectId])
+  @@index([modalidadeCadastro, createdAt], map: "Client_registrationType_createdAt_idx")
+}
+
+enum ModalidadeCadastro {
+  CLIENTE @map("CLIENT")
+  LEAD
+
+  @@map("RegistrationType")
+}
+
+model ClientDocument {
+  id           String   @id @default(uuid())
+  clientId     String
+  fileName     String
+  originalName String
+  mimeType     String?
+  size         Int?
+  url          String
+  description  String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  category     String?
+  updatedAt    DateTime @default(now())
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([uploadedById])
+  @@index([clientId, createdAt])
+}
+
+model ClientContact {
+  id        String   @id @default(uuid())
+  clientId  String
+  name      String?
+  role      String?
+  email     String?
+  phone     String?
+  notes     String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+// ----- ConteudoPortal.prisma -----
+model PortalContent {
+  id            String      @id @default(uuid())
+  title         String
+  summary       String
+  body          String
+  type          ContentType
+  coverImageUrl String?
+  videoUrl      String?
+  isPublished   Boolean     @default(false)
+  publishedAt   DateTime?
+  authorId      String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  campaignName  String?
+  ctaLabel      String?
+  ctaUrl        String?
+  highlight     Boolean     @default(false)
+  author        User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([type, isPublished, publishedAt])
+  @@index([authorId, createdAt])
+}
+
+// ----- ConviteFornecedor.prisma -----
+model SupplierInvite {
+  id          String               @id @default(uuid())
+  companyName String
+  contactName String?
+  email       String
+  phone       String?
+  token       String               @unique
+  status      SupplierInviteStatus @default(PENDING)
+  notes       String?
+  invitedById String?
+  acceptedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  invitedBy   User?                @relation("SupplierInviteAuthor", fields: [invitedById], references: [id])
+
+  @@index([email, createdAt])
+  @@index([status, createdAt])
+}
+
+// ----- Cotacao.prisma -----
+model Quote {
+  id               String         @id @default(uuid())
+  clientId         String?
+  origin           String
+  destination      String
+  serviceType      String
+  weight           Float?
+  volume           Float?
+  quantity         Int?
+  desiredDeadline  String?
+  notes            String?
+  price            Decimal?
+  commercialNotes  String?
+  status           QuoteStatus    @default(RECEIVED)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cargoDescription String?
+  contactName      String?
+  contactPhone     String?
+  deliveryAddress  String?
+  merchandiseValue Decimal?
+  pickupAddress    String?
+  requestType      String?
+  contactEmail     String?
+  code             String         @unique
+  prospectId       String?
+  chats            Chat[]
+  opportunities    Opportunity[]
+  propostas        Proposta[]
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prospect         Prospect?      @relation(fields: [prospectId], references: [id])
+  history          QuoteHistory[]
+  tickets          Ticket[]
+
+  @@index([prospectId])
+}
+
+// ----- DestinatarioMensagemChat.prisma -----
+model ChatMessageRecipient {
+  id        String      @id @default(uuid())
+  messageId String
+  userId    String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+// ----- EventoLinhaDoTempo.prisma -----
+model TimelineEvent {
+  id          String            @id @default(uuid())
+  clientId    String
+  type        TimelineEventType
+  title       String
+  description String
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy   User?             @relation("TimelineEventAuthor", fields: [createdById], references: [id])
+
+  @@index([clientId, createdAt])
+  @@index([type, createdAt])
+}
+
+// ----- EventoLinhaDoTempoLead.prisma -----
+model LeadTimelineEvent {
+  id          String                @id @default(uuid())
+  leadId      String
+  type        LeadTimelineEventType
+  title       String
+  description String
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  createdBy   User?                 @relation("LeadTimelineEventAuthor", fields: [createdById], references: [id])
+  lead        Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([type, createdAt])
+}
+
+// ----- HistoricoCotacao.prisma -----
+model QuoteHistory {
+  id        String      @id @default(uuid())
+  quoteId   String
+  status    QuoteStatus
+  notes     String?
+  createdAt DateTime    @default(now())
+  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+// ----- HistoricoRastreamento.prisma -----
+model TrackingHistory {
+  id          String         @id @default(uuid())
+  trackingId  String
+  status      ShipmentStatus
+  location    String?
+  description String?
+  createdAt   DateTime       @default(now())
+  tracking    Tracking       @relation(fields: [trackingId], references: [id], onDelete: Cascade)
+}
+
+// ----- HistoricoTicket.prisma -----
+model TicketHistory {
+  id           String                 @id @default(uuid())
+  ticketId     String
+  eventType    TicketHistoryEventType
+  title        String
+  description  String
+  metadata     Json?
+  internalOnly Boolean                @default(false)
+  createdById  String?
+  createdAt    DateTime               @default(now())
+  createdBy    User?                  @relation("TicketHistoryActor", fields: [createdById], references: [id])
+  ticket       Ticket                 @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdById, createdAt])
+}
+
+// ----- ImportacaoLead.prisma -----
+model LeadImportJob {
+  id             String                @id @default(uuid())
+  fileName       String
+  sourceFileType String
+  totalRows      Int                   @default(0)
+  successCount   Int                   @default(0)
+  ignoredCount   Int                   @default(0)
+  failureCount   Int                   @default(0)
+  status         LeadImportJobStatus   @default(PROCESSING)
+  summary        Json?
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  completedAt    DateTime?
+  createdBy      User?                 @relation(fields: [createdById], references: [id])
+  rowResults     LeadImportRowResult[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+// ----- InformativoAssinante.prisma -----
+enum StatusInformativo {
+  ATIVO
+  DESCADASTRADO
+}
+
+model InformativoAssinante {
+  id                String            @id @default(uuid())
+  nome              String
+  email             String            @unique
+  status            StatusInformativo @default(ATIVO)
+  origem            String            @default("SITE_PIZZATTOLOG")
+  aceitePrivacidade Boolean           @default(false)
+  criadoEm          DateTime          @default(now())
+  atualizadoEm      DateTime          @updatedAt
+}
+
+// ----- Lead.prisma -----
+model Lead {
+  siteRequest SolicitacaoSite? @relation("SolicitacaoSiteLead")
+  cadastroId    String? @unique(map: "Lead_registrationId_key") @map("registrationId")
+  cadastro      Client? @relation("CadastroLead", fields: [cadastroId], references: [id], onDelete: SetNull, map: "Lead_registrationId_fkey")
+  id                String                @id @default(uuid())
+  name              String
+  email             String?
+  phone             String?
+  company           String?
+  source            String                @default("manual")
+  status            String                @default("new")
+  notes             String?
+  normalizedEmail   String?
+  normalizedPhone   String?
+  channel           String?
+  sourcePhone       String?
+  externalMessageId String?
+  externalContactId String?
+  metadata          Json?
+  rawPayload        Json?
+  lastInteractionAt DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  prospectedById    String?
+  prospectedByName  String?
+  convertedProspectId String?
+  convertedProspect Prospect? @relation("LeadConvertedProspect", fields: [convertedProspectId], references: [id], onDelete: SetNull)
+  originatedProspects Prospect[] @relation("ProspectSourceLead")
+  convertedClients Client[] @relation("ClientSourceLead")
+  chats             Chat[]
+  createdBy         User?                 @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  updatedBy         User?                 @relation("LeadUpdatedBy", fields: [updatedById], references: [id])
+  importRows        LeadImportRowResult[]
+  timeline          LeadTimelineEvent[]
+  tickets           Ticket[]
+  observations      LeadObservacao[]
+  anexos            LeadAnexo[]
+  deletionRequests  LeadDeletionRequest[]
+
+  convertidoParaCliente Boolean @default(false)
+
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
+  @@index([source, createdAt])
+  @@index([status, createdAt])
+  @@index([prospectedById, createdAt])
+  @@index([convertedProspectId])
+}
+
+// ----- LeadAnexo.prisma -----
+model LeadAnexo {
+  id String @id @default(uuid())
+  leadId String
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  criadoEm DateTime @default(now())
+  usuarioId String?
+  usuario User? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  @@index([leadId, criadoEm])
+}
+
+// ----- LeadObservacao.prisma -----
+model LeadObservacao {
+  id          String   @id @default(uuid())
+  leadId      String
+  content     String
+  stage       String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lead      Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("LeadObservacaoAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([stage, createdAt])
+  @@index([createdById])
+}
+
+// ----- LogAuditoria.prisma -----
+model AuditLog {
+  id         String           @id @default(uuid())
+  category   AuditLogCategory
+  action     AuditLogAction
+  level      AuditLogLevel    @default(INFO)
+  message    String
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  route      String?
+  method     String?
+  targetType String?
+  targetId   String?
+  success    Boolean          @default(true)
+  userId     String?
+  createdAt  DateTime         @default(now())
+  user       User?            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+  @@index([action, createdAt])
+  @@index([success, createdAt])
+}
+
+// ----- LogEmail.prisma -----
+model LogEmail {
+  id                 String         @id @default(uuid())
+  ticketId           String?
+  propostaId         String?
+  notificationId     String?
+  userId             String?
+  emailDestino       String
+  assunto            String
+  resumo             String?
+  template           String?
+  status             StatusLogEmail @default(PENDENTE)
+  provedor           String?
+  idMensagemProvedor String?
+  mensagemErro       String?
+  enviadoEm          DateTime?
+  createdAt          DateTime       @default(now())
+  notification       Notification?  @relation(fields: [notificationId], references: [id])
+  proposta           Proposta?      @relation(fields: [propostaId], references: [id])
+  ticket             Ticket?        @relation(fields: [ticketId], references: [id])
+  user               User?          @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([propostaId])
+  @@index([notificationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ----- ManifestoSsw.prisma -----
+model ManifestoSsw {
+  id Int @id @default(autoincrement())
+
+  manifestoSsw      String  @unique @map("manifesto_ssw")
+  chaveManifestoSsw String? @map("chave_manifesto_ssw")
+
+  placa        String
+  placaCarreta String? @map("placa_carreta")
+
+  motoristaCpf  String? @map("motorista_cpf")
+  motoristaNome String? @map("motorista_nome")
+
+  dataEmissao     DateTime? @map("data_emissao")
+  dataPrevChegada DateTime? @map("data_prev_chegada")
+
+  recebidoEm   DateTime @default(now()) @map("recebido_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  ctrcs ManifestoSswCtrc[]
+
+  @@index([dataEmissao])
+  @@map("manifesto_ssw")
+}
+
+model ManifestoSswCtrc {
+  id Int @id @default(autoincrement())
+
+  manifestoId Int    @map("manifesto_id")
+  ctrcSsw     String @map("ctrc_ssw")
+
+  manifesto ManifestoSsw @relation(fields: [manifestoId], references: [id], onDelete: Cascade)
+
+  @@unique([manifestoId, ctrcSsw])
+  @@index([ctrcSsw])
+  @@map("manifesto_ssw_ctrc")
+}
+
+// ----- MarketingIntegration.prisma -----
+model MarketingIntegration {
+  id                    String                     @id @default(uuid())
+  provider              MarketingProvider          @unique
+  status                MarketingIntegrationStatus @default(NAO_CONFIGURADO)
+  accountId             String?
+  accountName           String?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  metadata              Json?
+  lastSyncAt            DateTime?
+  lastError             String?
+  ativo                 Boolean                    @default(true)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+}
+
+// ----- MarketingManualReport.prisma -----
+model MarketingManualReport {
+  id           String   @id @default(uuid())
+  title        String
+  propertyId   String
+  startDate    String
+  endDate      String
+  filename     String
+  rowCount     Int
+  data         Json
+  importedBy   String
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ----- MarketingOAuthSession.prisma -----
+// Autorizações temporárias isoladas da integração já conectada.
+model MarketingOAuthSession {
+  id                    String            @id @default(uuid())
+  provider              MarketingProvider
+  userId                String
+  stateHash             String            @unique
+  browserHash           String?
+  codeVerifierEncrypted String
+  startedAt             DateTime?
+  consumedAt            DateTime?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  expiresAt             DateTime
+  createdAt             DateTime          @default(now())
+
+  @@index([provider, userId])
+  @@index([expiresAt])
+}
+
+// ----- MensagemChat.prisma -----
+model ChatMessage {
+  id         String                 @id @default(uuid())
+  chatId     String
+  authorId   String
+  content    String
+  visibility ChatMessageVisibility  @default(PUBLICA_CLIENTE)
+  editedAt   DateTime?
+  deletedAt  DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  author     User                   @relation("ChatMessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  chat       Chat                   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  recipients ChatMessageRecipient[]
+
+  @@index([chatId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([visibility])
+  @@index([deletedAt])
+}
+
+// ----- MensagemTicket.prisma -----
+model TicketMessage {
+  id          String            @id @default(uuid())
+  ticketId    String
+  senderType  MessageSenderType @default(INTERNO)
+  message     String
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  isInternal  Boolean           @default(false)
+  attachments Json?
+  createdBy   User?             @relation("TicketMessageAuthor", fields: [createdById], references: [id])
+  ticket      Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([createdById, createdAt])
+}
+
+// ----- Notificacao.prisma -----
+model Notification {
+  id        String     @id @default(uuid())
+  userId    String
+  ticketId  String?
+  title     String
+  message   String
+  link      String?
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+  logsEmail LogEmail[]
+  ticket    Ticket?    @relation(fields: [ticketId], references: [id])
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([ticketId, createdAt])
+}
+
+// ----- Oportunidade.prisma -----
+model Opportunity {
+  id                String            @id @default(uuid())
+  clientId          String
+  title             String
+  value             Decimal?
+  stage             OpportunityStage  @default(NOVO)
+  status            OpportunityStatus @default(OPEN)
+  expectedCloseDate DateTime?
+  lostReason        String? // Texto legado/rótulo para compatibilidade
+  motivoPerda    String?
+  observacaoPerda   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  quoteId           String?
+  preContract       Boolean           @default(false)
+  preContractNotes  String?
+  client            Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quote             Quote?            @relation(fields: [quoteId], references: [id])
+  propostas         Proposta[]
+  tickets           Ticket[]
+
+  @@index([clientId, stage])
+  @@index([quoteId])
+  @@index([status, createdAt])
+}
+
+// ----- ParticipanteChat.prisma -----
+model ChatParticipant {
+  id         String    @id @default(uuid())
+  chatId     String
+  userId     String
+  canRead    Boolean   @default(true)
+  canWrite   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastReadAt DateTime?
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId, canRead])
+  @@index([chatId, canWrite])
+}
+
+// ----- PermissaoTelaPerfil.prisma -----
+model RoleScreenPermission {
+  id          String   @id @default(uuid())
+  role        UserRole
+  screenKey   String
+  screenLabel String?
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([role, screenKey])
+  @@index([role, isEnabled])
+}
+
+// ----- Proposta.prisma -----
+model Proposta {
+  id                            String         @id @default(uuid())
+  ticketId                      String
+  quoteId                       String?
+  opportunityId                 String?
+  clientId                      String?
+  criadaPorId                   String?
+  enviadaPorId                  String?
+  status                        StatusProposta @default(RASCUNHO)
+  titulo                        String
+  descricao                     String?
+  descricaoServico              String?
+  origem                        String?
+  destino                       String?
+  valor                         Decimal?
+  condicoesPagamento            String?
+  condicoesComerciais           String?
+  observacoes                   String?
+  validadeDias                  String?
+  validaAte                     DateTime?
+  versao                        Int            @default(1)
+  enviadaEm                     DateTime?
+  aprovadaPeloClienteEm         DateTime?
+  recusadaPeloClienteEm         DateTime?
+  ajusteSolicitadoPeloClienteEm DateTime?
+  enviadaParaGestaoEm           DateTime?
+  aprovadaPelaGestaoEm          DateTime?
+  recusadaPelaGestaoEm          DateTime?
+  ajusteSolicitadoPelaGestaoEm  DateTime?
+  createdAt                     DateTime       @default(now())
+  updatedAt                     DateTime       @updatedAt
+  code                          String         @unique
+  arquivoNome                   String?
+  arquivoUrl                    String?
+  arquivoMimeType               String?
+  arquivoTamanho                Int?
+  motivoRecusaCliente           String?
+  chats                         Chat[]
+  logsEmail                     LogEmail[]
+  client                        Client?        @relation(fields: [clientId], references: [id])
+  criadaPor                     User?          @relation("PropostaCriadaPor", fields: [criadaPorId], references: [id])
+  enviadaPor                    User?          @relation("PropostaEnviadaPor", fields: [enviadaPorId], references: [id])
+  opportunity                   Opportunity?   @relation(fields: [opportunityId], references: [id])
+  quote                         Quote?         @relation(fields: [quoteId], references: [id])
+  ticket                        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([quoteId])
+  @@index([opportunityId])
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([ticketId, versao])
+}
+
+// ----- Prospecto.prisma -----
+model Prospect {
+  solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteProspect")
+  id                  String                     @id @default(uuid())
+  nomeRazaoSocial     String
+  nomeContato         String?
+  email               String?
+  telefone            String?
+  document            String?
+  cidade              String?
+  estado              String?
+  origem              EntradaOrigem              @default(SITE)
+  statusCadastral     ProspectStatusCadastral    @default(PROSPECT)
+  portalAccessStatus  ProspectPortalAccessStatus @default(SEM_ACESSO)
+  createdFromTicketId String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  prospectedById      String?
+  prospectedByName    String?
+  sourceLeadId        String?
+  sourceLead          Lead? @relation("ProspectSourceLead", fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  convertedLeads      Lead[] @relation("LeadConvertedProspect")
+  convertedClients    Client[] @relation("ClientSourceProspect")
+  createdFromTicket   Ticket?                    @relation("ProspectCreatedFromTicket", fields: [createdFromTicketId], references: [id])
+  quotes              Quote[]
+  tickets             Ticket[]                   @relation("TicketProspect")
+
+  @@index([email])
+  @@index([telefone])
+  @@index([document])
+  @@index([statusCadastral, createdAt])
+  @@index([origem, createdAt])
+  @@index([prospectedById, createdAt])
+  @@index([sourceLeadId])
+}
+
+// ----- Rastreamento.prisma -----
+model Tracking {
+  id            String            @id @default(uuid())
+  clientId      String
+  code          String            @unique
+  origin        String?
+  destination   String?
+  carrier       String?
+  status        ShipmentStatus    @default(RECEIVED)
+  description   String?
+  estimatedDate DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  client        Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  history       TrackingHistory[]
+}
+
+// ----- ResultadoLinhaImportacaoLead.prisma -----
+model LeadImportRowResult {
+  id        String              @id @default(uuid())
+  jobId     String
+  rowNumber Int
+  status    LeadImportRowStatus
+  reason    String?
+  rawData   Json?
+  leadId    String?
+  createdAt DateTime            @default(now())
+  job       LeadImportJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lead      Lead?               @relation(fields: [leadId], references: [id])
+
+  @@index([jobId, rowNumber])
+  @@index([leadId])
+}
+
+// ----- site-institucional.prisma -----
+model PaginaSite {
+  id   String @id @default(uuid())
+  nome String
+  slug String @unique
+
+  conteudoRascunho  Json?
+  conteudoPublicado Json?
+
+  publicado                  Boolean @default(false)
+  temAlteracoesNaoPublicadas Boolean @default(false)
+
+  publicadoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----- SolicitacaoExclusaoCliente.prisma -----
+model ClientDeletionRequest {
+  id                  String                      @id @default(uuid())
+  clientId            String?
+  requestedById       String
+  approvedById        String?
+  status              ClientDeletionRequestStatus @default(PENDENTE)
+  reason              String?
+  managementResponse  String?
+  clientNameSnapshot  String?
+  clientEmailSnapshot String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  decidedAt           DateTime?
+  approvedBy          User?                       @relation("ClientDeletionApprovedBy", fields: [approvedById], references: [id])
+  client              Client?                     @relation(fields: [clientId], references: [id])
+  requestedBy         User                        @relation("ClientDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+  @@index([approvedById, createdAt])
+}
+
+// ----- SolicitacaoExclusaoLead.prisma -----
+model LeadDeletionRequest {
+  id                 String                    @id @default(uuid())
+  leadId             String?
+  requestedById      String
+  approvedById       String?
+  status             LeadDeletionRequestStatus @default(PENDENTE)
+  reason             String
+  managementResponse String?
+  leadNameSnapshot   String
+  leadEmailSnapshot  String?
+  leadSnapshot       String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  decidedAt          DateTime?
+  lead               Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  requestedBy        User                      @relation("LeadDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy         User?                     @relation("LeadDeletionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, status])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+enum LeadDeletionRequestStatus {
+  PENDENTE
+  APROVADA
+  RECUSADA
+  CANCELADA
+}
+
+// ----- SolicitacaoSite.prisma -----
+model SolicitacaoSite {
+  id String @id @default(uuid())
+
+  // Controle da solicitação
+  tipo         String
+  departamento String?
+  status       String  @default("NOVO")
+  origem       String  @default("SITE_PIZZATTOLOG")
+
+  // Dados da pessoa
+  nome     String
+  email    String
+  telefone String?
+  cargo    String?
+
+  // Dados da empresa
+  empresa String?
+  cnpj    String?
+
+  // Solicitação de cotação
+  solucao String?
+
+  // Cadastro de agregados
+  cidade       String?
+  categoriaCnh String?
+  possuiMopp   Boolean?
+  possuiEar    Boolean?
+  marcaVeiculo String?
+  anoVeiculo   Int?
+
+  // Conteúdo da solicitação
+  assunto  String?
+  mensagem String?
+
+  // Consentimentos
+  aceitePrivacidade  Boolean @default(false)
+  aceiteComunicacoes Boolean @default(false)
+
+  // Controle interno do CRM
+  etapaCotacao      CotacaoSiteEtapa?
+  leadId            String? @unique
+  prospectId        String?
+  clientId          String?
+  lead              Lead? @relation("SolicitacaoSiteLead", fields: [leadId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  prospect          Prospect? @relation("SolicitacaoSiteProspect", fields: [prospectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  client            Client? @relation("SolicitacaoSiteClient", fields: [clientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  responsavel       User? @relation("SolicitacaoSiteResponsavel", fields: [responsavelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  responsavelId     String?
+  observacaoInterna String?
+
+  // Datas
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Anexos
+  anexos AnexoSolicitacaoSite[]
+
+  @@index([etapaCotacao, responsavelId])
+  @@index([prospectId])
+  @@index([clientId])
+  @@index([tipo])
+  @@index([departamento])
+  @@index([status])
+  @@index([criadoEm])
+}
+
+model AnexoSolicitacaoSite {
+  id String @id @default(uuid())
+
+  solicitacaoId String
+
+  solicitacao SolicitacaoSite @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  nomeArquivo         String
+  nomeArquivoOriginal String
+  tipoArquivo         String?
+  tamanho             Int?
+  url                 String
+
+  criadoEm DateTime @default(now())
+
+  @@index([solicitacaoId])
+}
+
+// ----- Ticket.prisma -----
+model Ticket {
+  atendimentoSac AtendimentoSac?
+  id                  String          @id @default(uuid())
+  clientId            String?
+  subject             String
+  description         String
+  status              TicketStatus    @default(ABERTO)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  quoteId             String?
+  leadId              String?
+  opportunityId       String?
+  assignedToId        String?
+  requesterId         String?
+  type                TicketType      @default(SUPORTE)
+  requiresActionRole  UserRole?
+  lastInteractionAt   DateTime        @default(now())
+  internalOnly        Boolean         @default(false)
+  protocolo           String?         @unique
+  prospectId          String?
+  origem              EntradaOrigem?
+  prioridade          TicketPriority  @default(NORMAL)
+  nomeSolicitante     String?
+  emailSolicitante    String?
+  telefoneSolicitante String?
+  mensagem            String?
+  formPayload         Json?
+  closedAt            DateTime?
+  chats               Chat[]
+  logsEmail           LogEmail[]
+  notifications       Notification[]
+  propostas           Proposta[]
+  createdProspects    Prospect[]      @relation("ProspectCreatedFromTicket")
+  assignedTo          User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  client              Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead                Lead?           @relation(fields: [leadId], references: [id])
+  opportunity         Opportunity?    @relation(fields: [opportunityId], references: [id])
+  prospect            Prospect?       @relation("TicketProspect", fields: [prospectId], references: [id])
+  quote               Quote?          @relation(fields: [quoteId], references: [id])
+  requester           User?           @relation("TicketRequester", fields: [requesterId], references: [id])
+  history             TicketHistory[]
+  messages            TicketMessage[]
+
+  @@index([clientId])
+  @@index([prospectId])
+  @@index([quoteId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([assignedToId, status])
+  @@index([type, status])
+  @@index([requiresActionRole, status])
+  @@index([internalOnly, status])
+  @@index([status, createdAt])
+  @@index([lastInteractionAt])
+  @@index([origem, createdAt])
+  @@index([protocolo])
+}
+
+// ----- Usuario.prisma -----
+model User {
+  cadastrosResponsavelComercial Client[] @relation("ResponsavelComercialCadastro")
+  solicitacoesSiteResponsavel SolicitacaoSite[] @relation("SolicitacaoSiteResponsavel")
+  visitasResponsavel VisitaCliente[] @relation("VisitaResponsavel")
+  visitasCriadas VisitaCliente[] @relation("VisitaCriador")
+  visitasParticipante VisitaParticipante[] @relation("VisitaParticipanteUsuario")
+  visitasRealizadas VisitaRealizacao[] @relation("VisitaRealizacaoUsuario")
+  visitasValidadas VisitaValidacao[] @relation("VisitaValidacaoGestor")
+  visitasReagendadas VisitaReagendamento[] @relation("VisitaReagendamentoUsuario")
+  historicoVisitas VisitaHistorico[] @relation("VisitaHistoricoUsuario")
+  anexosVisitas VisitaAnexo[] @relation("VisitaAnexoUsuario")
+  leadAnexos LeadAnexo[]
+  atendimentosSac AtendimentoSac[] @relation("SacAtendente")
+  acoesSac AtendimentoSac[] @relation("SacAcao")
+  conclusoesSac AtendimentoSac[] @relation("SacConclusao")
+  historicoSac AtendimentoSacHistorico[] @relation("SacHistoricoUsuario")
+  tarefasSac AtendimentoSacTarefa[] @relation("SacTarefaResponsavel")
+  tarefasSacCriadas AtendimentoSacTarefa[] @relation("SacTarefaCriador")
+  anexosSac AtendimentoSacAnexo[] @relation("SacAnexoUsuario")
+  id                              String                  @id @default(uuid())
+  name                            String
+  email                           String                  @unique
+  passwordHash                    String
+  role                            UserRole                @default(CLIENTE)
+  roles                           UserRole[]              @default([])
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  isActive                        Boolean                 @default(true)
+  mustChangePassword              Boolean                 @default(true)
+  auditLogs                       AuditLog[]
+  chatMessages                    ChatMessage[]           @relation("ChatMessageAuthor")
+  privateChatMessages             ChatMessageRecipient[]
+  chatParticipants                ChatParticipant[]
+  clientProfile                   Client?                 @relation("ClientLoginUser")
+  approvedClientDeletionRequests  ClientDeletionRequest[] @relation("ClientDeletionApprovedBy")
+  requestedClientDeletionRequests ClientDeletionRequest[] @relation("ClientDeletionRequestedBy")
+  requestedLeadDeletionRequests   LeadDeletionRequest[] @relation("LeadDeletionRequestedBy")
+  approvedLeadDeletionRequests    LeadDeletionRequest[] @relation("LeadDeletionApprovedBy")
+  uploadedClientDocuments         ClientDocument[]
+  helpCenterArticlesCreated       HelpCenterArticle[]     @relation("HelpCenterArticleCreatedBy")
+  helpCenterArticlesUpdated       HelpCenterArticle[]     @relation("HelpCenterArticleUpdatedBy")
+  createdLeads                    Lead[]                  @relation("LeadCreatedBy")
+  updatedLeads                    Lead[]                  @relation("LeadUpdatedBy")
+  leadImportJobs                  LeadImportJob[]
+  createdLeadTimelineEvents       LeadTimelineEvent[]     @relation("LeadTimelineEventAuthor")
+  createdLeadObservations         LeadObservacao[]        @relation("LeadObservacaoAuthor")
+  logsEmail                       LogEmail[]
+  notifications                   Notification[]
+  passwordResetTokens             PasswordResetToken[]
+  authoredPosts                   PortalContent[]
+  propostasCriadas                Proposta[]              @relation("PropostaCriadaPor")
+  propostasEnviadas               Proposta[]              @relation("PropostaEnviadaPor")
+  supplierInvites                 SupplierInvite[]        @relation("SupplierInviteAuthor")
+  assignedTickets                 Ticket[]                @relation("TicketAssignedTo")
+  requestedTickets                Ticket[]                @relation("TicketRequester")
+  ticketHistoryEvents             TicketHistory[]         @relation("TicketHistoryActor")
+  ticketMessages                  TicketMessage[]         @relation("TicketMessageAuthor")
+  createdTimelineEvents           TimelineEvent[]         @relation("TimelineEventAuthor")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ----- VisitaCliente.prisma -----
+enum StatusVisita {
+  AGENDADA
+  AGUARDANDO_REALIZACAO
+  REAGENDAMENTO
+  AGUARDANDO_VALIDACAO
+  POS_VISITA
+  ATENDIMENTO_SAC
+  CONCLUIDA
+}
+
+enum EtapaVisita {
+  VISITA
+  REALIZACAO
+  VALIDACAO
+  POS_VISITA
+}
+
+enum ClassificacaoVisita {
+  EXCELENTE
+  BOA
+  REGULAR
+  RUIM
+}
+
+model VisitaCliente {
+  id String @id @default(uuid())
+  numero Int @unique @default(autoincrement())
+  protocolo String? @unique
+  clienteNome String
+  // Identificador anterior preservado apenas como referência histórica, sem relação.
+  clienteId String?
+  cnpj String?
+  localVisita String
+  dataPrevista DateTime
+  dataRealizada DateTime?
+  responsavelId String
+  responsavel User @relation("VisitaResponsavel", fields: [responsavelId], references: [id], onDelete: Restrict)
+  criadoPorId String
+  criadoPor User @relation("VisitaCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
+  tipoVisita String
+  observacoes String?
+  status StatusVisita @default(AGENDADA)
+  relato String?
+  insights String?
+  pontosPositivos String?
+  pontosAtencao String?
+  pessoaAtendeu String?
+  contatoPessoaAtendeu String?
+  emailPessoaAtendeu String?
+  teveCusto Boolean?
+  custo Decimal? @db.Decimal(12, 2)
+  novaDataAceita Boolean?
+  atingiuObjetivo Boolean?
+  sentimentoCliente String?
+  possuiMelhoria Boolean?
+  melhoriaIdentificada String?
+  classificacao ClassificacaoVisita?
+  avaliacaoRegistradaEm DateTime?
+  sacId String? @unique
+  sac AtendimentoSac? @relation(fields: [sacId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  concluidoEm DateTime?
+  participantes VisitaParticipante[]
+  realizacoes VisitaRealizacao[]
+  validacoes VisitaValidacao[]
+  reagendamentos VisitaReagendamento[]
+  historico VisitaHistorico[]
+  anexos VisitaAnexo[]
+  @@index([responsavelId, status])
+  @@index([clienteNome, dataPrevista])
+  @@index([status, dataPrevista])
+  @@index([tipoVisita])
+}
+
+model VisitaParticipante {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  nome String
+  email String?
+  telefone String?
+  usuarioId String?
+  usuario User? @relation("VisitaParticipanteUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  comunicacaoStatus String @default("PENDENTE")
+  criadoEm DateTime @default(now())
+  @@index([visitaId])
+}
+
+model VisitaRealizacao {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaRealizacaoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  dataRealizada DateTime
+  dados Json
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaValidacao {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  gestorId String
+  gestor User @relation("VisitaValidacaoGestor", fields: [gestorId], references: [id], onDelete: Restrict)
+  decisao String
+  observacao String?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaReagendamento {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaReagendamentoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  dataAnterior DateTime
+  novaData DateTime
+  motivo String
+  observacoes String?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaHistorico {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  usuarioId String
+  usuario User @relation("VisitaHistoricoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  tipo String
+  descricao String
+  observacao String?
+  statusAnterior StatusVisita?
+  statusNovo StatusVisita?
+  dados Json?
+  criadoEm DateTime @default(now())
+  @@index([visitaId, criadoEm])
+}
+
+model VisitaAnexo {
+  id String @id @default(uuid())
+  visitaId String
+  visita VisitaCliente @relation(fields: [visitaId], references: [id], onDelete: Restrict)
+  nome String
+  arquivo String
+  tipo String
+  tamanho Int
+  comentario String?
+  etapa EtapaVisita
+  usuarioId String
+  usuario User @relation("VisitaAnexoUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now())
+  @@index([visitaId, etapa])
+}

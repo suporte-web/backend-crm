@@ -4,7 +4,7 @@ import type {
   GoogleReport,
   ReportQuery,
 } from '../marketing-integrations/google-api.types';
-import { MetricsPeriodDto, metricsRange } from './dto/metrics-period.dto';
+import { MetricsPeriodDto, metricsRange } from './dtos/metrics-period.dto';
 
 export function reportRows(report: GoogleReport) {
   return (report.rows ?? []).map((row) => ({

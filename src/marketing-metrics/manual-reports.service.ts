@@ -4,8 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ImportManualReportDto } from './dto/import-manual-report.dto';
-import { metricsRange } from './dto/metrics-period.dto';
+import { ImportManualReportDto } from './dtos/import-manual-report.dto';
+import { metricsRange } from './dtos/metrics-period.dto';
 import { parseGa4Csv } from './ga4-csv';
 
 const summarySelect = {

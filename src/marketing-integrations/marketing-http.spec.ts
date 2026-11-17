@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
 import request from 'supertest';
-import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GoogleAnalyticsController } from './google-analytics.controller';
 import { GoogleAnalyticsService } from './google-analytics.service';
 import { GoogleAnalyticsProvider } from './providers/google-analytics.provider';

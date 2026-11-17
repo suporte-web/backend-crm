@@ -1,0 +1,160 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { PrismaService } from '../prisma/prisma.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateInternalQuoteDto } from './dtos/create-internal-quote.dto';
+import { CreateQuoteDto } from './dtos/create-quote.dto';
+import { RespondQuoteDto } from './dtos/respond-quote.dto';
+import { UpdateQuoteDto } from './dtos/update-quote.dto';
+import { UpdateQuoteStatusDto } from './dtos/update-quote-status.dto';
+import { QuotesService } from './quotes.service';
+
+@ApiTags('Cotações')
+@Controller('quotes')
+export class QuotesController {
+  constructor(
+    private readonly quotesService: QuotesService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  async create(
+    @CurrentUser() user: { sub: string },
+    @Body() dto: CreateQuoteDto,
+  ) {
+    const client = await this.prisma.client.findUnique({
+      where: { userId: user.sub },
+    });
+
+    if (!client) {
+      throw new NotFoundException('Perfil do cliente não encontrado.');
+    }
+
+    return this.quotesService.create(client.id, dto, user);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('internal')
+  createInternal(
+    @CurrentUser() user: { sub: string; role: string },
+    @Body() dto: CreateInternalQuoteDto,
+  ) {
+    return this.quotesService.createInternal(user, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'clientId', required: false, type: String })
+  @Get()
+  findAll(
+    @CurrentUser() user: { sub: string; role: string },
+    @Query('status') status?: string,
+    @Query('clientId') clientId?: string,
+  ) {
+    return this.quotesService.findAll(user, { status, clientId });
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async findMine(@CurrentUser() user: { sub: string }) {
+    const client = await this.prisma.client.findUnique({
+      where: { userId: user.sub },
+    });
+
+    if (!client) {
+      throw new NotFoundException('Perfil do cliente não encontrado.');
+    }
+
+    return this.quotesService.findMine(client.id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  findOne(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotação.');
+    }
+
+    return this.quotesService.findOne(user, id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateQuoteDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotação.');
+    }
+
+    return this.quotesService.update(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/status')
+  updateStatus(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateQuoteStatusDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotação.');
+    }
+
+    return this.quotesService.updateStatus(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/respond')
+  respond(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: RespondQuoteDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotação.');
+    }
+
+    return this.quotesService.respond(user, id, dto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/delete')
+  remove(
+    @CurrentUser() user: { sub: string; role: string },
+    @Param('id') id: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Informe o identificador da cotação.');
+    }
+
+    return this.quotesService.remove(user, id);
+  }
+}

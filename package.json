@@ -19,7 +19,14 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "site:sync-current-content": "ts-node -r tsconfig-paths/register src/scripts/sincronizar-site-institucional.ts",
-    "site:backfill-social-carreiras-images": "ts-node -r tsconfig-paths/register src/scripts/backfill-site-social-carreiras-images.ts"
+    "site:backfill-social-carreiras-images": "ts-node -r tsconfig-paths/register src/scripts/backfill-site-social-carreiras-images.ts",
+    "usuario:criar-admin": "node scripts/criar-admin.cjs",
+    "prisma:build": "node scripts/prisma-build-schema.js",
+    "prisma:generate": "npm run prisma:build && prisma generate",
+    "prisma:migrate": "npm run prisma:build && prisma migrate dev",
+    "prisma:push": "npm run prisma:build && prisma db push",
+    "prisma:studio": "npm run prisma:build && prisma studio",
+    "prisma:reset": "npm run prisma:build && prisma migrate reset"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -34,7 +41,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.2.7",
     "@prisma/adapter-pg": "^7.7.0",
-    "@prisma/client": "^7.7.0",
+    "@prisma/client": "^7.10.1",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",

@@ -1,0 +1,155 @@
+import { Injectable } from '@nestjs/common';
+import { QueryDeliveriesDto } from './dtos/query-deliveries.dto';
+import { PostgresDeliveriesService } from './database/postgres-deliveries.service';
+import {
+  buildDeliveryCitiesQuery,
+  buildDeliveryOccurrencesQuery,
+  buildDeliveryPayersQuery,
+  buildDeliveryRegionsQuery,
+  buildDeliveriesQuery,
+  buildDeliveriesSummaryQuery,
+} from './sql/deliveries.sql';
+
+type DeliveryRow = {
+  cgc_pag: string;
+  data_ref: string;
+  seq_ctrc: string;
+  ser_ctrc: string;
+  nro_ctrc: string;
+  seq_manifesto: string | null;
+  data_entrega: string | null;
+  hora_entrega: string | null;
+  data_prev_ent: string | null;
+  nome_cli_dest: string;
+  data_ult_ocor: string | null;
+  ult_ocor: string | null;
+  sigla_fil_emit: string;
+  ocorrencia: string;
+  cidade_origem: string;
+  cidade_dest: string;
+  uf_dest: string;
+  status_entrega: 'Entregue' | 'Pendente' | 'Em atraso';
+  em_atraso: 'Sim' | 'Nao';
+  sla_entrega: 'DENTRO DO SLA' | 'FORA DO SLA' | '-';
+  classificacao_rota: string;
+};
+
+type DeliverySummaryRow = {
+  totalPedidos: number;
+  entregues: number;
+  pendentes: number;
+  emAtraso: number;
+  entregueDentroDoSla: number;
+  entregueForaDoSla: number;
+  porcentagemEntrega: number | string;
+};
+
+type CityRow = {
+  cidade_dest: string;
+  uf_dest: string;
+};
+
+type RegionRow = {
+  uf_dest: string;
+  classificacao_rota: string;
+};
+
+type PayerRow = {
+  cgc_pag: string;
+};
+
+type OccurrenceRow = {
+  ult_ocor: string | null;
+  ocorrencia: string;
+};
+
+@Injectable()
+export class DeliveriesService {
+  constructor(
+    private readonly postgresDeliveriesService: PostgresDeliveriesService,
+  ) {}
+
+  async findAll(filters: QueryDeliveriesDto) {
+    const query = buildDeliveriesQuery(filters);
+
+    // console.log('SQL ENTREGAS:', query.text);
+    // console.log('VALUES ENTREGAS:', query.values);
+
+    return this.postgresDeliveriesService.query<DeliveryRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  async getSummary(filters: QueryDeliveriesDto) {
+    const query = buildDeliveriesSummaryQuery(filters);
+
+    // console.log('SQL RESUMO:', query.text);
+    // console.log('VALUES RESUMO:', query.values);
+
+    const [summary] =
+      await this.postgresDeliveriesService.query<DeliverySummaryRow>(
+        query.text,
+        query.values,
+      );
+
+    // A API sempre devolve numeros consistentes para o dashboard.
+    return {
+      totalPedidos: Number(summary?.totalPedidos || 0),
+      entregues: Number(summary?.entregues || 0),
+      pendentes: Number(summary?.pendentes || 0),
+      emAtraso: Number(summary?.emAtraso || 0),
+      entregueDentroDoSla: Number(summary?.entregueDentroDoSla || 0),
+      entregueForaDoSla: Number(summary?.entregueForaDoSla || 0),
+      porcentagemEntrega: Number(summary?.porcentagemEntrega || 0),
+    };
+  }
+
+  async findCities(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryCitiesQuery(filters);
+
+    return this.postgresDeliveriesService.query<CityRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  async findRegions(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryRegionsQuery(filters);
+
+    return this.postgresDeliveriesService.query<RegionRow>(
+      query.text,
+      query.values,
+    );
+  }
+
+  // log cnpj pagador
+  async findPayers(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryPayersQuery(filters);
+
+    // console.log('==============================');
+    // console.log('FILTROS DOS PAGADORES:', filters);
+    // console.log('VALORES DOS PAGADORES:', query.values);
+    // console.log('SQL DOS PAGADORES:', query.text);
+
+    const result = await this.postgresDeliveriesService.query<PayerRow>(
+      query.text,
+      query.values,
+    );
+
+    // console.log('TOTAL DE PAGADORES:', result.length);
+    // console.log('PAGADORES RETORNADOS:', result);
+    // console.log('==============================');
+
+    return result;
+  }
+
+  async findOccurrences(filters: QueryDeliveriesDto) {
+    const query = buildDeliveryOccurrencesQuery(filters);
+
+    return this.postgresDeliveriesService.query<OccurrenceRow>(
+      query.text,
+      query.values,
+    );
+  }
+}

@@ -1,0 +1,121 @@
+import { ClientsService } from '../clientes/clients.service';
+import { hasAnyRole } from '../common/user-roles';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthUser } from '../auth/types/auth-user.type';
+import { CriarOportunidadeDto } from './dtos/criar-oportunidade.dto';
+import { AtualizarOportunidadeDto } from './dtos/atualizar-oportunidade.dto';
+import { AtualizarEtapaOportunidadeDto } from './dtos/atualizar-etapa-oportunidade.dto';
+import { OportunidadesService } from './oportunidades.service';
+
+@ApiTags('Oportunidades')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.CONSULTORA)
+@Controller(['oportunidades', 'opportunities'])
+export class OportunidadesController {
+  constructor(
+    private readonly oportunidadesService: OportunidadesService,
+    private readonly clientsService: ClientsService,
+  ) {}
+
+  @Get('motivos-perda')
+  listarMotivosPerda(@CurrentUser() user: AuthUser) {
+    return this.oportunidadesService.listarMotivosPerda(user);
+  }
+
+  @Get('clients')
+  listarCadastros(@CurrentUser() user: AuthUser) {
+    return this.oportunidadesService.listarCadastros(user);
+  }
+
+  @Get('clients/:id/detail')
+  async obterDetalhe(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    await this.oportunidadesService.validarDetalhe(user, id);
+    const detalhe = await this.clientsService.getDetail(user, id);
+    if (hasAnyRole(user, ['CONSULTORA'])) {
+      detalhe.client.documents = detalhe.client.documents.filter(
+        (documento) => documento.category === 'OPORTUNIDADE_PROPOSTA',
+      );
+    }
+    return detalhe;
+  }
+
+  @Post()
+  criar(@CurrentUser() user: AuthUser, @Body() dto: CriarOportunidadeDto) {
+    return this.oportunidadesService.criar(user, dto);
+  }
+
+  @ApiQuery({ name: 'clienteId', required: false, type: String })
+  @ApiQuery({ name: 'etapa', required: false, type: String })
+  @ApiQuery({ name: 'situacao', required: false, type: String })
+  @Get()
+  listar(
+    @CurrentUser() usuario: AuthUser,
+    @Query() consulta: Record<string, string | undefined>,
+  ) {
+    return this.oportunidadesService.listar(usuario, {
+      clienteId: consulta.clienteId ?? consulta.clientId,
+      etapa: consulta.etapa ?? consulta.stage,
+      situacao: consulta.situacao ?? consulta.status,
+      modalidadeCadastro: consulta.modalidade,
+    });
+  }
+
+  @Patch([':id/etapa', ':id/stage'])
+  atualizarEtapa(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: AtualizarEtapaOportunidadeDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException(
+        'O identificador da oportunidade é obrigatório.',
+      );
+    }
+
+    return this.oportunidadesService.atualizarEtapa(user, id, dto);
+  }
+
+  @Patch(':id')
+  atualizar(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: AtualizarOportunidadeDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException(
+        'O identificador da oportunidade é obrigatório.',
+      );
+    }
+
+    return this.oportunidadesService.atualizar(user, id, dto);
+  }
+
+  @Delete(':id')
+  excluir(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException(
+        'O identificador da oportunidade é obrigatório.',
+      );
+    }
+
+    return this.oportunidadesService.excluir(user, id);
+  }
+}

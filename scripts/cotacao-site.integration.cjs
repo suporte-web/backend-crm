@@ -7,12 +7,12 @@ const { randomUUID } = require('node:crypto');
 const { Client, Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
-const { NotificationsService } = require('../dist/src/modules/notifications/notifications.service');
-const { SolicitacoesSiteService } = require('../dist/src/modules/solicitacoes-site/solicitacoes-site.service');
-const { CotacaoSiteWorkflowService } = require('../dist/src/modules/solicitacoes-site/cotacao-site-workflow.service');
-const { LeadsService } = require('../dist/src/modules/leads/leads.service');
-const { ChatsService } = require('../dist/src/modules/chats/chats.service');
-const { TicketsService } = require('../dist/src/modules/tickets/tickets.service');
+const { NotificationsService } = require('../dist/src/notifications/notifications.service');
+const { SolicitacoesSiteService } = require('../dist/src/solicitacoes-site/solicitacoes-site.service');
+const { CotacaoSiteWorkflowService } = require('../dist/src/solicitacoes-site/cotacao-site-workflow.service');
+const { LeadsService } = require('../dist/src/leads/leads.service');
+const { ChatsService } = require('../dist/src/chats/chats.service');
+const { TicketsService } = require('../dist/src/tickets/tickets.service');
 
 async function main() {
   const dbName = `crm_site_test_${process.pid}`;

@@ -11,13 +11,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../modules/auth/decorators/current-user.decorator';
-import { Roles } from '../modules/auth/decorators/roles.decorator';
-import { UserRole } from '../modules/auth/enums/user-role.enum';
-import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../modules/auth/guards/roles.guard';
-import type { AuthUser } from '../modules/auth/types/auth-user.type';
-import { ImportManualReportDto } from './dto/import-manual-report.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../auth/enums/user-role.enum';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthUser } from '../auth/types/auth-user.type';
+import { ImportManualReportDto } from './dtos/import-manual-report.dto';
 import { ManualReportsService } from './manual-reports.service';
 
 @ApiTags('Métricas de Marketing')

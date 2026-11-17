@@ -1,3 +1,25 @@
+## Organização do backend
+
+Os módulos de negócio ficam diretamente em `src/<nome-do-modulo>/`, com controller, module, service, testes e `dtos/` quando necessário. Os nomes de classes e as rotas existentes foram preservados nesta reorganização.
+
+Consulte [a estrutura e as convenções do backend](docs/estrutura-backend.md) antes de adicionar ou mover funcionalidades.
+
+O [BI Comercial por responsável](docs/bi-comercial.md) utiliza vínculo por ID de usuário, com escopo obrigatório por consultora e migração auditada dos nomes antigos.
+
+O monitoramento de entregas usa uma conexão própria com PostgreSQL, configurada por `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD`. Para servidores que exigem criptografia, configure `DB_SSL=true` no `.env` e reinicie o backend. O certificado do servidor é validado. Essa configuração é independente de `DATABASE_URL`, usada pelo Prisma para o banco do CRM.
+
+## Criar um administrador
+
+Com `DATABASE_URL` configurada no `.env`, o cliente Prisma gerado e as migrações aplicadas, execute na raiz do backend:
+
+```sh
+npm run usuario:criar-admin
+```
+
+O comando solicita nome, e-mail e senha (oculta, com confirmação). Cria um usuário ativo com `role: ADMIN` e `roles: [ADMIN]`, senha armazenada como hash bcrypt e troca obrigatória no primeiro acesso. Não sobrescreve contas existentes. A API não precisa estar em execução. No PowerShell com restrição de scripts, use `npm.cmd run usuario:criar-admin`.
+
+Para validar o script sem acessar o banco: `node --test scripts/criar-admin.test.cjs`.
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
