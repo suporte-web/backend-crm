@@ -9,8 +9,9 @@ import {
   IsString,
 } from 'class-validator';
 import { UserRole } from '@prisma/client';
+import { DadosSegmentoDto } from '../../segmentos/dtos/segmento.dto';
 
-export class UpdateUserDto {
+export class UpdateUserDto extends DadosSegmentoDto {
   @IsOptional()
   @IsString()
   name?: string;

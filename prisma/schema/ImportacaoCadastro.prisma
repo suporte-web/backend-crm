@@ -1,0 +1,20 @@
+model ImportacaoCadastro {
+  id                   String   @id @default(uuid())
+  arquivo              String
+  hashArquivo          String
+  aba                  String
+  usuarioId            String
+  usuario              User     @relation("AutorImportacaoCadastro", fields: [usuarioId], references: [id], onDelete: Restrict)
+  responsavelId        String
+  responsavel          User     @relation("ResponsavelImportacaoCadastro", fields: [responsavelId], references: [id], onDelete: Restrict)
+  empresaConsultoraId  String?
+  empresaConsultora    EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
+  linhas               Json
+  resultado            Json?
+  status               String   @default("PREVIA")
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+  completedAt          DateTime?
+  @@index([usuarioId, createdAt])
+  @@index([empresaConsultoraId, createdAt])
+}

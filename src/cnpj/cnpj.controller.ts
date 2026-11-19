@@ -5,6 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { CnpjService } from './cnpj.service';
+import { SegmentosService } from '../segmentos/segmentos.service';
 
 @ApiTags('CNPJ')
 @ApiBearerAuth()
@@ -12,7 +13,10 @@ import { CnpjService } from './cnpj.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.GESTAO, UserRole.COMERCIAL, UserRole.MARKETING, UserRole.CONSULTORA)
 export class CnpjController {
-  constructor(private readonly service: CnpjService) {}
+  constructor(private readonly service: CnpjService, private readonly segmentos: SegmentosService) {}
   @Get(':cnpj')
-  consultar(@Param('cnpj') cnpj: string) { return this.service.consultar(cnpj); }
+  async consultar(@Param('cnpj') cnpj: string) {
+    const dados = await this.service.consultar(cnpj);
+    return { ...dados, ...(await this.segmentos.classificar(dados.cnae)) };
+  }
 }

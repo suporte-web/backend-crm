@@ -1,4 +1,5 @@
 model EmpresaConsultora {
+  importacoesCadastros ImportacaoCadastro[]
   id        String   @id @default(uuid())
   nome      String
   cnpj      String?  @unique

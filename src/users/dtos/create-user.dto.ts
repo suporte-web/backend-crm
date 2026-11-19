@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UserRole } from '@prisma/client';
+import { DadosSegmentoDto } from '../../segmentos/dtos/segmento.dto';
 
 export class CreateClientContactDto {
   @IsOptional()
@@ -40,7 +41,7 @@ export class CreateClientContactDto {
   isPrimary?: boolean;
 }
 
-export class CreateUserDto {
+export class CreateUserDto extends DadosSegmentoDto {
   @IsString()
   name!: string;
 

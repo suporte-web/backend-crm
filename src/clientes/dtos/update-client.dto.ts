@@ -7,8 +7,9 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateClientContactDto } from './create-client.dto';
+import { DadosSegmentoDto } from '../../segmentos/dtos/segmento.dto';
 
-export class UpdateClientDto {
+export class UpdateClientDto extends DadosSegmentoDto {
   @IsOptional()
   @IsString()
   name?: string;

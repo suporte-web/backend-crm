@@ -1,4 +1,5 @@
 import { validarEmpresaLead } from '../common/empresa-consultora-access';
+import { resolverSegmentoCadastro } from '../segmentos/segmentos.service';
 import { assertSiteLeadAccess, siteLeadScope } from '../solicitacoes-site/site-workflow-access';
 import { garantirCadastroLead, removerCadastroLead } from '../common/cadastros';
 import { hasAnyRole } from '../common/user-roles';
@@ -1137,6 +1138,7 @@ async listarObservacoes(
 
     return this.prisma.$transaction(async (tx) => {
       const updatedLead = await tx.lead.update({
+        // O segmento do acompanhamento acompanha o cadastro canônico.
         where: { id: leadId },
         data: {
           ...(name !== undefined ? { name } : {}),
@@ -1197,15 +1199,22 @@ async listarObservacoes(
       });
 
       if (updatedLead.cadastroId) {
+        const cadastroSegmento = await tx.client.findUnique({ where: { id: updatedLead.cadastroId } });
+        const classificacao = await resolverSegmentoCadastro(tx, dto, cadastroSegmento ?? undefined);
         await tx.client.update({
           where: { id: updatedLead.cadastroId },
           data: {
             companyName: updatedLead.company || updatedLead.name,
             phone: updatedLead.phone,
             notes: updatedLead.notes,
-            ...(dto.segment !== undefined ? { segment: dto.segment } : {}),
+            ...classificacao,
+            ...(dto.siteUrl !== undefined ? { siteUrl: dto.siteUrl || null } : {}),
           },
         });
+        if (classificacao.segment !== undefined) {
+          const canonico = await tx.lead.update({ where: { id: leadId }, data: { metadata: { ...(metadata as Prisma.InputJsonObject), segment: classificacao.segment } } });
+          updatedLead.metadata = canonico.metadata;
+        }
         await tx.clientContact.updateMany({
           where: { clientId: updatedLead.cadastroId, isPrimary: true },
           data: {

@@ -4,9 +4,10 @@ import axios from 'axios';
 import { CNPJ_HTTP, CnpjHttp } from './cnpj.types';
 import { CnpjController } from './cnpj.controller';
 import { CnpjService } from './cnpj.service';
+import { SegmentosModule } from '../segmentos/segmentos.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, SegmentosModule],
   controllers: [CnpjController],
   providers: [CnpjService, {
     provide: CNPJ_HTTP,

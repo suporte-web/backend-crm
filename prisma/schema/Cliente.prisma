@@ -1,4 +1,9 @@
 model Client {
+  segmentoId String?
+  segmento Segmento? @relation(fields: [segmentoId], references: [id], onDelete: Restrict)
+  segmentoOrigem OrigemSegmento?
+  chaveImportacao String? @unique
+  siteUrl String?
   empresaConsultoraId String?
   empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
@@ -56,6 +61,7 @@ model Client {
   trackings        Tracking[]
 
   @@index([internalOwnerId])
+  @@index([segmentoId])
   @@index([responsavelId, createdAt])
   @@index([empresaConsultoraId, createdAt])
   @@index([prospectedById, createdAt])

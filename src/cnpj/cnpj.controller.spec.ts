@@ -7,6 +7,7 @@ import { CnpjModule } from './cnpj.module';
 import { CNPJ_HTTP } from './cnpj.types';
 import { JwtStrategy } from '../auth/strategies/jwt.strategy';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('Rota CNPJ com autenticação e autorização existentes', () => {
   let app: INestApplication;
@@ -19,6 +20,7 @@ describe('Rota CNPJ com autenticação e autorização existentes', () => {
       imports: [ConfigModule, CnpjModule],
       providers: [JwtStrategy, { provide: UsersService, useValue: users }],
     }).overrideProvider(ConfigService).useValue(new ConfigService({ JWT_SECRET: 'somente-testes-cnpj' }))
+      .overrideProvider(PrismaService).useValue({ regraSegmentoCnae: { findMany: jest.fn().mockResolvedValue([]) } })
       .overrideProvider(CNPJ_HTTP).useValue(http).compile();
     app = module.createNestApplication(); app.setGlobalPrefix('api'); await app.init();
   });

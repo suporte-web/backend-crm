@@ -7,6 +7,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DadosSegmentoDto } from '../../segmentos/dtos/segmento.dto';
 
 export class CreateClientContactDto {
   @IsOptional()
@@ -54,7 +55,7 @@ export class CreateClientContactDto {
   isPrimary?: boolean;
 }
 
-export class CreateClientDto {
+export class CreateClientDto extends DadosSegmentoDto {
   @IsOptional()
   @IsString()
   name?: string;

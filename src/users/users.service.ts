@@ -1,4 +1,5 @@
 import { capturarProspeccao } from '../common/prospeccao';
+import { resolverSegmentoCadastro } from '../segmentos/segmentos.service';
 import { getUserRoles, normalizeUserRoles } from '../common/user-roles';
 import {
   BadRequestException,
@@ -85,6 +86,7 @@ export class UsersService {
   const roles = normalizeUserRoles(dto.roles ?? (dto.role ? [dto.role] : []));
   dto.role = roles[0];
   const isClient = dto.role === UserRole.CLIENTE;
+  const classificacao = isClient ? await resolverSegmentoCadastro(this.prisma, dto) : {};
 
   const email =
     dto.email?.trim() ||
@@ -160,6 +162,8 @@ export class UsersService {
                 invoiceContactPhone: dto.invoiceContactPhone,
                 commercialTermsNotes: dto.commercialTermsNotes,
                 segment: dto.segment,
+                ...classificacao,
+                siteUrl: dto.siteUrl || null,
                 status: dto.status ?? 'PENDENTE',
                 internalOwnerId: dto.internalOwnerId ?? actor?.sub,
                 contacts:
@@ -610,6 +614,7 @@ export class UsersService {
       roles?.includes(UserRole.CLIENTE) ||
       existingUser.role === UserRole.CLIENTE ||
       !!existingUser.clientProfile;
+    const classificacao = shouldManageClientProfile ? await resolverSegmentoCadastro(this.prisma, dto, existingUser.clientProfile ?? undefined) : {};
 
     const updatedUser = await this.prisma.user.update({
       where: { id },
@@ -648,6 +653,8 @@ export class UsersService {
                 invoiceContactPhone: dto.invoiceContactPhone,
                 commercialTermsNotes: dto.commercialTermsNotes,
                 segment: dto.segment,
+                ...classificacao,
+                ...(dto.siteUrl !== undefined ? { siteUrl: dto.siteUrl || null } : {}),
                 status: dto.status,
                 internalOwnerId: dto.internalOwnerId,
               },
@@ -677,6 +684,8 @@ export class UsersService {
                 invoiceContactPhone: dto.invoiceContactPhone,
                 commercialTermsNotes: dto.commercialTermsNotes,
                 segment: dto.segment,
+                ...classificacao,
+                ...(dto.siteUrl !== undefined ? { siteUrl: dto.siteUrl || null } : {}),
                 status: dto.status,
                 internalOwnerId: dto.internalOwnerId,
               },

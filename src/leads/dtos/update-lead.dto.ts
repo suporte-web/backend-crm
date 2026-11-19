@@ -1,6 +1,9 @@
 import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { DadosSegmentoDto } from '../../segmentos/dtos/segmento.dto';
 
-export class UpdateLeadDto {
+export class UpdateLeadDto extends DadosSegmentoDto {
+  @IsOptional() @IsString()
+  cnae?: string;
   @IsOptional()
   @IsString()
   name?: string;

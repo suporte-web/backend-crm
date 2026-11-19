@@ -1,6 +1,7 @@
 import { consultaValorPropostaComercial, valorPropostaComercial } from '../common/valor-proposta-comercial';
 import { resolverPerda, historicoPerda, descricaoPerda, type DadosPerda } from '../oportunidades/motivos-perda';
 import { hasAnyRole } from '../common/user-roles';
+import { resolverSegmentoCadastro } from '../segmentos/segmentos.service';
 import { excluirCadastroComHistorico } from '../common/exclusao-cadastros';
 import { normalizarContatoLead, sincronizarContatoLead } from '../common/cadastros';
 import { assertOpportunityAccess, assertOpportunityOwner, isConsultora } from '../common/opportunity-access';
@@ -499,6 +500,9 @@ export class ClientsService {
           commercialTermsNotes:
             this.sanitize(dto.commercialTermsNotes) ?? undefined,
           segment: this.sanitize(dto.segment) ?? undefined,
+          segmentoId: dto.segmentoId,
+          segmentoAutomatico: dto.segmentoAutomatico,
+          siteUrl: dto.siteUrl,
           status: this.sanitize(dto.status) ?? 'PENDENTE',
           internalOwnerId: this.sanitize(dto.internalOwnerId) ?? user.sub,
           contacts: dto.contacts,
@@ -713,6 +717,7 @@ export class ClientsService {
         invoiceContactPhone: client.invoiceContactPhone,
         commercialTermsNotes: client.commercialTermsNotes,
         segment: client.segment,
+        segmentoId: client.segmentoId, segmentoOrigem: client.segmentoOrigem, siteUrl: client.siteUrl,
         notes: client.notes,
         status: client.status,
         internalOwnerId: client.internalOwnerId,
@@ -815,6 +820,7 @@ export class ClientsService {
         invoiceContactPhone: client.invoiceContactPhone,
         commercialTermsNotes: client.commercialTermsNotes,
         segment: client.segment,
+        segmentoId: client.segmentoId, segmentoOrigem: client.segmentoOrigem, siteUrl: client.siteUrl,
         notes: client.notes,
         status: client.status,
         internalOwnerId: client.internalOwnerId,
@@ -1583,6 +1589,9 @@ export class ClientsService {
     ].filter(Boolean);
 
     const updatedClient = await this.prisma.$transaction(async (tx) => {
+      const classificacao = await resolverSegmentoCadastro(tx, dto, existingClient);
+      if ((classificacao.segment !== undefined && classificacao.segment !== existingClient.segment) || (classificacao.segmentoOrigem !== undefined && classificacao.segmentoOrigem !== existingClient.segmentoOrigem)) changedFields.push('segmento padronizado');
+      if (dto.siteUrl !== undefined && dto.siteUrl !== (existingClient.siteUrl || '')) changedFields.push('site/link');
       if (existingClient.userId) {
         await tx.user.update({
           where: {
@@ -1621,6 +1630,8 @@ export class ClientsService {
           invoiceContactPhone: dto.invoiceContactPhone,
           commercialTermsNotes: dto.commercialTermsNotes,
           segment: dto.segment,
+          ...classificacao,
+          ...(dto.siteUrl !== undefined ? { siteUrl: dto.siteUrl || null } : {}),
           notes: dto.notes,
           status: dto.status,
           internalOwnerId: dto.internalOwnerId,
@@ -1653,7 +1664,7 @@ export class ClientsService {
           ...(principal ? { email: principal.email, phone: principal.phone || updatedClient.phone } : { phone: updatedClient.phone }),
           ...normalizarContatoLead(principal ? principal.email : leadVinculado.email, principal?.phone || updatedClient.phone),
           notes: updatedClient.notes,
-          metadata: { ...metadata, ...(dto.segment !== undefined ? { segment: dto.segment } : {}) },
+          metadata: { ...metadata, ...(classificacao.segment !== undefined ? { segment: classificacao.segment } : {}) },
           updatedById: user.sub,
         } });
       }

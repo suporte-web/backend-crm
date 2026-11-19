@@ -1,0 +1,30 @@
+model Segmento {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nome      String   @unique
+  aliases   String[] @default([])
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  regras    RegraSegmentoCnae[]
+  cadastros Client[]
+}
+
+model RegraSegmentoCnae {
+  id         String   @id @default(uuid())
+  prefixo    String   @unique
+  descricao  String?
+  segmentoId String
+  segmento   Segmento @relation(fields: [segmentoId], references: [id], onDelete: Restrict)
+  ativa      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([segmentoId])
+}
+
+enum OrigemSegmento {
+  CNAE
+  MANUAL
+  IMPORTACAO
+  LEGADO
+}

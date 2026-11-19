@@ -1,6 +1,8 @@
 import { VisitasModule } from './visitas/visitas.module';
 import { BiComercialModule } from './bi-comercial/bi-comercial.module';
 import { EmpresasConsultorasModule } from './empresas-consultoras/empresas-consultoras.module';
+import { SegmentosModule } from './segmentos/segmentos.module';
+import { ImportacoesCadastrosModule } from './importacoes-cadastros/importacoes-cadastros.module';
 import { AtendimentoSacModule } from './atendimento-sac/atendimento-sac.module';
 import { Module } from '@nestjs/common';
 import { CnpjModule } from './cnpj/cnpj.module';
@@ -39,6 +41,8 @@ import { AppController } from './app.controller';
 @Module({
   imports: [
     EmpresasConsultorasModule,
+    SegmentosModule,
+    ImportacoesCadastrosModule,
     ConfigModule.forRoot({ isGlobal: true }),
     CnpjModule,
     PrismaModule,

@@ -1,4 +1,6 @@
 model User {
+  importacoesCadastros ImportacaoCadastro[] @relation("AutorImportacaoCadastro")
+  importacoesCadastrosResponsavel ImportacaoCadastro[] @relation("ResponsavelImportacaoCadastro")
   empresaConsultoraId String?
   empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   cadastrosResponsavelComercial Client[] @relation("ResponsavelComercialCadastro")

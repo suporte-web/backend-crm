@@ -495,6 +495,11 @@ model Chat {
 
 // ----- Cliente.prisma -----
 model Client {
+  segmentoId String?
+  segmento Segmento? @relation(fields: [segmentoId], references: [id], onDelete: Restrict)
+  segmentoOrigem OrigemSegmento?
+  chaveImportacao String? @unique
+  siteUrl String?
   empresaConsultoraId String?
   empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   solicitacoesSite SolicitacaoSite[] @relation("SolicitacaoSiteClient")
@@ -552,6 +557,7 @@ model Client {
   trackings        Tracking[]
 
   @@index([internalOwnerId])
+  @@index([segmentoId])
   @@index([responsavelId, createdAt])
   @@index([empresaConsultoraId, createdAt])
   @@index([prospectedById, createdAt])
@@ -700,6 +706,7 @@ model ChatMessageRecipient {
 
 // ----- EmpresaConsultora.prisma -----
 model EmpresaConsultora {
+  importacoesCadastros ImportacaoCadastro[]
   id        String   @id @default(uuid())
   nome      String
   cnpj      String?  @unique
@@ -784,6 +791,28 @@ model TicketHistory {
   @@index([ticketId, createdAt])
   @@index([eventType, createdAt])
   @@index([createdById, createdAt])
+}
+
+// ----- ImportacaoCadastro.prisma -----
+model ImportacaoCadastro {
+  id                   String   @id @default(uuid())
+  arquivo              String
+  hashArquivo          String
+  aba                  String
+  usuarioId            String
+  usuario              User     @relation("AutorImportacaoCadastro", fields: [usuarioId], references: [id], onDelete: Restrict)
+  responsavelId        String
+  responsavel          User     @relation("ResponsavelImportacaoCadastro", fields: [responsavelId], references: [id], onDelete: Restrict)
+  empresaConsultoraId  String?
+  empresaConsultora    EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
+  linhas               Json
+  resultado            Json?
+  status               String   @default("PREVIA")
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+  completedAt          DateTime?
+  @@index([usuarioId, createdAt])
+  @@index([empresaConsultoraId, createdAt])
 }
 
 // ----- ImportacaoLead.prisma -----
@@ -1303,6 +1332,38 @@ model LeadImportRowResult {
   @@index([leadId])
 }
 
+// ----- Segmento.prisma -----
+model Segmento {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nome      String   @unique
+  aliases   String[] @default([])
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  regras    RegraSegmentoCnae[]
+  cadastros Client[]
+}
+
+model RegraSegmentoCnae {
+  id         String   @id @default(uuid())
+  prefixo    String   @unique
+  descricao  String?
+  segmentoId String
+  segmento   Segmento @relation(fields: [segmentoId], references: [id], onDelete: Restrict)
+  ativa      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([segmentoId])
+}
+
+enum OrigemSegmento {
+  CNAE
+  MANUAL
+  IMPORTACAO
+  LEGADO
+}
+
 // ----- site-institucional.prisma -----
 model PaginaSite {
   id   String @id @default(uuid())
@@ -1522,6 +1583,8 @@ model Ticket {
 
 // ----- Usuario.prisma -----
 model User {
+  importacoesCadastros ImportacaoCadastro[] @relation("AutorImportacaoCadastro")
+  importacoesCadastrosResponsavel ImportacaoCadastro[] @relation("ResponsavelImportacaoCadastro")
   empresaConsultoraId String?
   empresaConsultora EmpresaConsultora? @relation(fields: [empresaConsultoraId], references: [id], onDelete: Restrict)
   cadastrosResponsavelComercial Client[] @relation("ResponsavelComercialCadastro")

@@ -26,6 +26,8 @@ banco('Carteiras de empresas consultoras no banco local', () => {
           const sql = readFileSync(resolve('prisma/migrations/20261118100000_empresas_consultoras/migration.sql'), 'utf8');
           for (const comando of sql.split(';').map(item => item.trim()).filter(Boolean)) await tx.$executeRawUnsafe(comando);
         }
+        const [catalogo] = await tx.$queryRawUnsafe<Array<{ tabela: string | null }>>(`SELECT to_regclass('public."Segmento"')::text AS tabela`);
+        if (!catalogo.tabela) for (const comando of readFileSync(resolve('prisma/migrations/20261118120000_segmentos_importacao_cadastros/migration.sql'), 'utf8').split(';').map(item => item.trim()).filter(Boolean)) await tx.$executeRawUnsafe(comando);
         const db = new Proxy(tx, { get: (target, prop) => prop === '$transaction' ? (fn: (value: typeof tx) => unknown) => fn(tx) : Reflect.get(target, prop) }) as unknown as PrismaService;
         const novoUsuario = (name: string, role: UserRole, empresaConsultoraId?: string) => tx.user.create({ data: { name, email: `${randomUUID()}@example.test`, passwordHash: 'teste-sem-login', role, roles: [role], empresaConsultoraId } });
         const gestor = await novoUsuario('Gestor teste', UserRole.ADMIN);

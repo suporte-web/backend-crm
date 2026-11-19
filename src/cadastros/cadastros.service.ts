@@ -20,6 +20,7 @@ import {
 import { hasAnyRole } from '../common/user-roles';
 import { filtroEmpresaConsultora, validarEmpresaCadastro } from '../common/empresa-consultora-access';
 import { capturarProspeccao } from '../common/prospeccao';
+import { resolverSegmentoCadastro } from '../segmentos/segmentos.service';
 import { validarFotoCadastro } from '../common/foto-cadastro';
 import { listarResponsaveisComerciais, resolverResponsavelComercial } from './responsavel-comercial';
 import type { AuthUser } from '../auth/types/auth-user.type';
@@ -234,6 +235,8 @@ export class CadastrosService {
       volumeMensalEstimado,
       fotoUrl,
       dadosLead,
+      segmentoId,
+      segmentoAutomatico,
       contacts,
       name,
       registrationDate,
@@ -257,10 +260,12 @@ export class CadastrosService {
       return await this.prisma.$transaction(async (tx) => {
         const origem = await capturarProspeccao(tx, user);
         const vinculo = await resolverResponsavelComercial(tx, user, responsavelId ?? (hasAnyRole(user, ['CONSULTORA']) ? user.sub : undefined));
+        const classificacao = await resolverSegmentoCadastro(tx, { cnae: campos.cnae, segment: campos.segment, segmentoId, segmentoAutomatico });
         const empresaConsultoraId = vinculo?.empresaConsultoraId ?? null;
         const nomeResponsavel = vinculo?.name ?? responsavel;
         const dados = {
           ...campos,
+          ...classificacao,
           ...(vinculo ? { responsavelId: vinculo.id } : {}),
           empresaConsultoraId,
           companyName: nome,
@@ -332,7 +337,7 @@ export class CadastrosService {
               source: source || 'manual',
               status: etapaFunil || status || 'entrada_leads',
               notes: notes || campos.notes,
-              metadata: { ...extras, ...this.dadosComerciais({ proximaAcao, responsavel: nomeResponsavel, volumeMensalEstimado, fotoUrl }) },
+              metadata: { ...extras, segment: classificacao.segment !== undefined ? classificacao.segment : campos.segment ?? null, ...this.dadosComerciais({ proximaAcao, responsavel: nomeResponsavel, volumeMensalEstimado, fotoUrl }) },
               createdById: user.sub,
               updatedById: user.sub,
               ...origem,
