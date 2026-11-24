@@ -20,6 +20,16 @@ type Filters = FiltrosProspeccaoDto & {
   tamanho?: number;
 };
 const author = { select: { id: true, name: true } } as const;
+const contatoPrincipalSelect = {
+  select: { name: true },
+  orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+  take: 1,
+} satisfies Prisma.Client$contactsArgs;
+
+function nomeContato(nome: string | null | undefined, empresas: Array<string | null | undefined>) {
+  const contato = nome?.trim();
+  return contato && !empresas.some(empresa => empresa?.trim().toLocaleLowerCase('pt-BR') === contato.toLocaleLowerCase('pt-BR')) ? contato : null;
+}
 const timeline = {
   include: { createdBy: author },
   orderBy: { createdAt: 'desc' as const },
@@ -135,6 +145,10 @@ export class GestaoProspeccoesService {
               select: {
                 id: true,
                 name: true,
+                company: true,
+                cadastro: {
+                  select: { companyName: true, tradeName: true, legalName: true, contacts: contatoPrincipalSelect },
+                },
                 status: true,
                 createdAt: true,
                 updatedAt: true,
@@ -151,6 +165,7 @@ export class GestaoProspeccoesService {
               select: {
                 id: true,
                 nomeRazaoSocial: true,
+                nomeContato: true,
                 statusCadastral: true,
                 sourceLeadId: true,
                 convertedLeads: {
@@ -187,6 +202,7 @@ export class GestaoProspeccoesService {
                 companyName: true,
                 tradeName: true,
                 legalName: true,
+                contacts: contatoPrincipalSelect,
                 status: true,
                 createdAt: true,
                 updatedAt: true,
@@ -222,10 +238,13 @@ export class GestaoProspeccoesService {
         clientEnabled ? this.prisma.client.count({ where: clientWhere }) : 0,
       ]);
     const records = [
-      ...leads.map((item) => ({
+      ...leads.map(({ cadastro, ...item }) => ({
         ...item,
+        id: item.id,
+        createdAt: item.createdAt,
         tipo: 'LEAD' as const,
         nome: item.name,
+        contatoPrincipal: nomeContato(cadastro?.contacts?.[0]?.name, [item.company, cadastro?.companyName, cadastro?.tradeName, cadastro?.legalName]) || nomeContato(item.name, [item.company, cadastro?.companyName, cadastro?.tradeName, cadastro?.legalName]),
         href: `/leads/${item.id}`,
       })),
       ...prospects.map(({ convertedLeads, sourceLead, ...item }) => {
@@ -238,10 +257,13 @@ export class GestaoProspeccoesService {
           : (convertedLeads[0] ?? sourceLead);
         return {
           ...item,
+          id: item.id,
+          createdAt: item.createdAt,
           prospectedById: origin?.prospectedById ?? null,
           prospectedByName: origin?.prospectedByName ?? null,
           tipo: 'PROSPECT' as const,
           nome: item.nomeRazaoSocial,
+          contatoPrincipal: nomeContato(item.nomeContato, [item.nomeRazaoSocial]),
           status: item.statusCadastral,
           href:
             item.sourceLeadId || convertedLeads[0]?.id
@@ -249,7 +271,7 @@ export class GestaoProspeccoesService {
               : null,
         };
       }),
-      ...clients.map(({ sourceLead, sourceProspect, ...item }) => {
+      ...clients.map(({ sourceLead, sourceProspect, contacts, ...item }) => {
         const origin = [
           item,
           sourceLead,
@@ -264,9 +286,12 @@ export class GestaoProspeccoesService {
         );
         return {
           ...item,
+          id: item.id,
+          createdAt: item.createdAt,
           prospectedById: origin?.prospectedById ?? null,
           prospectedByName: origin?.prospectedByName ?? null,
           tipo: 'CLIENTE' as const,
+          contatoPrincipal: nomeContato(contacts?.[0]?.name, [item.tradeName, item.companyName, item.legalName]),
           nome:
             item.tradeName || item.companyName || item.legalName || 'Cliente',
           href: `/clientes/${item.id}`,

@@ -35,6 +35,26 @@ describe('Gestão de Prospecções', () => {
     service = module.get(GestaoProspeccoesService);
   });
 
+  it('separa contato principal da empresa para leads, prospects e clientes', async () => {
+    prisma.lead.findMany.mockResolvedValue([
+      { id: 'l1', name: 'Empresa A', company: 'Empresa A', createdAt: date, cadastro: { companyName: 'Empresa A', contacts: [{ name: 'Maria' }] } },
+      { id: 'l2', name: 'Empresa B', company: 'Empresa B', createdAt: date },
+      { id: 'l3', name: 'Carlos', company: 'Empresa C', createdAt: date },
+    ]);
+    prisma.prospect.findMany.mockResolvedValue([
+      { id: 'p1', nomeRazaoSocial: 'Empresa D', nomeContato: 'Ana', createdAt: date, convertedLeads: [] },
+    ]);
+    prisma.client.findMany.mockResolvedValue([
+      { id: 'c1', companyName: 'Empresa E', contacts: [{ name: 'Joana' }], createdAt: date },
+      { id: 'c2', companyName: 'Empresa F', contacts: [], createdAt: date },
+    ]);
+    const resultado = await service.listar(comercial, {});
+    const contatos = Object.fromEntries(resultado.registros.map(item => [item.id, item.contatoPrincipal]));
+    expect(contatos).toEqual({ l1: 'Maria', l2: null, l3: 'Carlos', p1: 'Ana', c1: 'Joana', c2: null });
+    expect(prisma.client.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({ contacts: expect.objectContaining({ orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }], take: 1 }) }),
+    }));
+  });
   it.each([
     UserRole.CONSULTORA,
     UserRole.MARKETING,
