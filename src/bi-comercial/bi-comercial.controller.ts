@@ -14,7 +14,10 @@ export class BiComercialController {
   constructor(private readonly service: BiComercialService) {}
 
   @Get()
-  consultar(@CurrentUser() user: AuthUser, @Query() filtros: ConsultarBiComercialDto) {
+  consultar(
+    @CurrentUser() user: AuthUser,
+    @Query() filtros: ConsultarBiComercialDto,
+  ) {
     return this.service.consultar(user, filtros);
   }
 }

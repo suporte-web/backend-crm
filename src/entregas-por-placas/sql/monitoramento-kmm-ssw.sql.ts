@@ -297,6 +297,7 @@ export function buildCtrcsSswPorNfQuery(nfs: number[]): SqlQuery {
         ult_ocor,
         data_ult_ocor,
         hora_ult_ocor,
+        data_prev_ent,
         data_entrega,
         hora_entrega
       from (
@@ -308,6 +309,7 @@ export function buildCtrcsSswPorNfQuery(nfs: number[]): SqlQuery {
           ctrc.ult_ocor,
           ctrc.data_ult_ocor,
           ctrc.hora_ult_ocor,
+          to_char(ctrc.data_prev_ent, 'YYYY-MM-DD') as data_prev_ent,
           ctrc.data_entrega,
           ctrc.hora_entrega,
           row_number() over (

@@ -22,7 +22,6 @@ import { ForgotPasswordDto } from './dtos/forgot-password.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { MailService } from '../mail/mail.service';
 
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -31,7 +30,7 @@ export class AuthService {
     private readonly auditLogsService: AuditLogsService,
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   async login(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
@@ -220,7 +219,9 @@ export class AuthService {
     }
 
     if (resetToken.usedAt) {
-      throw new BadRequestException('Este link de recuperação já foi utilizado.');
+      throw new BadRequestException(
+        'Este link de recuperação já foi utilizado.',
+      );
     }
 
     if (resetToken.expiresAt < new Date()) {

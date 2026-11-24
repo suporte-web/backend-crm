@@ -97,6 +97,7 @@ type SswCtrcRow = QueryResultRow & {
   ult_ocor: string | null;
   data_ult_ocor: string | Date | null;
   hora_ult_ocor: string | null;
+  data_prev_ent: string | null;
   data_entrega: string | Date | null;
   hora_entrega: string | null;
 };
@@ -115,6 +116,8 @@ type MonitoramentoEntregasPorPlacasRow = {
   modelo: string | null;
   nome_motorista: string | null;
   data_monitoramento: string | null;
+  data_prev_ent: string | null;
+  pendentes_sem_previsao: number;
   qtd_ctrcs: number;
   entregues: number;
   faltam: number;
@@ -1132,9 +1135,12 @@ private async buscarEventosDiaKmm(data: string) {
     const qtdCtrcs = rota.documentos.size;
     let entregues = 0;
     let encontradosSsw = 0;
+    const previsoesPendentes: string[] = [];
+    let pendentesSemPrevisao = 0;
 
     for (const documento of rota.documentos.values()) {
       if (documento.nfMinima === null) {
+        pendentesSemPrevisao += 1;
         continue;
       }
 
@@ -1146,7 +1152,19 @@ private async buscarEventosDiaKmm(data: string) {
 
       if (ctrcs.some((ctrc) => ctrc.data_entrega != null)) {
         entregues += 1;
+        continue;
       }
+
+      // A data vem do campo DATE do SSW em YYYY-MM-DD, sem conversão de fuso.
+      // Mantém a mesma unidade de contagem dos indicadores: documento KMM.
+      const previsoes = ctrcs.flatMap((ctrc) => {
+        const previsao = ctrc.data_prev_ent?.trim();
+        if (!previsao || !/^\d{4}-\d{2}-\d{2}$/.test(previsao)) return [];
+        const date = new Date(`${previsao}T00:00:00.000Z`);
+        return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === previsao ? [previsao] : [];
+      });
+      if (previsoes.length) previsoesPendentes.push(...previsoes);
+      else pendentesSemPrevisao += 1;
     }
 
     const faltam = Math.max(qtdCtrcs - entregues, 0);
@@ -1172,6 +1190,8 @@ private async buscarEventosDiaKmm(data: string) {
       modelo: null,
       nome_motorista: rota.nomeMotorista,
       data_monitoramento: data,
+      data_prev_ent: previsoesPendentes.sort()[0] ?? null,
+      pendentes_sem_previsao: pendentesSemPrevisao,
       qtd_ctrcs: qtdCtrcs,
       entregues,
       faltam,

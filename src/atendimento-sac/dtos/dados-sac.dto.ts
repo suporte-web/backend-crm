@@ -25,6 +25,7 @@ export class FiltroSacDto {
   @IsString()
   @MaxLength(50)
   protocolo?: string;
+
   @ApiPropertyOptional({
     description: 'Tipo de manifestação recebida.',
     type: String,
@@ -33,6 +34,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsIn(['RECLAMACAO', 'ELOGIO'])
   tipo?: string;
+
   @ApiPropertyOptional({
     description: 'Status atual do atendimento.',
     type: String,
@@ -41,6 +43,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsEnum(StatusAtendimentoSac)
   status?: StatusAtendimentoSac;
+
   @ApiPropertyOptional({
     description: 'Identificador do usuário responsável pelo atendimento.',
     type: String,
@@ -49,6 +52,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsUUID()
   atendenteId?: string;
+
   @ApiPropertyOptional({
     description: 'Identificador do usuário responsável pela ação corretiva.',
     type: String,
@@ -57,6 +61,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsUUID()
   responsavelAcaoId?: string;
+
   @ApiPropertyOptional({
     description: 'Área relacionada à manifestação.',
     type: String,
@@ -66,6 +71,7 @@ export class FiltroSacDto {
   @IsString()
   @MaxLength(150)
   area?: string;
+
   @ApiPropertyOptional({
     description: 'Data inicial do período de consulta, em formato ISO 8601.',
     type: String,
@@ -73,6 +79,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsDateString()
   inicio?: string;
+
   @ApiPropertyOptional({
     description: 'Data final do período de consulta, em formato ISO 8601.',
     type: String,
@@ -80,6 +87,7 @@ export class FiltroSacDto {
   @IsOptional()
   @IsDateString()
   fim?: string;
+
   @ApiPropertyOptional({
     description:
       'Número da página, informado como texto numérico na query string.',
@@ -90,6 +98,7 @@ export class FiltroSacDto {
   @Matches(/^\d{1,6}$/)
   pagina?: string;
 }
+
 export class DirecionarSacDto {
   @ApiProperty({
     description: 'Identificador do usuário responsável pelo atendimento.',
@@ -98,6 +107,7 @@ export class DirecionarSacDto {
   })
   @IsUUID()
   atendenteId!: string;
+
   @ApiPropertyOptional({
     description: 'Observação a registrar no histórico do atendimento.',
     type: String,
@@ -109,6 +119,7 @@ export class DirecionarSacDto {
   @MaxLength(4000)
   observacao?: string;
 }
+
 export class ClassificarSacDto {
   @ApiProperty({
     description: 'Classificação da reclamação.',
@@ -121,6 +132,7 @@ export class ClassificarSacDto {
   @MinLength(2)
   @MaxLength(150)
   tipoReclamacao!: string;
+
   @ApiPropertyOptional({
     description: 'Documento relacionado à reclamação.',
     type: String,
@@ -131,6 +143,7 @@ export class ClassificarSacDto {
   @IsString()
   @MaxLength(150)
   documento?: string;
+
   @ApiProperty({
     description: 'Motivo registrado nesta etapa do atendimento.',
     type: String,
@@ -142,6 +155,7 @@ export class ClassificarSacDto {
   @MinLength(3)
   @MaxLength(4000)
   motivo!: string;
+
   @ApiProperty({
     description: 'Área relacionada à manifestação.',
     type: String,
@@ -153,6 +167,7 @@ export class ClassificarSacDto {
   @MinLength(2)
   @MaxLength(150)
   area!: string;
+
   @ApiProperty({
     description: 'Identificador do usuário responsável pela ação corretiva.',
     type: String,
@@ -160,12 +175,14 @@ export class ClassificarSacDto {
   })
   @IsUUID()
   responsavelAcaoId!: string;
+
   @ApiProperty({
     description: 'Prazo da ação, em formato ISO 8601.',
     type: String,
   })
   @IsDateString()
   prazo!: string;
+
   @ApiPropertyOptional({
     description: 'Informações complementares da classificação.',
     type: String,
@@ -177,6 +194,7 @@ export class ClassificarSacDto {
   @MaxLength(4000)
   observacoesClassificacao?: string;
 }
+
 export class PlanoAcaoSacDto {
   @ApiProperty({
     description: 'Descrição da ação que será executada.',
@@ -189,6 +207,7 @@ export class PlanoAcaoSacDto {
   @MinLength(3)
   @MaxLength(4000)
   oQue!: string;
+
   @ApiProperty({
     description: 'Nome ou identificação de quem executará a ação.',
     type: String,
@@ -200,12 +219,14 @@ export class PlanoAcaoSacDto {
   @MinLength(2)
   @MaxLength(150)
   executor!: string;
+
   @ApiProperty({
     description: 'Prazo da ação, em formato ISO 8601.',
     type: String,
   })
   @IsDateString()
   prazo!: string;
+
   @ApiPropertyOptional({
     description: 'Data de execução da ação, em formato ISO 8601.',
     type: String,
@@ -213,6 +234,7 @@ export class PlanoAcaoSacDto {
   @IsOptional()
   @IsDateString()
   dataExecucao?: string;
+
   @ApiPropertyOptional({
     description: 'Informações complementares do plano de ação.',
     type: String,
@@ -223,6 +245,7 @@ export class PlanoAcaoSacDto {
   @IsString()
   @MaxLength(4000)
   observacoes?: string;
+
   @ApiPropertyOptional({
     description: 'Relato da execução e dos resultados da ação.',
     type: String,
@@ -234,6 +257,7 @@ export class PlanoAcaoSacDto {
   @MaxLength(10000)
   reporte?: string;
 }
+
 export class RncSacDto {
   @ApiProperty({
     description: 'Indica se foi gerado um registro de não conformidade (RNC).',
@@ -241,6 +265,7 @@ export class RncSacDto {
   })
   @IsBoolean()
   gerou!: boolean;
+
   @ApiPropertyOptional({
     description: 'Número do registro de não conformidade.',
     type: String,
@@ -251,6 +276,7 @@ export class RncSacDto {
   @IsString()
   @MaxLength(150)
   numero?: string;
+
   @ApiPropertyOptional({
     description: 'Data do registro de não conformidade, em formato ISO 8601.',
     type: String,
@@ -258,6 +284,7 @@ export class RncSacDto {
   @IsOptional()
   @IsDateString()
   data?: string;
+
   @ApiPropertyOptional({
     description: 'Horário do registro no formato HH:mm.',
     type: String,
@@ -266,6 +293,7 @@ export class RncSacDto {
   @IsOptional()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   hora?: string;
+
   @ApiPropertyOptional({
     description: 'Local da ocorrência.',
     type: String,
@@ -276,6 +304,7 @@ export class RncSacDto {
   @IsString()
   @MaxLength(150)
   local?: string;
+
   @ApiPropertyOptional({
     description: 'Setor relacionado ao registro.',
     type: String,
@@ -286,6 +315,7 @@ export class RncSacDto {
   @IsString()
   @MaxLength(150)
   setor?: string;
+
   @ApiPropertyOptional({
     description: 'Motivo registrado nesta etapa do atendimento.',
     type: String,
@@ -296,6 +326,7 @@ export class RncSacDto {
   @IsString()
   @MaxLength(4000)
   motivo?: string;
+
   @ApiPropertyOptional({
     description: 'Descrição detalhada do registro de não conformidade.',
     type: String,
@@ -307,6 +338,7 @@ export class RncSacDto {
   @MaxLength(10000)
   descricao?: string;
 }
+
 export class AvaliarSacDto {
   @ApiProperty({
     description: 'Indica se a conclusão da ação foi aprovada.',
@@ -314,6 +346,7 @@ export class AvaliarSacDto {
   })
   @IsBoolean()
   aprovado!: boolean;
+
   @ApiPropertyOptional({
     description: 'Motivo registrado nesta etapa do atendimento.',
     type: String,
@@ -325,6 +358,7 @@ export class AvaliarSacDto {
   @MaxLength(4000)
   motivo?: string;
 }
+
 export class ObservacaoSacDto {
   @ApiProperty({
     description: 'Observação a registrar no histórico do atendimento.',
@@ -338,6 +372,7 @@ export class ObservacaoSacDto {
   @MaxLength(4000)
   observacao!: string;
 }
+
 export class AnexoSacDto {
   @ApiProperty({
     description: 'Etapa do atendimento à qual o anexo pertence.',
@@ -346,6 +381,7 @@ export class AnexoSacDto {
   })
   @IsIn(['ANEXOS', 'CLASSIFICACAO', 'ACAO_CORRETIVA', 'RNC', 'CONCLUSAO'])
   etapa!: string;
+
   @ApiPropertyOptional({
     description:
       'Identificador da tarefa vinculada ao anexo, quando aplicável.',
@@ -355,6 +391,7 @@ export class AnexoSacDto {
   @IsOptional()
   @IsUUID()
   tarefaId?: string;
+
   @ApiPropertyOptional({
     description: 'Comentário sobre o arquivo anexado.',
     type: String,

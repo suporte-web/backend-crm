@@ -41,6 +41,7 @@ import {
   PlanoAcaoSacDto,
   RncSacDto,
 } from './dtos/dados-sac.dto';
+
 @ApiTags('Atendimento SAC')
 @ApiBearerAuth()
 @ApiExtraModels(AnexoSacDto)
@@ -55,54 +56,62 @@ import {
 @UseGuards(JwtAuthGuard, UsuarioSacGuard)
 export class AtendimentoSacController {
   constructor(private readonly sac: AtendimentoSacService) {}
-  @ApiOperation({ summary: 'Listar atendimentos do SAC com filtros' })
+
   @Get()
+  @ApiOperation({ summary: 'Listar atendimentos do SAC com filtros' })
   listar(@CurrentUser() u: UsuarioSac, @Query() q: FiltroSacDto) {
     return this.sac.listar(u, q);
   }
+
+  @Get('participantes')
   @ApiOperation({
     summary: 'Consultar participantes disponíveis para o atendimento',
   })
-  @Get('participantes')
   participantes(@CurrentUser() u: UsuarioSac) {
     return this.sac.participantes(u);
   }
-  @ApiOperation({ summary: 'Listar ações atribuídas ao usuário autenticado' })
+
   @Get('minhas-acoes')
+  @ApiOperation({ summary: 'Listar ações atribuídas ao usuário autenticado' })
   acoes(@CurrentUser() u: UsuarioSac) {
     return this.sac.minhasAcoes(u);
   }
-  @ApiOperation({ summary: 'Consultar uma ação atribuída ao usuário' })
+
   @Get('minhas-acoes/:id')
+  @ApiOperation({ summary: 'Consultar uma ação atribuída ao usuário' })
   acao(@CurrentUser() u: UsuarioSac, @Param('id', ParseUUIDPipe) id: string) {
     return this.sac.minhaAcao(u, id);
   }
-  @ApiOperation({ summary: 'Consultar os detalhes de um atendimento' })
+
   @Get(':id')
+  @ApiOperation({ summary: 'Consultar os detalhes de um atendimento' })
   detalhe(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.sac.detalhe(u, id);
   }
-  @ApiOperation({ summary: 'Consultar o histórico do atendimento' })
+
   @Get(':id/historico')
+  @ApiOperation({ summary: 'Consultar o histórico do atendimento' })
   historico(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.sac.historico(u, id);
   }
-  @ApiOperation({ summary: 'Consultar as tarefas do atendimento' })
+
   @Get(':id/tarefas')
+  @ApiOperation({ summary: 'Consultar as tarefas do atendimento' })
   tarefas(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.sac.tarefas(u, id);
   }
-  @ApiOperation({ summary: 'Atribuir o atendimento a um atendente' })
+
   @Post(':id/direcionar')
+  @ApiOperation({ summary: 'Atribuir o atendimento a um atendente' })
   direcionar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -110,18 +119,20 @@ export class AtendimentoSacController {
   ) {
     return this.sac.direcionar(u, id, d);
   }
-  @ApiOperation({ summary: 'Iniciar o atendimento' })
+
   @Post(':id/iniciar')
+  @ApiOperation({ summary: 'Iniciar o atendimento' })
   iniciar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.sac.iniciar(u, id);
   }
+
+  @Post(':id/classificar')
   @ApiOperation({
     summary: 'Classificar a manifestação e definir o responsável pela ação',
   })
-  @Post(':id/classificar')
   classificar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -129,8 +140,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.classificar(u, id, d);
   }
-  @ApiOperation({ summary: 'Registrar o início do plano de ação' })
+
   @Post(':id/acao/iniciar')
+  @ApiOperation({ summary: 'Registrar o início do plano de ação' })
   iniciarAcao(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -138,8 +150,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.plano(u, id, d, false);
   }
-  @ApiOperation({ summary: 'Salvar o plano de ação' })
+
   @Put(':id/acao')
+  @ApiOperation({ summary: 'Salvar o plano de ação' })
   salvarAcao(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -147,8 +160,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.plano(u, id, d, false);
   }
-  @ApiOperation({ summary: 'Concluir a ação corretiva' })
+
   @Post(':id/acao/concluir')
+  @ApiOperation({ summary: 'Concluir a ação corretiva' })
   concluirAcao(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -156,8 +170,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.plano(u, id, d, true);
   }
-  @ApiOperation({ summary: 'Registrar informações de não conformidade' })
+
   @Post(':id/rnc')
+  @ApiOperation({ summary: 'Registrar informações de não conformidade' })
   rnc(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -165,8 +180,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.registrarRnc(u, id, d);
   }
-  @ApiOperation({ summary: 'Avaliar a conclusão da ação' })
+
   @Post(':id/avaliar')
+  @ApiOperation({ summary: 'Avaliar a conclusão da ação' })
   avaliar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -174,8 +190,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.avaliar(u, id, d);
   }
-  @ApiOperation({ summary: 'Reabrir o atendimento com uma observação' })
+
   @Post(':id/reabrir')
+  @ApiOperation({ summary: 'Reabrir o atendimento com uma observação' })
   reabrir(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -183,8 +200,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.reabrir(u, id, d);
   }
-  @ApiOperation({ summary: 'Adicionar uma observação ao atendimento' })
+
   @Post(':id/observacoes')
+  @ApiOperation({ summary: 'Adicionar uma observação ao atendimento' })
   observar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,
@@ -192,8 +210,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.observar(u, id, d);
   }
-  @ApiOperation({ summary: 'Anexar um arquivo ao atendimento' })
+
   @Post(':id/anexos')
+  @ApiOperation({ summary: 'Anexar um arquivo ao atendimento' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -227,8 +246,9 @@ export class AtendimentoSacController {
   ) {
     return this.sac.anexar(u, id, d, f);
   }
-  @ApiOperation({ summary: 'Baixar um anexo autorizado do atendimento' })
+
   @Get(':id/anexos/:anexoId')
+  @ApiOperation({ summary: 'Baixar um anexo autorizado do atendimento' })
   async baixar(
     @CurrentUser() u: UsuarioSac,
     @Param('id', ParseUUIDPipe) id: string,

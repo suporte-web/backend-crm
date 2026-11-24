@@ -56,13 +56,16 @@ export class AtendimentoSacService {
     private readonly notificacoes: NotificationsService,
     private readonly config: ConfigService,
   ) {}
+
   private gestor(u: UsuarioSac) {
     return hasAnyRole(u, gestores);
   }
+
   private verificarPerfil(u: UsuarioSac) {
     if (!this.gestor(u) && !hasAnyRole(u, ['ATENDIMENTO']))
       throw new ForbiddenException('Acesso restrito à equipe de atendimento.');
   }
+
   private verificarAtendente(u: UsuarioSac, a: AtendimentoSac) {
     if (
       !this.gestor(u) &&
@@ -70,17 +73,20 @@ export class AtendimentoSacService {
     )
       throw new ForbiddenException('Atendimento não atribuído a você.');
   }
+
   private async registro(tx: Tx, id: string) {
     const a = await tx.atendimentoSac.findUnique({ where: { id } });
     if (!a) throw new NotFoundException('Atendimento não encontrado.');
     return a;
   }
+
   private exigirStatus(a: AtendimentoSac, permitidos: StatusAtendimentoSac[]) {
     if (!permitidos.includes(a.status))
       throw new ConflictException(
         'Esta etapa não está disponível no status atual. Atualize o atendimento.',
       );
   }
+
   private async evento(
     tx: Tx,
     a: AtendimentoSac,
@@ -106,6 +112,7 @@ export class AtendimentoSacService {
       },
     });
   }
+
   private async mudar(
     tx: Tx,
     a: AtendimentoSac,
@@ -122,6 +129,7 @@ export class AtendimentoSacService {
     await this.evento(tx, a, u, tipo, descricao, { statusNovo: status });
     a.status = status;
   }
+
   private async tarefa(
     tx: Tx,
     a: AtendimentoSac,
@@ -147,6 +155,7 @@ export class AtendimentoSacService {
     await this.evento(tx, a, u, 'TAREFA_CRIADA', titulo, { tarefaId: t.id });
     return t;
   }
+
   private async iniciarTarefas(
     tx: Tx,
     a: AtendimentoSac,
@@ -201,6 +210,7 @@ export class AtendimentoSacService {
       );
     }
   }
+
   private async transacao<T>(operacao: (tx: Tx) => Promise<T>) {
     // A fila por atendimento e a leitura de autorização são serializadas no banco.
     for (let tentativa = 0; tentativa < 3; tentativa++) {
@@ -220,6 +230,7 @@ export class AtendimentoSacService {
     }
     throw new ConflictException('Atualize e tente novamente.');
   }
+
   private async notificar(
     a: AtendimentoSac,
     u: UsuarioSac | null,
@@ -237,6 +248,7 @@ export class AtendimentoSacService {
         this.logger.warn('Não foi possível registrar uma notificação do SAC.'),
       );
   }
+
   async receberTicketTransacional(
     tx: Tx,
     ticketId: string,
@@ -331,6 +343,7 @@ export class AtendimentoSacService {
     );
     return atendimento;
   }
+
   async receberTicket(ticketId: string, notificar = true) {
     const existente = await this.prisma.atendimentoSac.findUnique({
       where: { ticketOrigemId: ticketId },
@@ -364,6 +377,7 @@ export class AtendimentoSacService {
     }
     return { sucesso: true, protocolo: a.protocolo };
   }
+
   async criarDaVisita(
     tx: Tx,
     u: UsuarioSac,
@@ -430,6 +444,7 @@ export class AtendimentoSacService {
     );
     return atendimento;
   }
+
   async listar(u: UsuarioSac, q: FiltroSacDto) {
     this.verificarPerfil(u);
     const fim = q.fim ? new Date(q.fim) : undefined;
@@ -469,6 +484,7 @@ export class AtendimentoSacService {
       porPagina: 30,
     };
   }
+
   async participantes(u: UsuarioSac) {
     this.verificarPerfil(u);
     return this.prisma.user.findMany({
@@ -477,6 +493,7 @@ export class AtendimentoSacService {
       orderBy: { name: 'asc' },
     });
   }
+
   async detalhe(u: UsuarioSac, id: string) {
     const a = await this.prisma.atendimentoSac.findUnique({
       where: { id },
@@ -517,12 +534,15 @@ export class AtendimentoSacService {
     const { assinaturaRelato, identificadorRelato, anexos, ...original } = p;
     return { ...a, relatoOriginal: original };
   }
+
   async historico(u: UsuarioSac, id: string) {
     return (await this.detalhe(u, id)).historico;
   }
+
   async tarefas(u: UsuarioSac, id: string) {
     return (await this.detalhe(u, id)).tarefas;
   }
+
   async direcionar(u: UsuarioSac, id: string, d: DirecionarSacDto) {
     if (!this.gestor(u))
       throw new ForbiddenException(
@@ -611,6 +631,7 @@ export class AtendimentoSacService {
     );
     return { sucesso: true };
   }
+
   async iniciar(u: UsuarioSac, id: string) {
     await this.transacao(async (tx) => {
       const a = await this.registro(tx, id);
@@ -640,6 +661,7 @@ export class AtendimentoSacService {
     });
     return { sucesso: true };
   }
+
   async classificar(u: UsuarioSac, id: string, d: ClassificarSacDto) {
     const a = await this.transacao(async (tx) => {
       const a = await this.registro(tx, id);
@@ -717,6 +739,7 @@ export class AtendimentoSacService {
       .catch(() => this.logger.warn('Falha na notificação de ação.'));
     return { sucesso: true };
   }
+
   private async verificarAcao(
     tx: Tx,
     u: UsuarioSac,
@@ -741,6 +764,7 @@ export class AtendimentoSacService {
         'Você pode atuar somente em ações atribuídas diretamente a você.',
       );
   }
+
   async minhasAcoes(u: UsuarioSac) {
     return this.prisma.atendimentoSacTarefa.findMany({
       where: { tipo: 'ACAO_CORRETIVA', responsavelId: u.sub },
@@ -768,6 +792,7 @@ export class AtendimentoSacService {
       take: 100,
     });
   }
+
   async minhaAcao(u: UsuarioSac, id: string) {
     const tarefa = await this.prisma.atendimentoSacTarefa.findFirst({
       where: {
@@ -805,6 +830,7 @@ export class AtendimentoSacService {
       },
     });
   }
+
   async plano(
     u: UsuarioSac,
     id: string,
@@ -898,6 +924,7 @@ export class AtendimentoSacService {
       );
     return { sucesso: true };
   }
+
   async registrarRnc(u: UsuarioSac, id: string, d: RncSacDto) {
     if (
       d.gerou &&
@@ -936,6 +963,7 @@ export class AtendimentoSacService {
     });
     return { sucesso: true };
   }
+
   async avaliar(u: UsuarioSac, id: string, d: AvaliarSacDto) {
     const a = await this.transacao(async (tx) => {
       const a = await this.registro(tx, id);
@@ -1010,6 +1038,7 @@ export class AtendimentoSacService {
         .catch(() => this.logger.warn('Falha na notificação de devolução.'));
     return { sucesso: true };
   }
+
   async reabrir(u: UsuarioSac, id: string, d: ObservacaoSacDto) {
     if (!this.gestor(u))
       throw new ForbiddenException(
@@ -1042,6 +1071,7 @@ export class AtendimentoSacService {
       await this.notificar(a, u, [a.atendenteId], 'Atendimento reaberto.');
     return { sucesso: true };
   }
+
   async observar(u: UsuarioSac, id: string, d: ObservacaoSacDto) {
     await this.transacao(async (tx) => {
       const a = await this.registro(tx, id);
@@ -1060,6 +1090,7 @@ export class AtendimentoSacService {
       join(process.cwd(), 'private-uploads', 'relatos-site')
     );
   }
+
   async anexar(
     u: UsuarioSac,
     id: string,
@@ -1141,6 +1172,7 @@ export class AtendimentoSacService {
       throw e;
     }
   }
+
   async baixar(u: UsuarioSac, id: string, anexoId: string) {
     const a = await this.prisma.atendimentoSac.findUnique({ where: { id } });
     if (!a) throw new NotFoundException('Atendimento não encontrado.');
